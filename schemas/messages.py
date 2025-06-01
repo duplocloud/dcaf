@@ -1,4 +1,4 @@
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Literal
 from datetime import datetime
 
 from pydantic import BaseModel, Field, HttpUrl
@@ -38,7 +38,7 @@ class Data(BaseModel):
 
 
 class Message(BaseModel):
-    role: str
+    role: Literal["user", "assistant"]
     content: str = ""
     data: Data = Field(default_factory=Data)
     platform_context: Optional[PlatformContext] = None
@@ -48,5 +48,5 @@ class Message(BaseModel):
     agent: Optional[str, dict] = None
 
 
-class MessagesPayload(BaseModel):
+class Messages(BaseModel):
     messages: List[Message]
