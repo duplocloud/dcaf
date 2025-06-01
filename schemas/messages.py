@@ -1,4 +1,4 @@
-from typing import List, Optional, Dict, Any, Literal
+from typing import List, Optional, Dict, Any, Literal, Union
 from datetime import datetime
 
 from pydantic import BaseModel, Field, HttpUrl
@@ -41,12 +41,20 @@ class Message(BaseModel):
     role: Literal["user", "assistant"]
     content: str = ""
     data: Data = Field(default_factory=Data)
+    timestamp: Optional[datetime] = None
+    user: Optional[Union[str, Dict[str, Any]]] = None
+    agent: Optional[Union[str, Dict[str, Any]]] = None
+
+
+class UserMessage(Message):
+    role: Literal["user"] = "user"
     platform_context: Optional[PlatformContext] = None
     ambient_context: Optional[AmbientContext] = None
-    timestamp: Optional[datetime] = None
-    user: Optional[str, dict] = None
-    agent: Optional[str, dict] = None
+
+
+class AgentMessage(Message):
+    role: Literal["assistant"] = "assistant"
 
 
 class Messages(BaseModel):
-    messages: List[Message]
+    messages: List[Union[UserMessage, AgentMessage]]
