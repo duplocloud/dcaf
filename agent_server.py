@@ -1,13 +1,13 @@
 from typing import Protocol, runtime_checkable, Dict, Any  # 👈 import decorator
 from fastapi import FastAPI, HTTPException, Body
 from pydantic import ValidationError
-from schemas.messages import Messages, Message
+from schemas.messages import Messages, Message, UserMessage, AgentMessage
 
 
 @runtime_checkable            
 class AgentProtocol(Protocol):
     """Any agent that can respond to a chat."""
-    def invoke(self, messages: Messages) -> Message: ...
+    def invoke(self, messages: Messages) -> AgentMessage: ...
     # (If you add more required methods later, this check auto-updates.)
 
 
@@ -27,8 +27,8 @@ def create_chat_app(agent: AgentProtocol) -> FastAPI:
         return {"status": "ok"}
 
     # ----- chat endpoint -----------------------------------------------------
-    @app.post("/api/sendMessage", response_model=Message, tags=["chat"])
-    def send_message(raw_body: Dict[str, Any] = Body(...)) -> Message:
+    @app.post("/api/sendMessage", response_model=AgentMessage, tags=["chat"])
+    def send_message(raw_body: Dict[str, Any] = Body(...)) -> AgentMessage:
         # 1. validate presence of 'messages'
         if "messages" not in raw_body:
             raise HTTPException(status_code=400,
@@ -42,10 +42,7 @@ def create_chat_app(agent: AgentProtocol) -> FastAPI:
         # 2. delegate to agent
         try:
             assistant_msg = agent.invoke(msgs_obj)
-            assistant_msg = Message.model_validate(assistant_msg)  # schema guardrail
-
-            if assistant_msg.role != "assistant":
-                raise ValueError("Agent must return a Message with role='assistant'")
+            assistant_msg = AgentMessage.model_validate(assistant_msg)  # schema guardrail
 
             return assistant_msg
 
