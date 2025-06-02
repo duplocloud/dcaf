@@ -17,8 +17,8 @@ dotenv.load_dotenv()
 
 # Choose which agent to use
 # agent = EchoAgent()
-# agent = LLMPassthroughAgent(BedrockAnthropicLLM())
-agent = CommandAgent(BedrockAnthropicLLM())
+agent = LLMPassthroughAgent(BedrockAnthropicLLM())
+# agent = CommandAgent(BedrockAnthropicLLM())
 # agent = BoilerplateAgent()  # Default to the boilerplate agent
 
 app = create_chat_app(agent)
