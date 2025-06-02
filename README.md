@@ -33,7 +33,7 @@ This project provides a modular framework for creating, testing and deploying ag
 ### Prerequisites
 
 - Python 3.8+
-- AWS account with Bedrock access (for LLM functionality)
+- The application uses AWS Bedrock for LLM functionality. Configure your AWS credentials in the `.env` file (refer to env.example) or through standard AWS credential methods (environment variables, IAM roles, etc.) when running locally. Not required when deployed in DuploCloud.
 
 ### Installation
 
@@ -84,6 +84,14 @@ uvicorn main:app --port 8000 --reload
 - **Health Check**: `GET /health`
 - **Send Message**: `POST /api/sendMessage`
 
+### Use Service Desk Mock UI (Work in progress)
+
+```bash
+python service_desk_mock_ui.py
+```
+
+Note: This is a simple mock UI for testing interactions. Creates a UI that connects to the FastAPI server at `http://localhost:8000/api/sendMessage`. It does not mock all service desk features and only replciates the content and terminal command approval/rejection features. Future support will be added to mock all service desk features for local testing.
+
 ## Boilerplate Agents
 
 The framework includes three boilerplate agent implementations that can be used as-is or as a foundation for custom agents:
@@ -131,17 +139,11 @@ class MyCustomAgent(AgentProtocol):
         return AgentMessage(content="Your response")
 ```
 
-### Use Service Desk Mock UI (Work in progress)
+## Coming Soon (Hopefully before tomorrow)
 
-```bash
-python service_desk_mock_ui.py
-```
-
-Note: This is a simple mock UI for testing interactions. Creates a UI that connects to the FastAPI server at `http://localhost:8000/api/sendMessage`. It does not mock all service desk features and only replciates the content and terminal command approval/rejection features. Future support will be added to mock all service desk features for local testing.
-
-### AWS Configuration
-
-The application uses AWS Bedrock for LLM functionality. Configure your AWS credentials in the `.env` file or through standard AWS credential methods (environment variables, IAM roles, etc.) when running locally. Not required when deployed in DuploCloud.
+- A boilerplate for a tool calling agent using strands, so that you can create an agent by just adding some python functions with doc strings (tools) and by editing a system prompt
+- Boilerplate for workflows
+- Dockerizaiton
 
 ## License
 See the [LICENSE](LICENSE) file for details.
