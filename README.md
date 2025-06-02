@@ -153,5 +153,10 @@ After creating your agent, update `main.py` to use it by importing your agent cl
 - Boilerplate for workflows
 - Dockerizaiton
 
+## References:
+
+- Service Desk Request Response Structure:
+https://docs.duplocloud.com/docs/ai-suite/ai-studio/developers
+
 ## License
 See the [LICENSE](LICENSE) file for details.
