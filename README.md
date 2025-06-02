@@ -131,7 +131,7 @@ class MyCustomAgent(AgentProtocol):
         return AgentMessage(content="Your response")
 ```
 
-## Use Service Desk Mock UI
+### Use Service Desk Mock UI (Work in progress)
 
 ```bash
 python service_desk_mock_ui.py
