@@ -4,10 +4,9 @@ A flexible, protocol-based service desk agent framework built with FastAPI that 
 
 ## Overview
 
-This project provides a modular framework for creating and deploying service desk agents that can:
+This project provides a modular framework for creating, testing and deploying agents that can integrate with DuploCloud Service Desk and can:
 
 - Process chat messages from users
-- Implement different agent behaviors through a common protocol
 - Integrate with AWS Bedrock for LLM capabilities (especially Anthropic Claude models)
 - Provide a standardized message schema for communication
 - Include a mock UI for testing interactions
@@ -17,6 +16,8 @@ This project provides a modular framework for creating and deploying service des
 ```
 ├── agent_server.py         # FastAPI server and agent protocol definition
 ├── agents/                 # Agent implementations
+│   ├── boilerplate_agent.py # Minimal starter boilerplate agent
+│   ├── cmd_agent.py        # Command-execution agent implementation
 │   ├── echo_agent.py       # Simple echo agent implementation
 │   └── llm_passthrough_agent.py # Agent that passes through to LLM
 ├── main.py                 # Application entry point
@@ -33,9 +34,6 @@ This project provides a modular framework for creating and deploying service des
 
 - Python 3.8+
 - AWS account with Bedrock access (for LLM functionality)
-- For mock UI: tkinter
-  - Mac: `brew install python-tk`
-  - Windows: Included with Python installation
 
 ### Installation
 
@@ -86,7 +84,40 @@ uvicorn main:app --port 8000 --reload
 - **Health Check**: `GET /health`
 - **Send Message**: `POST /api/sendMessage`
 
-### Creating a New Agent
+## Boilerplate Agents
+
+The framework includes three boilerplate agent implementations that can be used as-is or as a foundation for custom agents:
+
+### 1. EchoAgent
+
+A simple agent that echoes back the user's last message.
+
+- **Implementation**: `agents/echo_agent.py`
+- **Functionality**: Extracts the last user message and returns it prefixed with "Echo: "
+- **Use Case**: Useful for testing the messaging framework and verifying that communication is working properly
+
+
+### 2. LLMPassthroughAgent
+
+A simple agent that passes messages directly to an LLM and returns the response.
+
+- **Implementation**: `agents/llm_passthrough_agent.py`
+- **Functionality**: Preprocesses messages and sends them to AWS Bedrock Anthropic LLM, then returns the LLM's response
+- **Use Case**: Useful for general conversational assistance without custom processing logic
+
+### 3. CommandAgent
+
+A more sophisticated agent that can process messages, execute terminal commands, and leverage LLM capabilities.
+
+- **Implementation**: `agents/cmd_agent.py`
+- **Functionality**:
+  - Processes user messages and handles approved command execution
+  - Uses AWS Bedrock Anthropic LLM to generate responses and suggest commands
+  - Provides structured responses with explanations for suggested commands
+  - Tracks and includes executed command outputs in responses
+- **Use Case**: Ideal for providing CLI assistance, executing system operations, and helping users with terminal-based tasks
+
+## Creating a New Agent
 
 To create a new agent, implement the `AgentProtocol` interface:
 
@@ -100,18 +131,17 @@ class MyCustomAgent(AgentProtocol):
         return AgentMessage(content="Your response")
 ```
 
-### Use Service Desk Mock UI
+## Use Service Desk Mock UI
 
 ```bash
 python service_desk_mock_ui.py
 ```
 
-Note: This is a simple mock UI for testing interactions. It is it does not mock all service desk features and only replciates the content and terminal command approval/rejection features. Future support will be added to mock all service desk features for local testing.
+Note: This is a simple mock UI for testing interactions. Creates a UI that connects to the FastAPI server at `http://localhost:8000/api/sendMessage`. It does not mock all service desk features and only replciates the content and terminal command approval/rejection features. Future support will be added to mock all service desk features for local testing.
 
-## AWS Configuration
+### AWS Configuration
 
-The application uses AWS Bedrock for LLM functionality. Configure your AWS credentials in the `.env` file or through standard AWS credential methods (environment variables, IAM roles, etc.).
+The application uses AWS Bedrock for LLM functionality. Configure your AWS credentials in the `.env` file or through standard AWS credential methods (environment variables, IAM roles, etc.) when running locally. Not required when deployed in DuploCloud.
 
 ## License
-
 See the [LICENSE](LICENSE) file for details.

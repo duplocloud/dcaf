@@ -8,6 +8,7 @@ from services.llm import BedrockAnthropicLLM
 from agents.echo_agent import EchoAgent
 from agents.llm_passthrough_agent import LLMPassthroughAgent
 from agents.cmd_agent import CommandAgent
+from agents.boilerplate_agent import BoilerplateAgent
 import dotenv
 from service_desk_mock_ui import start_UI
 
@@ -18,6 +19,7 @@ dotenv.load_dotenv()
 # agent = EchoAgent()
 # agent = LLMPassthroughAgent(BedrockAnthropicLLM())
 agent = CommandAgent(BedrockAnthropicLLM())
+# agent = BoilerplateAgent()  # Default to the boilerplate agent
 
 app = create_chat_app(agent)
 

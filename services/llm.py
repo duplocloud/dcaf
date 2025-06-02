@@ -111,6 +111,8 @@ class BedrockAnthropicLLM:
         
         # Parse and return the response
         response_body = json.loads(response['body'].read().decode('utf-8'))
+
+        logger.info("LLM Response body: %s", response_body)
         return self._extract_response(response_body, model_id, tool_choice)
     
     def _prepare_request_body(

@@ -1,9 +1,10 @@
-from typing import Protocol, runtime_checkable, Dict, Any  # 👈 import decorator
+from typing import Protocol, runtime_checkable, Dict, Any, List 
 from fastapi import FastAPI, HTTPException, Body
 from pydantic import ValidationError
-from schemas.messages import Messages, Message, UserMessage, AgentMessage
+from schemas.messages import AgentMessage
 import logging
 import os
+from schemas.messages import Messages
 
 logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO"),
@@ -15,7 +16,7 @@ logger = logging.getLogger(__name__)
 @runtime_checkable            
 class AgentProtocol(Protocol):
     """Any agent that can respond to a chat."""
-    def invoke(self, messages: Messages) -> AgentMessage: ...
+    def invoke(self, messages: Dict[str, List[Dict[str, Any]]]) -> AgentMessage: ...
     # (If you add more required methods later, this check auto-updates.)
 
 
@@ -49,12 +50,14 @@ def create_chat_app(agent: AgentProtocol) -> FastAPI:
 
         # 2. delegate to agent
         try:
-            msgs_obj = msgs_obj.model_dump()["messages"]
+            # Pass the raw messages dictionary directly to the agent
+            msgs_obj = msgs_obj.model_dump()
             logger.info("Invoking agent with messages: %s", msgs_obj)
             assistant_msg = agent.invoke(msgs_obj)
 
             logger.info("Assistant message: %s", assistant_msg)
 
+            # Still validate the response format
             assistant_msg = AgentMessage.model_validate(assistant_msg)  # schema guardrail
 
             return assistant_msg

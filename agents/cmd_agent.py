@@ -5,7 +5,7 @@ import os
 from typing import List, Dict, Any, Optional
 
 from agent_server import AgentProtocol
-from schemas.messages import Messages, AgentMessage, Message, Command, ExecutedCommand, Data
+from schemas.messages import AgentMessage, Command, ExecutedCommand, Data
 from services.llm import BedrockAnthropicLLM
 
 logger = logging.getLogger(__name__)
@@ -28,18 +28,18 @@ class CommandAgent(AgentProtocol):
         self.system_prompt = system_prompt or self._default_system_prompt()
         self.response_schema = self._create_response_schema()
     
-    def invoke(self, messages: Messages) -> AgentMessage:
+    def invoke(self, messages: Dict[str, List[Dict[str, Any]]]) -> AgentMessage:
         """
         Process user messages, execute commands if approved, and generate a response.
         
         Args:
-            messages: A Messages object containing conversation history
+            messages: A dictionary containing message history in the format {"messages": [...]}
             
         Returns:
-            An AgentMessage containing the response and any commands
+            An AgentMessage containing the response, suggested commands, and executed commands
         """
         # Process messages to handle command execution and prepare for LLM
-        processed_messages = self.process_messages(messages)
+        processed_messages, executed_commands = self.process_messages(messages)
         
         # Generate response from LLM
         llm_response = self.call_llm(processed_messages)
@@ -47,42 +47,53 @@ class CommandAgent(AgentProtocol):
         # Extract commands from LLM response
         commands = self._extract_commands(llm_response)
         
-        # Create and return the agent message
+        # Create and return the agent message with both suggested and executed commands
         return AgentMessage(
             content=llm_response.get("content", "I'm unable to provide a response at this time."),
             data=Data(
-                cmds=[Command(command=cmd["command"]) for cmd in commands]
+                cmds=[Command(command=cmd["command"]) for cmd in commands],
+                executed_cmds=[ExecutedCommand(command=cmd["command"], output=cmd["output"]) 
+                              for cmd in executed_commands]
             )
         )
     
-    def process_messages(self, messages: Messages) -> List[Dict[str, Any]]:
+    def process_messages(self, messages: Dict[str, List[Dict[str, Any]]]) -> tuple[List[Dict[str, Any]], List[Dict[str, str]]]:
         """
         Process the raw messages to handle command execution and prepare for LLM.
         
         Args:
-            messages: A Messages object containing conversation history
+            messages: A dictionary containing message history in the format {"messages": [...]}
             
         Returns:
-            A list of processed messages ready for the LLM
+            A tuple containing:
+            - A list of processed messages ready for the LLM
+            - A list of executed commands with their outputs
         """
         processed_messages = []
         executed_cmds = []
         
-        # Convert Pydantic models to dict for processing
-        messages_list = [msg.model_dump() for msg in messages.messages]
+        # Extract the messages list from the dictionary
+        messages_list = messages.get("messages", [])
         
         for msg in messages_list:
+            # Ensure we're only processing messages with valid roles (user or assistant)
+            role = msg.get("role")
+            if role not in ["user", "assistant"]:
+                continue
+                
             # Create a basic message with role and content
-            processed_msg = {"role": msg["role"], "content": msg["content"]}
+            processed_msg = {"role": role, "content": msg.get("content", "")}
             
             # Process user messages with approved commands
-            if msg["role"] == "user" and "data" in msg:
-                data = msg["data"]
+            if role == "user":
+                data = msg.get("data", {})
                 
-                # Check for commands to execute
-                if "cmds" in data:
+                # Check for commands to execute - only in the current message
+                if "cmds" in data and msg == messages_list[-1]:  # Only check the most recent message
+                    logger.info(f"Processing commands in most recent user message: {data['cmds']}")
                     for cmd in data["cmds"]:
                         if cmd.get("execute", False):
+                            logger.info(f"Executing approved command: {cmd['command']}")
                             # Execute the approved command
                             output = self.execute_cmd(cmd["command"])
                             
@@ -95,17 +106,20 @@ class CommandAgent(AgentProtocol):
                             # Append command output to the message content
                             cmd_info = f"\n\nExecuted command: {cmd['command']}\nOutput: {output}"
                             processed_msg["content"] += cmd_info
+                        else:
+                            logger.info(f"Skipping command without execute flag: {cmd['command']}")
                 
                 # Include previously executed commands
                 if "executed_cmds" in data and data["executed_cmds"]:
                     for cmd in data["executed_cmds"]:
-                        cmd_info = f"\n\nPreviously executed command: {cmd['command']}\nOutput: {cmd['output']}"
+                        executed_cmds.append(cmd)
+                        cmd_info = f"\n\nPreviously executed: {cmd['command']}\nOutput: {cmd['output']}"
                         processed_msg["content"] += cmd_info
             
-            # Add the processed message
+            # Add the processed message to the list
             processed_messages.append(processed_msg)
         
-        return processed_messages
+        return processed_messages, executed_cmds
     
     def call_llm(self, messages: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
