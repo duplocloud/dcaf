@@ -6,6 +6,9 @@ __pycache__/
 # C extensions
 *.so
 
+# AWS credentials
+update_env_aws_creds.sh
+
 # Distribution / packaging
 .Python
 build/

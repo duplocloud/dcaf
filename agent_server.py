@@ -2,7 +2,15 @@ from typing import Protocol, runtime_checkable, Dict, Any  # 👈 import decorat
 from fastapi import FastAPI, HTTPException, Body
 from pydantic import ValidationError
 from schemas.messages import Messages, Message, UserMessage, AgentMessage
+import logging
+import os
 
+logging.basicConfig(
+    level=os.getenv("LOG_LEVEL", "INFO"),
+    format="%(asctime)s | %(name)s | %(message)s",
+)
+
+logger = logging.getLogger(__name__)
 
 @runtime_checkable            
 class AgentProtocol(Protocol):
@@ -41,6 +49,8 @@ def create_chat_app(agent: AgentProtocol) -> FastAPI:
 
         # 2. delegate to agent
         try:
+            msgs_obj = msgs_obj.model_dump()["messages"]
+            logger.info("Invoking agent with messages: %s", msgs_obj)
             assistant_msg = agent.invoke(msgs_obj)
             assistant_msg = AgentMessage.model_validate(assistant_msg)  # schema guardrail
 
