@@ -113,10 +113,13 @@ python service_desk_mock_ui.py
 
 Note: This is a simple mock UI for testing interactions. Creates a UI that connects to the FastAPI server at `http://localhost:8000/api/sendMessage`. It does not mock all service desk features and only replciates the content and terminal command approval/rejection features. Future support will be added to mock all service desk features for local testing.
 
-### Common Errors:
+### Common Errors and Solutions:
 
 - 404 while testing the /sendMessage API endpoint:
-Try to replace `0.0.0.0` in the url with `localhost` when making the API call
+SolutionLTry to replace `0.0.0.0` in the url with `localhost` when making the API call
+
+- `An error occurred (ExpiredTokenException) when calling the InvokeModel operation: The security token included in the request is expired`
+Update the aws creds in the .env file (use the env_update_aws_creds.sh script to update it automatically using duplo jit)  
 
 ## Boilerplate Agents
 
