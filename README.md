@@ -84,7 +84,7 @@ uvicorn main:app --port 8000 --reload
 - **Health Check**: `GET /health`
 - **Send Message**: `POST /api/sendMessage`
 
-### Testing the API using Postman
+### Testing the API
 
 - Import the postman collection in the project root (service-desk-agent.postman_collection.json) into postman to try out the /health and /api/sendMessage endpoints
 
