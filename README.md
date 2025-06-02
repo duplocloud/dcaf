@@ -91,7 +91,7 @@ uvicorn main:app --port 8000 --reload
 (or)
 
 - Sample cURL:
-  
+```
   curl --location 'http://localhost:8000/api/sendMessage' \
 --header 'Content-Type: application/json' \
 --data '{
@@ -102,7 +102,8 @@ uvicorn main:app --port 8000 --reload
     }
     ]   
 }'
-  
+
+```
 
 ### Testing the Agent API using Service Desk Mock UI (Work in progress)
 
