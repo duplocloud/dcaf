@@ -90,7 +90,8 @@ uvicorn main:app --port 8000 --reload
 
 (or)
 
-- Sample cURL
+- Sample cURL:
+  
   curl --location 'http://localhost:8000/api/sendMessage' \
 --header 'Content-Type: application/json' \
 --data '{
