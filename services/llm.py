@@ -4,6 +4,9 @@ import time
 import logging
 from typing import Dict, Any, Optional
 import os
+import dotenv
+
+dotenv.load_dotenv()
 
 logger = logging.getLogger(__name__)
 

@@ -1,6 +1,6 @@
 from agent_server import AgentProtocol
 from schemas.messages import Messages, AgentMessage
-from llm import BedrockAnthropicLLM
+from services.llm import BedrockAnthropicLLM
 import os
 
 class LLMPassthroughAgent(AgentProtocol):

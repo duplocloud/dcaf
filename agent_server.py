@@ -52,14 +52,19 @@ def create_chat_app(agent: AgentProtocol) -> FastAPI:
             msgs_obj = msgs_obj.model_dump()["messages"]
             logger.info("Invoking agent with messages: %s", msgs_obj)
             assistant_msg = agent.invoke(msgs_obj)
+
+            logger.info("Assistant message: %s", assistant_msg)
+
             assistant_msg = AgentMessage.model_validate(assistant_msg)  # schema guardrail
 
             return assistant_msg
 
         except ValidationError as ve:
+            logger.error("Validation error in agent: %s", ve)
             raise HTTPException(status_code=500,
                                 detail=f"Agent returned invalid Message: {ve}")
         except Exception as e:
+            logger.error("Exception in agent: %s", e)
             raise HTTPException(status_code=500, detail=str(e))
 
     return app
