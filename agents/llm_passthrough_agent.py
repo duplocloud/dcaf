@@ -10,7 +10,8 @@ class LLMPassthroughAgent(AgentProtocol):
         self.model_id = os.getenv("BEDROCK_MODEL_ID", "anthropic.claude-3-5-sonnet-20240620-v1:0")
 
     def call_bedrock_anthropic_llm(self, messages: list):
-        return self.llm.invoke(messages=messages, model_id=self.model_id)
+        system_prompt = "You are a helpful assistant name Duplo Dash."
+        return self.llm.invoke(messages=messages, model_id=self.model_id, system_prompt=system_prompt)
 
     def preprocess_messages(self, messages: Dict[str, List[Dict[str, Any]]]):
         preprocessed_messages = []
