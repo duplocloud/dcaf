@@ -127,17 +127,25 @@ A more sophisticated agent that can process messages, execute terminal commands,
 
 ## Creating a New Agent
 
-To create a new agent, implement the `AgentProtocol` interface:
+The easiest way to create a new agent is to modify the existing `BoilerplateAgent` in `agents/boilerplate_agent.py` which provides a minimal implementation of the `AgentProtocol` interface.
+
+Alternatively, you can implement the `AgentProtocol` interface from scratch:
 
 ```python
+from typing import Dict, Any, List
 from agent_server import AgentProtocol
-from schemas.messages import Messages, AgentMessage
+from schemas.messages import AgentMessage
 
 class MyCustomAgent(AgentProtocol):
-    def invoke(self, messages: Messages) -> AgentMessage:
+    def invoke(self, messages: Dict[str, List[Dict[str, Any]]]) -> AgentMessage:
+        # Extract messages list from the dictionary
+        messages_list = messages.get("messages", [])
+        
         # Your agent logic here
         return AgentMessage(content="Your response")
 ```
+
+After creating your agent, update `main.py` to use it by importing your agent class and updating the agent variable to point to your `agent` instance.
 
 ## Coming Soon (Hopefully before tomorrow)
 

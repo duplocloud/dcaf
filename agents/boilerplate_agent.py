@@ -19,5 +19,4 @@ class BoilerplateAgent(AgentProtocol):
         Returns:
             An AgentMessage with a 'Not Implemented' response
         """
-        
         return AgentMessage(content="Not Implemented. Override this method with your agent's logic.")
