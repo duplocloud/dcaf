@@ -10,8 +10,6 @@ from agents.llm_passthrough_agent import LLMPassthroughAgent
 from agents.cmd_agent import CommandAgent
 from agents.boilerplate_agent import BoilerplateAgent
 import dotenv
-from service_desk_mock_ui import start_UI
-import os
 
 # Load environment variables from .env file and override existing ones
 dotenv.load_dotenv(override=True)
