@@ -1,7 +1,42 @@
 #!/bin/bash
 
+# Default values
+TENANT="agents"
+HOST="https://duplo.hackathon.duploworkshop.com/"
+
+# Parse command line arguments
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --tenant=*)
+      TENANT="${1#*=}"
+      shift
+      ;;
+    --host=*)
+      HOST="${1#*=}"
+      shift
+      ;;
+    --tenant)
+      TENANT="$2"
+      shift 2
+      ;;
+    --host)
+      HOST="$2"
+      shift 2
+      ;;
+    *)
+      echo "Unknown parameter: $1"
+      echo "Usage: $0 [--tenant=TENANT_NAME] [--host=HOST_URL]"
+      echo "   or: $0 [--tenant TENANT_NAME] [--host HOST_URL]"
+      exit 1
+      ;;
+  esac
+done
+
+echo "Using tenant: $TENANT"
+echo "Using host: $HOST"
+
 # Run duplo-jit command and capture output
-output=$(duplo-jit aws --no-cache --tenant=agents --host "https://duplo.hackathon.duploworkshop.com/" --interactive)
+output=$(duplo-jit aws --no-cache --tenant="$TENANT" --host "$HOST" --interactive)
 
 # Extract credentials using jq
 access_key=$(echo "$output" | jq -r '.AccessKeyId')

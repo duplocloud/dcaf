@@ -65,6 +65,16 @@ cp env.example .env
 
 Edit the `.env` file with your AWS credentials and other configuration values.
 
+### AWS Credentials Setup
+
+Use [`env_update_aws_creds.sh`](./env_update_aws_creds.sh) to fetch temporary AWS credentials via `duplo-jit`. It creates `.env` if not present, adds missing variables, and updates credentials. Uses default host (`https://duplo.hackathon.duploworkshop.com/`) and tenant (`agents`), overridable with `--host` and `--tenant` arguments.
+
+Make executable and run:
+```bash
+chmod +x env_update_aws_creds.sh
+./env_update_aws_creds.sh [--host=HOST_URL] [--tenant=TENANT_NAME]
+```
+
 ### Running the Application
 
 Start the server:
