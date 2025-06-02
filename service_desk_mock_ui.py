@@ -167,20 +167,25 @@ class ChatClient:
 					bg="#1e1e1e", font=("Segoe UI", 11)).pack(side="right", padx=6)
 
 			cmd_vars.append((var, cmd_obj))
-
-		tk.Button(inner, text="Submit", bg="#3a3a3a", fg="white", relief="flat",
-				activebackground="#4a4a4a", padx=12, pady=6,
-				command=lambda: self._submit_cmds(resp, cmd_vars)
-				).pack(anchor="e", pady=(6, 2))
+		
+		submit_button = tk.Button(inner, text="Submit", bg="#3a3a3a", fg="white", relief="flat",
+			activebackground="#4a4a4a", padx=12, pady=6,
+			)
+		
+		submit_button.pack(anchor="e", pady=(6, 2))
+		submit_button.configure(
+			command=lambda: self._submit_cmds(resp=resp, cmd_vars=cmd_vars, submit_button=submit_button)
+		)
 
 		self.chat.window_create(tk.END, window=spacer)
 		self.chat.insert(tk.END, "\n")
 		self.chat.configure(state="disabled")
 		self.chat.yview(tk.END)
 
-	def _submit_cmds(self, resp: dict, cmd_vars):
+	def _submit_cmds(self, resp: dict, cmd_vars, submit_button):
 		new_data = {"cmds": []}
 		decision_lines = []
+		submit_button.config(state=tk.DISABLED)
 
 		for var, cmd_obj in cmd_vars:
 			choice = bool(var.get())
@@ -191,9 +196,6 @@ class ChatClient:
 			decision_lines.append(
 				f"{'✓' if choice else '✗'} {cmd_obj['command']}"
 			)
-
-		# verdict_text = "User decisions:\n" + "\n".join(decision_lines) + "\n"
-		# self._append_line(verdict_text, "user")
 
 		self.history.append({"role": "user", "content": "", "data": new_data})
 
