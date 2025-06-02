@@ -84,13 +84,37 @@ uvicorn main:app --port 8000 --reload
 - **Health Check**: `GET /health`
 - **Send Message**: `POST /api/sendMessage`
 
-### Use Service Desk Mock UI (Work in progress)
+### Testing the API using Postman
+
+- Import the postman collection in the project root (service-desk-agent.postman_collection.json) into postman to try out the /health and /api/sendMessage endpoints
+
+(or)
+
+- Sample cURL
+  curl --location 'http://localhost:8000/api/sendMessage' \
+--header 'Content-Type: application/json' \
+--data '{
+ "messages" : [
+    {
+        "role" : "user",
+        "content" : "Hi! What'\''s your name?"
+    }
+    ]   
+}'
+  
+
+### Testing the Agent API using Service Desk Mock UI (Work in progress)
 
 ```bash
 python service_desk_mock_ui.py
 ```
 
 Note: This is a simple mock UI for testing interactions. Creates a UI that connects to the FastAPI server at `http://localhost:8000/api/sendMessage`. It does not mock all service desk features and only replciates the content and terminal command approval/rejection features. Future support will be added to mock all service desk features for local testing.
+
+### Common Errors:
+
+- 404 while testing the /sendMessage API endpoint:
+Try to replace `0.0.0.0` in the url with `localhost` when making the API call
 
 ## Boilerplate Agents
 
