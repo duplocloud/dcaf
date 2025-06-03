@@ -6,7 +6,7 @@ from typing import Dict, Any, Optional
 import os
 import dotenv
 
-dotenv.load_dotenv()
+dotenv.load_dotenv(override=True)
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +42,16 @@ class BedrockAnthropicLLM:
                 )
         else:
             self.bedrock_runtime = boto3.client('bedrock-runtime', region_name=region_name)
-    
+
+    def call_llm(self, prompt: str) -> str:
+        """
+        Dummy implementation of an LLM call.
+        In production, this method should make an API call to AWS Bedrock
+        using the Anthropics model to get the refined explanation.
+        For now, it simply echoes the prompt back with a prefix.
+        """
+        return f"Refined explanation: {prompt}"
+
     def invoke(
         self,
         messages: list,
