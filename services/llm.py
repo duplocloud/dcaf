@@ -256,3 +256,110 @@ class BedrockAnthropicLLM:
             return output
         else:
             return response_body["content"][0]["text"]
+        
+
+def call_bedrock(client, request_body: dict):
+    """Invoke Claude and print the assistant text / tool input."""
+    raw = client.bedrock_runtime.invoke_model(
+        modelId="anthropic.claude-3-5-sonnet-20240620-v1:0",
+        body=json.dumps(request_body),
+    )
+    response = json.loads(raw["body"].read())
+    return response
+
+    # tool_use replies store text under ['content'][0]['input'] instead of ['text']
+    leaf_key = "input" if "input" in response["content"][0] else "text"
+    LLM_content = response["content"][0][leaf_key]
+    return LLM_content
+
+if __name__ == "__main__":
+    client = BedrockAnthropicLLM()
+
+    # 1) Simplest LLM call
+    basic_body_message = {
+        "messages": [{"role": "user", "content": "Hi"}],
+        "max_tokens": 1000,
+        "anthropic_version": "bedrock-2023-05-31",
+    }
+    basic_body_response = call_bedrock(client, basic_body_message)
+    print(basic_body_response)
+
+    # 2) LLM call with back-and-forth history
+    back_and_forth_message_body = {
+        "messages": [
+            {"role": "user", "content": "Hi"},
+            {"role": "assistant", "content": "Hello!"},
+            {"role": "user", "content": "What is your name?"},
+        ],
+        "max_tokens": 1000,
+        "anthropic_version": "bedrock-2023-05-31"
+    }
+    back_and_forth_message_response = call_bedrock(client, back_and_forth_message_body)
+    print(back_and_forth_message_response)
+
+    # 3) Same with a system prompt
+    system_prompt_body = {
+        "messages": [
+            {"role": "user", "content": "Hi"},
+            {"role": "assistant", "content": "Hello!"},
+            {"role": "user", "content": "What is your name?"},
+        ],
+        "max_tokens": 1000,
+        "anthropic_version": "bedrock-2023-05-31",
+        "system" : "You are a DUPLOCLOUD agent. Your name is DUPLO."
+    }
+    system_prompt_body_response = call_bedrock(client, system_prompt_body)
+    print(system_prompt_body_response)
+
+    # 4) Force JSON output via system-prompt *and* via tool-use
+    # 4a) Using the system prompt
+    JSON_system_prompt_body = {
+        "messages": [
+            {"role": "user", "content": "Hi"},
+            {"role": "assistant", "content": "Hello!"},
+            {"role": "user", "content": "What is your name?"},
+        ],
+        "max_tokens": 1000,
+        "anthropic_version": "bedrock-2023-05-31",
+        "system" : """
+            You are a DUPLOCLOUD agent. Your name is DUPLO. 
+            Every response you have, make it in a JSON format. 
+            It should have two fields. 
+            One is the 'content' where you output your normal response. The other is 'tone' where you have one of the following values: 'angry', 'sad', 'happy','funny'
+        """
+    }
+    JSON_output_response = call_bedrock(client, JSON_system_prompt_body) 
+    print(JSON_output_response)
+
+    tool_use_body = {
+        "messages": [
+            {"role": "user", "content": "Hi"},
+            {"role": "assistant", "content": "Hello!"},
+            {"role": "user", "content": "What is your name?"},
+        ],
+        "max_tokens": 1000,
+        "anthropic_version": "bedrock-2023-05-31",
+        "system" : "You are a DUPLOCLOUD agent. Your name is DUPLO.",
+        "tools" : [{
+                "name":"tone",
+                "description":"Gives the tone of the message while also giving your regular response to the previous message",
+                "input_schema": {
+                    "type":"object",
+                    "properties": {
+                        "content" : {
+                            "type":"string",
+                            "description" : "The normal response you would have for the user"
+                        },
+                        "tone" : {
+                            "type":"string",
+                            "enum": ["happy", "angry", "sad", "funny"],
+                            "description" : "Should be the tone of the message"
+                        }
+                    }
+                }
+            }],
+        # Here we are forcing LLM to make use of the 'tone' tool we defined by passing in a tools_choice parameter
+        "tool_choice" : {"type": "tool", "name" : "tone"}
+    }
+    tool_use_respone = call_bedrock(client, tool_use_body)
+    print(tool_use_respone)
