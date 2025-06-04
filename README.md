@@ -211,7 +211,7 @@ response = json.loads(raw["body"].read())
 
 Here are different request_bodys that we can send to the LLM:
 
-1) One-shot prompt — minimal request / response:
+### 1) One-shot prompt — minimal request / response:
 
 The simplest call we can make to the API. In the input body to the API, we have to define three values
 - messages, the list of message data from the user and assistant 
@@ -248,7 +248,7 @@ response = {
 
 The response dictionary contains the metadata for the LLM reply. The 'content' field contains the response from the LLM. 
 
-2) Add conversation history through multiple messages
+### 2) Add conversation history through multiple messages
 
 Messages can contain an entire conversation between the user and model, labeled respectively with "user" and "assistant" under 'role'. 
 - Messages must strictly alternate between user and alternate for Bedrock to accept the response
@@ -284,7 +284,7 @@ response = {
 ```
 
 
-3) System prompt
+### 3) System prompt
 
 We can use the system prompt to give specific instructions and any other information useful for the LLM.
 - The system prompt is the first message sent to the LLM. 
@@ -321,7 +321,7 @@ response = {
 }
 ```
 
-4) Structured JSON replies
+### 4) Structured JSON replies
 
 Assume we need the response to be in the form of the following json format:
 ```
@@ -393,7 +393,7 @@ You can use "input_schema" to dictate what the input for a tool call should look
 "tool_choice" identifies to Bedrock and the LLM which tools are required or not required in its response. 
 
 Input:
-````
+```
 request_body = {
   "messages": [
       {"role": "user", "content": "Hi"},
@@ -424,6 +424,7 @@ request_body = {
   "tool_choice" : {"type": "tool", "name" : "tone"}
 }
 ```
+
 Output from Bedrock API:
 ```
 response = {
