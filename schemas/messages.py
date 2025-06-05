@@ -25,6 +25,9 @@ class PlatformContext(BaseModel):
     tenant_name: Optional[str] = None
     aws_credentials: Optional[Dict[str, Any]] = None
     kubeconfig: Optional[str] = None
+    duplo_host: Optional[str] = None
+    duplo_token: Optional[str] = None
+    tenant_id: Optional[str] = None
 
 
 class AmbientContext(BaseModel):

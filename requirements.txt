@@ -70,3 +70,4 @@ urllib3==2.4.0
     #   requests
 uvicorn==0.34.3
     # via -r requirements.in
+duplocloud-client==0.2.51

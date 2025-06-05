@@ -9,6 +9,7 @@ from agents.echo_agent import EchoAgent
 from agents.llm_passthrough_agent import LLMPassthroughAgent
 from agents.cmd_agent import CommandAgent
 from agents.boilerplate_agent import BoilerplateAgent
+from agents.production_readiness_agent import ProductionReadinessAgent
 import dotenv
 
 # Load environment variables from .env file and override existing ones
@@ -16,9 +17,10 @@ dotenv.load_dotenv(override=True)
 
 # Choose which agent to use
 # agent = EchoAgent()
-agent = LLMPassthroughAgent(BedrockAnthropicLLM())
+# agent = LLMPassthroughAgent(BedrockAnthropicLLM())
 # agent = CommandAgent(BedrockAnthropicLLM())
 # agent = BoilerplateAgent()  # Default to the boilerplate agent
+agent = ProductionReadinessAgent(BedrockAnthropicLLM())
 
 app = create_chat_app(agent)
 
