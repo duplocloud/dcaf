@@ -32,11 +32,32 @@ class ProductionReadinessAgent(AgentProtocol):
     
     def _default_system_prompt(self) -> str:
         """Return the default system prompt for the Production Readiness Agent"""
-        return """You are a Production Readiness Assessment agent for DuploCloud.
-        Your job is to evaluate resources in a DuploCloud tenant for production readiness.
-        Analyze the provided resource information and identify any issues or improvements needed.
-        Provide clear recommendations and prioritize critical issues.
-        Format your response in a clear, structured way with markdown for readability."""
+        return """You are a Production Readiness Assessment Agent for DuploCloud, an expert in cloud infrastructure and DevOps best practices.
+        
+    Your primary responsibility is to evaluate DuploCloud tenant environments for production readiness by analyzing resources, configurations, and security settings.
+    
+    ASSESSMENT APPROACH:
+    1. Thoroughly analyze all tenant resources including infrastructure, Kubernetes deployments, security configurations, and operational features
+    2. Identify critical gaps that could impact availability, security, reliability, or compliance
+    3. Categorize issues by severity (Critical, Warning, Info) based on potential business impact
+    4. Provide clear, actionable recommendations with implementation priorities
+
+    EVALUATION CRITERIA:
+    - High Availability: Redundancy, autoscaling, multi-AZ deployments
+    - Security: AWS security features, encryption, network policies, access controls
+    - Operational Excellence: Logging, monitoring, alerting configurations
+    - Cost Optimization: Right-sizing, resource utilization, waste elimination
+    - Performance: Resource allocation, scaling policies, bottlenecks
+    - Compliance: Security best practices, regulatory requirements
+
+    RESPONSE FORMAT:
+    - Begin with an executive summary showing overall readiness score and key metrics
+    - Group findings by resource type with clear pass/fail indicators
+    - Prioritize recommendations as Immediate (critical), Short-term (warnings), and Long-term (improvements)
+    - Use markdown formatting for readability with headers, tables, and bullet points
+    - Include specific remediation steps for each identified issue
+
+    Remember that your assessment directly impacts production deployment decisions, so be thorough, accurate, and provide practical, implementable recommendations."""
     
     def _validate_platform_context(self, platform_context: Optional[Dict[str, Any]]) -> bool:
         """
@@ -213,7 +234,6 @@ class ProductionReadinessAgent(AgentProtocol):
             else:
                 results["resources"]["rds"] = []
                 logger.info("No RDS instances found")
-                print("No RDS instances found")
             
             # Check ecache clusters
             logger.info("Checking ecache clusters...")
@@ -222,7 +242,6 @@ class ProductionReadinessAgent(AgentProtocol):
             else:
                 results["resources"]["ecache"] = []
                 logger.info("No ecache clusters found")
-                print("No ecache clusters found")
             
             # Check K8s deployments
             logger.info("Checking K8s deployments...")
@@ -231,7 +250,6 @@ class ProductionReadinessAgent(AgentProtocol):
             else:
                 results["resources"]["k8s_deployments"] = []
                 logger.info("No K8s deployments found")
-                print("No K8s deployments found")
             
             # Check ASGs
             logger.info("Checking ASGs...")
@@ -240,7 +258,6 @@ class ProductionReadinessAgent(AgentProtocol):
             else:
                 results["resources"]["asgs"] = []
                 logger.info("No ASGs found")
-                print("No ASGs found")
             
             # Check S3 buckets
             logger.info("Checking S3 buckets...")
@@ -249,7 +266,6 @@ class ProductionReadinessAgent(AgentProtocol):
             else:
                 results["resources"]["s3"] = []
                 logger.info("No S3 buckets found")
-                print("No S3 buckets found")
             
             # Check Duplo tenant features
             logger.info("Checking Duplo tenant features...")
@@ -265,7 +281,7 @@ class ProductionReadinessAgent(AgentProtocol):
             
             # Calculate summary statistics
             logger.info("Calculating summary statistics...")
-            # self._calculate_summary(results)
+            self._calculate_summary(results)
             
             return results
             
@@ -1112,16 +1128,68 @@ class ProductionReadinessAgent(AgentProtocol):
         
         # Process each resource type
         for _, resources in results.get("resources", {}).items():
-            for resource_data in resources:
+            # Skip empty resources
+            if not resources:
+                continue
+                
+            # Handle list format (most resource types)
+            if isinstance(resources, list):
+                for resource in resources:
+                    if not isinstance(resource, dict):
+                        continue
+                        
+                    total_resources += 1
+                    
+                    # Count issues by severity
+                    critical_failures = 0
+                    warning_count = 0
+                    
+                    for check in resource.get("checks", []):
+                        if not check.get("passed", True):
+                            if check.get("severity") == "critical":
+                                critical_failures += 1
+                            elif check.get("severity") == "warning":
+                                warning_count += 1
+                    
+                    # Store counts in the resource for future reference
+                    resource["critical_failures"] = critical_failures
+                    resource["warnings"] = warning_count
+                    
+                    # A resource is considered passing if it has no critical failures
+                    if critical_failures == 0:
+                        passing_resources += 1
+                    
+                    critical_issues += critical_failures
+                    warnings += warning_count
+            
+            # Handle dict format (aws_security and system_settings)
+            elif isinstance(resources, dict) and "checks" in resources:
                 total_resources += 1
+                critical_failures = 0
+                warning_count = 0
+                
+                for check in resources.get("checks", []):
+                    if not check.get("passed", True):
+                        if check.get("severity") == "critical":
+                            critical_failures += 1
+                        elif check.get("severity") == "warning":
+                            warning_count += 1
+                
+                # Store counts in the resource for future reference
+                resources["critical_failures"] = critical_failures
+                resources["warnings"] = warning_count
                 
                 # A resource is considered passing if it has no critical failures
-                if resource_data.get("critical_failures", 0) == 0:
+                if critical_failures == 0:
                     passing_resources += 1
                 
-                critical_issues += resource_data.get("critical_failures", 0)
-                warnings += resource_data.get("warnings", 0)
+                critical_issues += critical_failures
+                warnings += warning_count
         
+        # Initialize summary if it doesn't exist
+        if "summary" not in results:
+            results["summary"] = {}
+            
         # Update summary
         results["summary"]["total_resources"] = total_resources
         results["summary"]["passing_resources"] = passing_resources
