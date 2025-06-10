@@ -107,17 +107,25 @@ class DuploClient:
             params: Optional query parameters
             
         Returns:
-            API response as dictionary
+            API response as dictionary or empty list/dict if 404 status code
         """
         url = self._build_url(endpoint)
         logger.debug(f"Making GET request to {url}")
         headers = self._get_headers()
         
-        logger.debug(f"Making GET request to {url}")
-        response = requests.get(url, headers=headers, params=params)
-        response.raise_for_status()
-        
-        return response.json()
+        try:
+            response = requests.get(url, headers=headers, params=params)
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code == 404:
+                logger.warning(f"Resource not found (404) for endpoint: {endpoint}")
+                # Return empty list or dict based on expected response type
+                # Most DuploCloud API endpoints return lists for collections
+                return []
+            else:
+                # Re-raise other HTTP errors
+                raise
     
     def post(self, endpoint: str, data: Dict[str, Any]) -> Dict[str, Any]:
         """

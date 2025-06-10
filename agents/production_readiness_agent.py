@@ -25,7 +25,8 @@ class ProductionReadinessAgent(AgentProtocol):
             system_prompt: Optional custom system prompt to override the default
         """
         logger.info("Initializing ProductionReadinessAgent")
-        self.model_id = os.getenv("BEDROCK_MODEL_ID", "anthropic.claude-3-5-sonnet-20240620-v1:0")
+        # self.model_id = os.getenv("BEDROCK_MODEL_ID", "anthropic.claude-3-5-sonnet-20240620-v1:0")
+        self.model_id = os.getenv("BEDROCK_MODEL_ID", "us.anthropic.claude-3-5-sonnet-20240620-v1:0")
         self.llm = llm
         self.system_prompt = system_prompt or self._default_system_prompt()
     
@@ -175,31 +176,6 @@ class ProductionReadinessAgent(AgentProtocol):
         
         return processed_messages
 
-    # def check_production_readiness(self, messages: Dict[str, List[Dict[str, Any]]]) -> Dict[str, Any]:
-    #     """
-    #     Check various DuploCloud resources for production readiness.
-        
-    #     Args:
-    #         messages: A dictionary containing message history
-            
-    #     Returns:
-    #         A dictionary with production readiness assessment results
-    #     """
-    #     # Check Duplo Services for production readiness
-    #     logger.info("check_production_readiness 1: ProductionReadinessAgent")
-    #     results = {}
-    #     results["duplo_services"] = self._check_duplo_services(messages)
-        
-    #     return results
-    
-    # def _check_duplo_services(self, messages: Dict[str, List[Dict[str, Any]]]) -> Dict[str, Any]:
-    #     """Check Duplo Services for production readiness"""
-    #     results = {}
-    #     logger.info("_check_duplo_services 1: ProductionReadinessAgent")
-    #     for service in self.duplo_client.get(f"subscriptions/{self.duplo_client.tenant_id}/GetReplicationControllers"):
-    #         results[service["Name"]] = service
-    #     return results
-    
     def check_production_readiness(self) -> Dict[str, Any]:
         """
         Check resources for production readiness.
@@ -232,53 +208,89 @@ class ProductionReadinessAgent(AgentProtocol):
             
             # Check RDS instances
             logger.info("Checking RDS instances...")
-            if "rds" in resources:
+            if "rds" in resources and resources["rds"]:
                 results["resources"]["rds"] = self._check_rds_instances(tenant, resources["rds"])
             else:
                 results["resources"]["rds"] = []
                 logger.info("No RDS instances found")
+                print("No RDS instances found")
             
             # Check ecache clusters
             logger.info("Checking ecache clusters...")
-            if "ecache" in resources:
+            if "ecache" in resources and resources["ecache"]:
                 results["resources"]["ecache"] = self._check_ecache_clusters(tenant, resources["ecache"])
             else:
                 results["resources"]["ecache"] = []
                 logger.info("No ecache clusters found")
+                print("No ecache clusters found")
             
             # Check K8s deployments
             logger.info("Checking K8s deployments...")
-            if "k8s_deployments" in resources:
+            if "k8s_deployments" in resources and resources["k8s_deployments"]:
                 results["resources"]["k8s_deployments"] = self._check_k8s_deployments(tenant, resources["k8s_deployments"])
             else:
                 results["resources"]["k8s_deployments"] = []
                 logger.info("No K8s deployments found")
+                print("No K8s deployments found")
             
             # Check ASGs
             logger.info("Checking ASGs...")
-            if "asgs" in resources:
+            if "asgs" in resources and resources["asgs"]:
                 results["resources"]["asgs"] = self._check_autoscaling_groups(tenant, resources["asgs"])
             else:
                 results["resources"]["asgs"] = []
                 logger.info("No ASGs found")
+                print("No ASGs found")
             
             # Check S3 buckets
             logger.info("Checking S3 buckets...")
-            if "s3" in resources:
+            if "s3" in resources and resources["s3"]:
                 results["resources"]["s3"] = self._check_s3_buckets(tenant, resources["s3"])
             else:
                 results["resources"]["s3"] = []
                 logger.info("No S3 buckets found")
+                print("No S3 buckets found")
+            
+            # Check Duplo tenant features
+            logger.info("Checking Duplo tenant features...")
+            results["resources"]["duplo_features"] = self._check_duplo_features(tenant, resources)
             
             # Calculate summary statistics
             logger.info("Calculating summary statistics...")
-            self._calculate_summary(results)
+            # self._calculate_summary(results)
             
             return results
             
         except Exception as e:
             logger.error(f"Error checking production readiness: {str(e)}", exc_info=True)
             return {"error": f"Error checking production readiness: {str(e)}"}
+    
+    def _filter_resources(self, resources: List[Dict[str, Any]], exclude_prefixes: List[str], name_field: str = "Name") -> List[Dict[str, Any]]:
+        """
+        Filter resources based on name prefixes to exclude.
+        
+        Args:
+            resources: List of resources to filter
+            exclude_prefixes: List of prefixes to exclude
+            name_field: The field name that contains the resource name
+            
+        Returns:
+            Filtered list of resources
+        """
+        if not resources or not exclude_prefixes:
+            return resources
+            
+        original_count = len(resources)
+        filtered_resources = [
+            resource for resource in resources 
+            if not any(str(resource.get(name_field, "")).startswith(prefix) for prefix in exclude_prefixes)
+        ]
+        
+        filtered_count = original_count - len(filtered_resources)
+        if filtered_count > 0:
+            logger.info(f"Filtered out {filtered_count} resources with excluded prefixes: {exclude_prefixes}")
+            
+        return filtered_resources
     
     def _get_resources_to_check(self) -> Dict[str, List[Dict[str, Any]]]:
         """
@@ -287,17 +299,34 @@ class ProductionReadinessAgent(AgentProtocol):
         Returns:
             Dictionary with resource types and their instances
         """
-        # This is a placeholder - you would implement actual resource fetching here
-        # based on your DuploClient's capabilities
-        return {
-            "rds": self.duplo_client.get(f"v3/subscriptions/{self.duplo_client.tenant_id}/aws/rds/instance"),
+        # Fetch all resources from DuploCloud
+        raw_resources = {
+            "rds": self.duplo_client.official_client.load("rds").list(),
             "ecache": self.duplo_client.get(f"subscriptions/{self.duplo_client.tenant_id}/GetEcacheInstances"),
-            "k8s_deployments": self.duplo_client.get(f"subscriptions/{self.duplo_client.tenant_id}/GetReplicationControllers"),
-            "s3": self.duplo_client.get(f"v3/subscriptions/{self.duplo_client.tenant_id}/aws/s3Bucket"),
-            "asgs": self.duplo_client.get(f"subscriptions/{self.duplo_client.tenant_id}/GetTenantAsgProfiles"),
-            # "duplo-logging": self.duplo_client.get(f"admin/GetLoggingEnabledTenants"),
-            # "duplo-monitoring": self.duplo_client.get(f"subscriptions/{self.duplo_client.tenant_id}/GetTenantLoggingProfiles"),
+            "k8s_deployments": self.duplo_client.official_client.load("service").list(),
+            "s3": self.duplo_client.official_client.load("s3").list(),
+            "asgs": self.duplo_client.official_client.load("asg").list(),
+            "duplo_logging": self.duplo_client.get(f"admin/GetLoggingEnabledTenants"),
+            "duplo_monitoring": self.duplo_client.get(f"admin/GetMonitoringConfigForTenant/default"),
+            "duplo_alerting": self.duplo_client.get(f"v3/admin/tenant/{self.duplo_client.tenant_id}/metadata/enable_alerting"),
         }
+        
+        # Define prefixes to exclude for each resource type
+        exclude_prefixes = {
+            "k8s_deployments": ["filebeat-k8s-", "cadvisor-k8s-", "node-exporter-k8s-"],
+            # "s3": ["duplo-", "log-", "backup-"],
+            # "rds": [],
+            # "ecache": [],
+            # "asgs": []
+        }
+        
+        # Apply filters to exclude resources based on prefixes
+        filtered_resources = {}
+        for resource_type, resources_list in raw_resources.items():
+            prefixes = exclude_prefixes.get(resource_type, [])
+            filtered_resources[resource_type] = self._filter_resources(resources_list, prefixes)
+        
+        return filtered_resources
     
     def _get_current_timestamp(self) -> str:
         """Get current timestamp in ISO format."""
@@ -325,6 +354,63 @@ class ProductionReadinessAgent(AgentProtocol):
         """
         results = {}
         
+        # Handle case where resources list is empty but we still want to run checks
+        # (e.g., for "resource not found" type checks)
+        if not resources and checks:
+            # Create a placeholder result for "not found" case
+            resource_id = "not_found"
+            resource_results = {
+                'checks': {},
+                'pass_count': 0,
+                'fail_count': 0,
+                'critical_failures': 0,
+                'warnings': 0
+            }
+            
+            for check in checks:
+                check_name = check['name']
+                condition_func = check.get('condition', lambda val: (val is not None, "Attribute is set"))
+                severity = check.get('severity', 'warning')
+                recommendation = check.get('recommendation', '')
+                
+                # Apply condition function with None as the attribute value
+                passed, message = condition_func(None)
+                
+                check_result = {
+                    'passed': passed,
+                    'message': message,
+                    'severity': severity,
+                    'recommendation': recommendation if not passed else ''
+                }
+                
+                # Update counters
+                if passed:
+                    resource_results['pass_count'] += 1
+                else:
+                    resource_results['fail_count'] += 1
+                    if severity == 'critical':
+                        resource_results['critical_failures'] += 1
+                    elif severity == 'warning':
+                        resource_results['warnings'] += 1
+                
+                resource_results['checks'][check_name] = check_result
+            
+            # Calculate score
+            total_checks = len(checks)
+            if total_checks > 0:
+                weighted_score = (
+                    resource_results['pass_count'] * 1.0 - 
+                    resource_results['critical_failures'] * 1.5 - 
+                    resource_results['warnings'] * 0.5
+                ) / total_checks * 100
+                resource_results['score'] = max(0, min(100, weighted_score))
+            else:
+                resource_results['score'] = 0
+            
+            results[resource_id] = resource_results
+            return results
+        
+        # Normal case with resources present
         for resource in resources:
             resource_id = resource.get('identifier', resource.get('Name', 'unknown'))
             resource_results = {
@@ -337,18 +423,19 @@ class ProductionReadinessAgent(AgentProtocol):
             
             for check in checks:
                 check_name = check['name']
-                attribute_path = check['attribute_path']
-                condition_func = check['condition']
+                attribute_path = check.get('attribute_path', [])
+                condition_func = check.get('condition', lambda val: (val is not None, "Attribute is set"))
                 severity = check.get('severity', 'warning')
                 recommendation = check.get('recommendation', '')
                 
                 # Extract attribute value by traversing the path
                 attr_value = resource
                 try:
-                    for key in attribute_path:
-                        attr_value = attr_value.get(key)
-                        if attr_value is None:
-                            break
+                    if attribute_path:
+                        for key in attribute_path:
+                            attr_value = attr_value.get(key)
+                            if attr_value is None:
+                                break
                 except (TypeError, KeyError):
                     attr_value = None
                 
@@ -398,7 +485,7 @@ class ProductionReadinessAgent(AgentProtocol):
         rds_checks = [
             {
                 'name': 'encryption',
-                'attribute_path': ['StorageEncrypted'],
+                'attribute_path': ['EncryptStorage'],
                 'condition': lambda val: (val is True, 
                                          "Storage encryption is enabled" if val is True else 
                                          "Storage encryption is not enabled"),
@@ -417,20 +504,38 @@ class ProductionReadinessAgent(AgentProtocol):
             {
                 'name': 'backup_retention',
                 'attribute_path': ['BackupRetentionPeriod'],
-                'condition': lambda val: (val >= 7 if isinstance(val, (int, float)) else False,
+                'condition': lambda val: (val >= 0 if isinstance(val, (int, float)) else False,
                                          f"Backup retention period is {val} days" if isinstance(val, (int, float)) else
                                          "Backup retention period not set"),
-                'severity': 'warning',
+                'severity': 'critical',
                 'recommendation': "Set backup retention period to at least 7 days"
             },
             {
-                'name': 'monitoring',
-                'attribute_path': ['EnhancedMonitoringResourceArn'],
-                'condition': lambda val: (val is not None, 
-                                         "Enhanced monitoring is enabled" if val is not None else 
-                                         "Enhanced monitoring is not enabled"),
+                'name': 'deletion_protection',
+                'attribute_path': ['DeletionProtection'],
+                'condition': lambda val: (val is True, 
+                                         "Deletion protection is enabled" if val is True else 
+                                         "Deletion protection is not enabled"),
+                'severity': 'critical',
+                'recommendation': "Enable deletion protection to prevent accidental deletion"
+            },
+            {
+                'name': 'logging',
+                'attribute_path': ['EnableLogging'],
+                'condition': lambda val: (val is True, 
+                                         "Logging is enabled" if val is True else 
+                                         "Logging is not enabled"),
                 'severity': 'warning',
-                'recommendation': "Enable enhanced monitoring for better visibility"
+                'recommendation': "Enabling logging is crucial for observability, performance tuning, security auditing, and troubleshooting"
+            },
+            {
+                'name': 'performance_insights',
+                'attribute_path': ['EnablePerformanceInsights'],
+                'condition': lambda val: (val is True, 
+                                         "Performance insights is enabled" if val is True else 
+                                         "Performance insights is not enabled"),
+                'severity': 'warning',
+                'recommendation': "Enable performance insights for better database performance over time"
             }
         ]
         
@@ -442,28 +547,37 @@ class ProductionReadinessAgent(AgentProtocol):
         # Define checks for ecache clusters
         ecache_checks = [
             {
-                'name': 'encryption_in_transit',
-                'attribute_path': ['TransitEncryptionEnabled'],
+                'name': 'encryption_at_rest',
+                'attribute_path': ['EnableEncryptionAtRest'],
                 'condition': lambda val: (val is True, 
-                                         "Transit encryption is enabled" if val is True else 
-                                         "Transit encryption is not enabled"),
+                                         "Encryption at rest is enabled" if val is True else 
+                                         "Encryption at rest is not enabled"),
                 'severity': 'critical',
-                'recommendation': "Enable transit encryption for data in transit"
+                'recommendation': "Enable encryption at rest for data protection"
             },
             {
-                'name': 'auth_token',
-                'attribute_path': ['AuthTokenEnabled'],
+                'name': 'encryption_at_transit',
+                'attribute_path': ['EnableEncryptionAtTransit'],
                 'condition': lambda val: (val is True, 
-                                         "AUTH token is enabled" if val is True else 
-                                         "AUTH token is not enabled"),
+                                         "Encryption at transit is enabled" if val is True else 
+                                         "Encryption at transit is not enabled"),
                 'severity': 'critical',
-                'recommendation': "Enable AUTH token for authentication"
+                'recommendation': "Enable encryption at transit for data protection"
+            },
+            {
+                'name': 'multi_az',
+                'attribute_path': ['MultiAZEnabled'],
+                'condition': lambda val: (val is True, 
+                                         "Multi-AZ deployment is enabled" if val is True else 
+                                         "Multi-AZ deployment is not enabled"),
+                'severity': 'critical',
+                'recommendation': "Enable Multi-AZ deployment for high availability"
             },
             {
                 'name': 'automatic_failover',
-                'attribute_path': ['AutomaticFailover'],
-                'condition': lambda val: (val == 'enabled', 
-                                         "Automatic failover is enabled" if val == 'enabled' else 
+                'attribute_path': ['AutomaticFailoverEnabled'],
+                'condition': lambda val: (val is True, 
+                                         "Automatic failover is enabled" if val is True else 
                                          "Automatic failover is not enabled"),
                 'severity': 'warning',
                 'recommendation': "Enable automatic failover for high availability"
@@ -487,26 +601,89 @@ class ProductionReadinessAgent(AgentProtocol):
                 'recommendation': "Configure at least 2 replicas for high availability"
             },
             {
+                'name': 'hpa_configured',
+                'attribute_path': ['HPASpecs'],
+                'condition': lambda val: (
+                    val is not None,
+                    "HPA is configured" if val is not None else "HPA is not configured"
+                ),
+                'severity': 'warning',
+                'recommendation': "Configure Horizontal Pod Autoscaler (HPA) for automatic scaling"
+            },
+            {
+                'name': 'hpa_min_replicas',
+                'attribute_path': ['HPASpecs', 'minReplicas'],
+                'condition': lambda val: (
+                    isinstance(val, (int, float)) and val >= 2,
+                    f"HPA minimum replicas is {val}" if isinstance(val, (int, float)) else "HPA minimum replicas not determined"
+                ),
+                'severity': 'critical',
+                'recommendation': "Configure HPA with at least 2 minimum replicas for high availability"
+            },
+            {
+                'name': 'hpa_metrics_configured',
+                'attribute_path': ['HPASpecs', 'metrics'],
+                'condition': lambda metrics: (
+                    isinstance(metrics, list) and len(metrics) > 0,
+                    f"HPA has {len(metrics)} metrics configured" if isinstance(metrics, list) else "HPA metrics not configured"
+                ),
+                'severity': 'warning',
+                'recommendation': "Configure HPA with appropriate metrics (CPU/memory)"
+            },
+            {
                 'name': 'resource_limits',
-                'attribute_path': ['Template', 'template', 'spec', 'containers'],
-                'condition': lambda containers: (
-                    all(container.get('resources', {}).get('limits') for container in containers) if isinstance(containers, list) else False,
-                    "All containers have resource limits" if isinstance(containers, list) and all(container.get('resources', {}).get('limits') for container in containers) else
-                    "Some or all containers are missing resource limits"
+                'attribute_path': ['Template', 'OtherDockerConfig'],
+                'condition': lambda config: (
+                    isinstance(config, str) and '"Resources"' in config and '"limits"' in config,
+                    "Resource limits are configured" if isinstance(config, str) and '"Resources"' in config and '"limits"' in config else
+                    "Resource limits are not configured"
                 ),
                 'severity': 'warning',
                 'recommendation': "Set resource limits for all containers"
             },
             {
-                'name': 'liveness_probe',
-                'attribute_path': ['Template', 'spec', 'containers'],
-                'condition': lambda containers: (
-                    all(container.get('livenessProbe') for container in containers) if isinstance(containers, list) else False,
-                    "All containers have liveness probes" if isinstance(containers, list) and all(container.get('livenessProbe') for container in containers) else
-                    "Some or all containers are missing liveness probes"
+                'name': 'resource_requests',
+                'attribute_path': ['Template', 'OtherDockerConfig'],
+                'condition': lambda config: (
+                    isinstance(config, str) and '"Resources"' in config and '"requests"' in config,
+                    "Resource requests are configured" if isinstance(config, str) and '"Resources"' in config and '"requests"' in config else
+                    "Resource requests are not configured"
                 ),
                 'severity': 'warning',
-                'recommendation': "Configure liveness probes for all containers"
+                'recommendation': "Set resource requests for all containers"
+            },
+            {
+                'name': 'liveness_probe',
+                'attribute_path': ['Template', 'OtherDockerConfig'],
+                'condition': lambda config: (
+                    isinstance(config, str) and '"LivenessProbe"' in config,
+                    "Liveness probe is configured" if isinstance(config, str) and '"LivenessProbe"' in config else
+                    "Liveness probe is not configured"
+                ),
+                'severity': 'warning',
+                'recommendation': "Configure liveness probe to ensure automatic restart of unhealthy containers"
+            },
+            {
+                'name': 'readiness_probe',
+                'attribute_path': ['Template', 'OtherDockerConfig'],
+                'condition': lambda config: (
+                    isinstance(config, str) and '"ReadinessProbe"' in config,
+                    "Readiness probe is configured" if isinstance(config, str) and '"ReadinessProbe"' in config else
+                    "Readiness probe is not configured"
+                ),
+                'severity': 'warning',
+                'recommendation': "Configure readiness probe to prevent routing traffic to containers that aren't ready"
+            },
+            {
+                'name': 'rolling_update_strategy',
+                'attribute_path': ['Template', 'OtherDockerConfig'],
+                'condition': lambda config: (
+                    isinstance(config, str) and '"DeploymentStrategy"' in config and '"RollingUpdate"' in config,
+                    "Rolling update strategy is configured" if isinstance(config, str) and '"DeploymentStrategy"' in config and '"RollingUpdate"' in config else
+                    "Rolling update strategy is not configured"
+                ),
+                'severity': 'warning',
+                'recommendation': "Configure rolling update strategy for zero-downtime deployments"
             }
         ]
         
@@ -515,63 +692,40 @@ class ProductionReadinessAgent(AgentProtocol):
     def _check_autoscaling_groups(self, tenant: str, asgs: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Check Auto Scaling Groups for production readiness"""
         
-        asg_checks = [
-            {
-                'name': 'multiple_azs',
-                'attribute_path': ['AvailabilityZones'],
-                'condition': lambda azs: (
-                    isinstance(azs, list) and len(azs) >= 2,
-                    f"ASG spans {len(azs)} availability zones" if isinstance(azs, list) else
-                    "ASG availability zones not determined"
-                ),
+        if asgs is None or asgs == []:
+            # Specific checks for when no ASGs are found
+            asg_checks = [
+                {
+                    'name': 'asg_not_found',
+                    'condition': lambda val: (False, "No Auto Scaling Groups found"),
+                    'severity': 'critical',
+                    'recommendation': "Configure Auto Scaling Groups for high availability and fault tolerance in production environments"
+                }
+            ]
+        else:
+            # Normal checks when ASGs are present
+            asg_checks = [
+                {
+                'name': 'is_cluster_autoscaled',
+                'attribute_path': ['IsClusterAutoscaled'],
+                'condition': lambda val: (val is True, 
+                                         "Cluster autoscaling is enabled" if val is True else 
+                                         "Cluster autoscaling is not enabled"),
                 'severity': 'critical',
-                'recommendation': "Configure ASG to span at least 2 availability zones"
-            },
-            {
-                'name': 'min_instances',
-                'attribute_path': ['MinSize'],
-                'condition': lambda val: (
-                    isinstance(val, (int, float)) and val >= 2,
-                    f"Minimum instance count is {val}" if isinstance(val, (int, float)) else
-                    "Minimum instance count not determined"
-                ),
-                'severity': 'critical',
-                'recommendation': "Set minimum instance count to at least 2 for high availability"
-            },
-            {
-                'name': 'instance_refresh_enabled',
-                'attribute_path': ['InstanceRefreshConfig'],
-                'condition': lambda val: (
-                    val is not None,
-                    "Instance refresh is configured" if val is not None else
-                    "Instance refresh is not configured"
-                ),
-                'severity': 'warning',
-                'recommendation': "Configure instance refresh for rolling updates"
-            },
-            {
-                'name': 'health_check_type',
-                'attribute_path': ['HealthCheckType'],
-                'condition': lambda val: (
-                    val == 'ELB',
-                    "ELB health check type is used" if val == 'ELB' else
-                    f"Health check type is {val}"
-                ),
-                'severity': 'warning',
-                'recommendation': "Use ELB health check type for better health monitoring"
-            },
-            {
-                'name': 'termination_policies',
-                'attribute_path': ['TerminationPolicies'],
-                'condition': lambda policies: (
-                    isinstance(policies, list) and any(p in ['OldestLaunchConfiguration', 'OldestLaunchTemplate'] for p in policies),
-                    "Appropriate termination policies are configured" if isinstance(policies, list) and any(p in ['OldestLaunchConfiguration', 'OldestLaunchTemplate'] for p in policies) else
-                    "Optimal termination policies not configured"
-                ),
-                'severity': 'warning',
-                'recommendation': "Configure termination policies to include OldestLaunchConfiguration or OldestLaunchTemplate"
-            }
-        ]
+                'recommendation': "Enable cluster autoscaling for high availability"
+                },
+                {
+                    'name': 'multiple_azs',
+                    'attribute_path': ['Zones'],
+                    'condition': lambda zones: (
+                        isinstance(zones, list) and len(zones) >= 2,
+                        f"ASG spans {len(zones)} availability zones" if isinstance(zones, list) and len(zones) >= 2 else
+                        "ASG availability zones not determined"
+                    ),
+                    'severity': 'critical',
+                    'recommendation': "Configure ASG to span at least 2 availability zones"
+                }
+            ]
         
         return self._generic_resource_check(tenant, asgs, asg_checks)
 
@@ -580,68 +734,120 @@ class ProductionReadinessAgent(AgentProtocol):
         
         s3_checks = [
             {
-            'name': 'encryption',
-            'attribute_path': ['ServerSideEncryptionConfiguration', 'Rules'],
-            'condition': lambda rules: (
-                isinstance(rules, list) and len(rules) > 0,
-                "Server-side encryption is configured" if isinstance(rules, list) and len(rules) > 0 else
-                "Server-side encryption is not configured"
-            ),
-            'severity': 'critical',
-            'recommendation': "Enable default server-side encryption"
+                'name': 'encryption',
+                'attribute_path': ['DefaultEncryption'],
+                'condition': lambda val: (val is not None, 
+                    "Server-side encryption is enabled" if val is not None else 
+                    "Server-side encryption is not enabled"),
+                'severity': 'critical',
+                'recommendation': "Enable server-side encryption"
             },
             {
-            'name': 'public_access_block',
-            'attribute_path': ['PublicAccessBlockConfiguration'],
-            'condition': lambda config: (
-                config is not None and all([
-                    config.get('BlockPublicAcls', False),
-                    config.get('IgnorePublicAcls', False),
-                    config.get('BlockPublicPolicy', False),
-                    config.get('RestrictPublicBuckets', False)
-                ]),
-                "Public access block is fully configured" if config is not None else
-                "Public access block is not fully configured"
-            ),
-            'severity': 'critical',
-            'recommendation': "Enable all public access block settings"
+                'name': 'public_access_block',
+                'attribute_path': ['AllowPublicAccess'],
+                'condition': lambda val: (val is False,
+                    "Block public access is enabled" if val is False else
+                    "Block public access is not enabled"),
+                'severity': 'critical',
+                'recommendation': "Enable block public access"
             },
             {
-            'name': 'versioning',
-            'attribute_path': ['Versioning', 'Status'],
-            'condition': lambda status: (
-                status == 'Enabled',
-                "Versioning is enabled" if status == 'Enabled' else
-                "Versioning is not enabled"
-            ),
-            'severity': 'warning',
-            'recommendation': "Enable versioning for data protection"
+                'name': 'versioning',
+                'attribute_path': ['EnableVersioning'],
+                'condition': lambda val: (val is True, 
+                    "Versioning is enabled" if val is True else 
+                    "Versioning is not enabled"),
+                'severity': 'warning',
+                'recommendation': "Enable versioning for data protection"
             },
             {
-            'name': 'logging',
-            'attribute_path': ['LoggingConfiguration'],
-            'condition': lambda config: (
-                config is not None and config.get('DestinationBucketName') is not None,
-                "Logging is enabled" if config is not None and config.get('DestinationBucketName') is not None else
-                "Logging is not enabled"
-            ),
-            'severity': 'warning',
-            'recommendation': "Enable logging to track bucket access"
+                'name': 'logging',
+                'attribute_path': ['EnableAccessLogs'],
+                'condition': lambda val: (val is True, 
+                    "Logging is enabled" if val is True else 
+                    "Logging is not enabled"),
+                'severity': 'warning',
+                'recommendation': "Enable logging to track bucket access"
             },
-            {
-            'name': 'lifecycle_rules',
-            'attribute_path': ['LifecycleConfiguration', 'Rules'],
-            'condition': lambda rules: (
-                isinstance(rules, list) and len(rules) > 0,
-                f"{len(rules)} lifecycle rules configured" if isinstance(rules, list) else
-                "No lifecycle rules configured"
-            ),
-            'severity': 'warning',
-            'recommendation': "Configure lifecycle rules for cost optimization"
-            }
         ]
     
         return self._generic_resource_check(tenant, buckets, s3_checks)
+        
+    def _check_duplo_features(self, tenant: str, resources: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Check DuploCloud tenant-specific features for production readiness"""
+        
+        # Create a synthetic resource to represent the tenant features
+        tenant_resource = {
+            'identifier': f"{tenant}",
+            'Name': f"{tenant}"
+        }
+        
+        # Extract logging status
+        logging_enabled = False
+        if "duplo_logging" in resources and resources["duplo_logging"]:
+            for tenant_logging in resources["duplo_logging"]:
+                if tenant_logging.get("TenantId") == self.duplo_client.tenant_id and tenant_logging.get("Enabled") is True:
+                    logging_enabled = True
+                    break
+        tenant_resource["LoggingEnabled"] = logging_enabled
+        
+        # Extract monitoring status
+        monitoring_enabled = False
+        if "duplo_monitoring" in resources and resources["duplo_monitoring"]:
+            # Check if monitoring is enabled globally
+            monitoring_data = resources["duplo_monitoring"]
+            if isinstance(monitoring_data, dict):
+                # First check global monitoring enabled flag
+                if monitoring_data.get("Enabled") is True:
+                    # Then check if this tenant is in the enabled tenants list
+                    enabled_tenants = monitoring_data.get("EnabledTenants", [])
+                    for tenant_info in enabled_tenants:
+                        if tenant_info.get("TenantId") == self.duplo_client.tenant_id and tenant_info.get("Enabled") is True:
+                            monitoring_enabled = True
+                            break
+        tenant_resource["MonitoringEnabled"] = monitoring_enabled
+        
+        # Extract alerting status
+        alerting_enabled = False
+        if "duplo_alerting" in resources and resources["duplo_alerting"]:
+            alerting_data = resources["duplo_alerting"]
+            if isinstance(alerting_data, dict) and alerting_data.get("Value", "").lower() == "true":
+                alerting_enabled = True
+            # Some API responses might have a different structure
+            elif isinstance(alerting_data, dict) and alerting_data.get("Key") == "enable_alerting" and alerting_data.get("Value", "").lower() == "true":
+                alerting_enabled = True
+        tenant_resource["AlertingEnabled"] = alerting_enabled
+        
+        # Define checks for tenant features
+        tenant_checks = [
+            {
+                'name': 'logging_enabled',
+                'attribute_path': ['LoggingEnabled'],
+                'condition': lambda val: (val is True,
+                                         "Logging is enabled" if val is True else "Logging is not enabled"),
+                'severity': 'critical',
+                'recommendation': "Enable logging for the tenant to ensure proper audit trails and troubleshooting capabilities"
+            },
+            {
+                'name': 'monitoring_enabled',
+                'attribute_path': ['MonitoringEnabled'],
+                'condition': lambda val: (val is True,
+                                         "Monitoring is enabled" if val is True else "Monitoring is not enabled"),
+                'severity': 'critical',
+                'recommendation': "Enable monitoring for the tenant to track resource performance and health"
+            },
+            {
+                'name': 'alerting_enabled',
+                'attribute_path': ['AlertingEnabled'],
+                'condition': lambda val: (val is True,
+                                         "Alerting is enabled" if val is True else "Alerting is not enabled"),
+                'severity': 'critical',
+                'recommendation': "Enable alerting to receive notifications for critical events and issues"
+            }
+        ]
+        
+        # Use the generic resource check with a list containing just the tenant resource
+        return self._generic_resource_check(tenant, [tenant_resource], tenant_checks)
 
     def _calculate_summary(self, results: Dict[str, Any]) -> None:
         """
@@ -656,8 +862,8 @@ class ProductionReadinessAgent(AgentProtocol):
         warnings = 0
         
         # Process each resource type
-        for resource_type, resources in results.get("resources", {}).items():
-            for resource_id, resource_data in resources.items():
+        for _, resources in results.get("resources", {}).items():
+            for resource_data in resources:
                 total_resources += 1
                 
                 # A resource is considered passing if it has no critical failures
