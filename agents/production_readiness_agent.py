@@ -309,6 +309,7 @@ class ProductionReadinessAgent(AgentProtocol):
             "duplo_logging": self.duplo_client.get(f"admin/GetLoggingEnabledTenants"),
             "duplo_monitoring": self.duplo_client.get(f"admin/GetMonitoringConfigForTenant/default"),
             "duplo_alerting": self.duplo_client.get(f"v3/admin/tenant/{self.duplo_client.tenant_id}/metadata/enable_alerting"),
+            "duplo_notification": self.duplo_client.get(f"subscriptions/{self.duplo_client.tenant_id}/GetTenantMonConfig"),
         }
         
         # Define prefixes to exclude for each resource type
@@ -334,7 +335,7 @@ class ProductionReadinessAgent(AgentProtocol):
         return datetime.now().isoformat()
     
     def _generic_resource_check(self, tenant: str, resources: List[Dict[str, Any]], 
-                               checks: List[Dict[str, Any]]) -> Dict[str, Any]:
+                           checks: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
         Generic function to check attributes on resources.
         
@@ -374,7 +375,12 @@ class ProductionReadinessAgent(AgentProtocol):
                 recommendation = check.get('recommendation', '')
                 
                 # Apply condition function with None as the attribute value
-                passed, message = condition_func(None)
+                # Check if the condition function accepts a resource parameter
+                try:
+                    passed, message = condition_func(None, None)
+                except TypeError:
+                    # Fallback to original behavior if the function doesn't accept resource parameter
+                    passed, message = condition_func(None)
                 
                 check_result = {
                     'passed': passed,
@@ -440,7 +446,12 @@ class ProductionReadinessAgent(AgentProtocol):
                     attr_value = None
                 
                 # Apply condition function to the attribute value
-                passed, message = condition_func(attr_value)
+                # Check if the condition function accepts a resource parameter
+                try:
+                    passed, message = condition_func(attr_value, resource)
+                except TypeError:
+                    # Fallback to original behavior if the function doesn't accept resource parameter
+                    passed, message = condition_func(attr_value)
                 
                 check_result = {
                     'passed': passed,
@@ -818,6 +829,28 @@ class ProductionReadinessAgent(AgentProtocol):
                 alerting_enabled = True
         tenant_resource["AlertingEnabled"] = alerting_enabled
         
+        # Extract notification configuration status
+        notification_configured = False
+        notification_channel = "None"
+        if "duplo_notification" in resources and resources["duplo_notification"]:
+            notification_data = resources["duplo_notification"]
+            if isinstance(notification_data, dict):
+                # Check for different notification channels
+                if notification_data.get("RoutingKey"):
+                    notification_configured = True
+                    notification_channel = "PagerDuty"
+                elif notification_data.get("Dsn"):
+                    notification_configured = True
+                    notification_channel = "Sentry"
+                elif notification_data.get("NrApiKey"):
+                    notification_configured = True
+                    notification_channel = "New Relic"
+                elif notification_data.get("OpsGenieApiKey"):
+                    notification_configured = True
+                    notification_channel = "OpsGenie"
+        tenant_resource["NotificationConfigured"] = notification_configured
+        tenant_resource["NotificationChannel"] = notification_channel
+        
         # Define checks for tenant features
         tenant_checks = [
             {
@@ -843,6 +876,16 @@ class ProductionReadinessAgent(AgentProtocol):
                                          "Alerting is enabled" if val is True else "Alerting is not enabled"),
                 'severity': 'critical',
                 'recommendation': "Enable alerting to receive notifications for critical events and issues"
+            },
+            {
+                'name': 'notification_configured',
+                'attribute_path': ['NotificationConfigured'],
+                'condition': lambda val, resource=None: (
+                    val is True,
+                    f"Alert notification is configured using {resource.get('NotificationChannel')}" if val is True and resource else "Alert notification is not configured"
+                ),
+                'severity': 'critical',
+                'recommendation': "Configure alert notification channel (PagerDuty, Sentry, New Relic, or OpsGenie) to ensure timely response to critical alerts"
             }
         ]
         
