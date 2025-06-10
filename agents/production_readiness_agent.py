@@ -255,6 +255,14 @@ class ProductionReadinessAgent(AgentProtocol):
             logger.info("Checking Duplo tenant features...")
             results["resources"]["duplo_features"] = self._check_duplo_features(tenant, resources)
             
+            # Check AWS security features
+            logger.info("Checking AWS security features...")
+            results["resources"]["aws_security"] = self._check_aws_security(tenant, resources)
+            
+            # Check system settings
+            logger.info("Checking system settings...")
+            results["resources"]["system_settings"] = self._check_system_settings(tenant, resources)
+            
             # Calculate summary statistics
             logger.info("Calculating summary statistics...")
             # self._calculate_summary(results)
@@ -310,6 +318,8 @@ class ProductionReadinessAgent(AgentProtocol):
             "duplo_monitoring": self.duplo_client.get(f"admin/GetMonitoringConfigForTenant/default"),
             "duplo_alerting": self.duplo_client.get(f"v3/admin/tenant/{self.duplo_client.tenant_id}/metadata/enable_alerting"),
             "duplo_notification": self.duplo_client.get(f"subscriptions/{self.duplo_client.tenant_id}/GetTenantMonConfig"),
+            "aws_security": self.duplo_client.get(f"v3/admin/systemSettings/awsAccountSecurity"),
+            "system_settings": self.duplo_client.get(f"v3/admin/systemSettings/config"),
         }
         
         # Define prefixes to exclude for each resource type
@@ -784,6 +794,202 @@ class ProductionReadinessAgent(AgentProtocol):
     
         return self._generic_resource_check(tenant, buckets, s3_checks)
         
+    def _check_aws_security(self, tenant: str, resources: Dict[str, Any]) -> Dict[str, Any]:
+        """Check AWS security features for production readiness"""
+        
+        # Create a synthetic resource to represent AWS security features
+        security_resource = {
+            'identifier': f"aws-security",
+            'Name': f"aws-security"
+        }
+        
+        # Extract security features
+        security_features = {}
+        if "aws_security" in resources and resources["aws_security"] and isinstance(resources["aws_security"], dict):
+            features = resources["aws_security"].get("Features", {})
+            if features and isinstance(features, dict):
+                security_features = features
+        
+        # Add security features to resource
+        security_resource["EnableVpcFlowLogs"] = security_features.get("EnableVpcFlowLogs", False)
+        security_resource["EnableSecurityHub"] = security_features.get("EnableSecurityHub", False)
+        security_resource["EnableGuardDuty"] = security_features.get("EnableGuardDuty", False)
+        security_resource["EnableCloudTrail"] = security_features.get("EnableCloudTrail", False)
+        security_resource["EnablePasswordPolicy"] = security_features.get("EnablePasswordPolicy", False)
+        security_resource["EnableGlobalS3PublicAccessBlock"] = security_features.get("EnableGlobalS3PublicAccessBlock", False)
+        security_resource["EnableInspector"] = security_features.get("EnableInspector", False)
+        security_resource["EnableCisCloudTrailCloudWatchAlarms"] = security_features.get("EnableCisCloudTrailCloudWatchAlarms", False)
+        security_resource["EnableAllSecurityHubRegions"] = security_features.get("EnableAllSecurityHubRegions", False)
+        security_resource["EnableAllInspectorRegions"] = security_features.get("EnableAllInspectorRegions", False)
+        security_resource["DeleteDefaultVpcs"] = security_features.get("DeleteDefaultVpcs", False)
+        security_resource["RevokeDefaultSgRules"] = security_features.get("RevokeDefaultSgRules", False)
+        
+        # Define checks for AWS security features
+        security_checks = [
+            {
+                'name': 'vpc_flow_logs',
+                'attribute_path': ['EnableVpcFlowLogs'],
+                'condition': lambda val: (val is True,
+                                        "VPC Flow Logs are enabled" if val is True else "VPC Flow Logs are not enabled"),
+                'severity': 'critical',
+                'recommendation': "Enable VPC Flow Logs to monitor network traffic for security analysis and troubleshooting"
+            },
+            {
+                'name': 'security_hub',
+                'attribute_path': ['EnableSecurityHub'],
+                'condition': lambda val: (val is True,
+                                        "AWS Security Hub is enabled" if val is True else "AWS Security Hub is not enabled"),
+                'severity': 'critical',
+                'recommendation': "Enable AWS Security Hub for comprehensive security compliance monitoring"
+            },
+            {
+                'name': 'guard_duty',
+                'attribute_path': ['EnableGuardDuty'],
+                'condition': lambda val: (val is True,
+                                        "AWS GuardDuty is enabled" if val is True else "AWS GuardDuty is not enabled"),
+                'severity': 'critical',
+                'recommendation': "Enable AWS GuardDuty for threat detection and continuous security monitoring"
+            },
+            {
+                'name': 'cloud_trail',
+                'attribute_path': ['EnableCloudTrail'],
+                'condition': lambda val: (val is True,
+                                        "AWS CloudTrail is enabled" if val is True else "AWS CloudTrail is not enabled"),
+                'severity': 'critical',
+                'recommendation': "Enable AWS CloudTrail for comprehensive API activity tracking and auditing"
+            },
+            {
+                'name': 'password_policy',
+                'attribute_path': ['EnablePasswordPolicy'],
+                'condition': lambda val: (val is True,
+                                        "AWS Password Policy is enabled" if val is True else "AWS Password Policy is not enabled"),
+                'severity': 'warning',
+                'recommendation': "Enable AWS Password Policy to enforce strong password requirements"
+            },
+            {
+                'name': 's3_public_access_block',
+                'attribute_path': ['EnableGlobalS3PublicAccessBlock'],
+                'condition': lambda val: (val is True,
+                                        "Global S3 Public Access Block is enabled" if val is True else "Global S3 Public Access Block is not enabled"),
+                'severity': 'critical',
+                'recommendation': "Enable Global S3 Public Access Block to prevent accidental public exposure of S3 buckets"
+            },
+            {
+                'name': 'inspector',
+                'attribute_path': ['EnableInspector'],
+                'condition': lambda val: (val is True,
+                                        "AWS Inspector is enabled" if val is True else "AWS Inspector is not enabled"),
+                'severity': 'warning',
+                'recommendation': "Enable AWS Inspector for automated security assessment and vulnerability identification"
+            },
+            {
+                'name': 'cis_cloudtrail_cloudwatch_alarms',
+                'attribute_path': ['EnableCisCloudTrailCloudWatchAlarms'],
+                'condition': lambda val: (val is True,
+                                        "CIS CloudTrail CloudWatch Alarms are enabled" if val is True else "CIS CloudTrail CloudWatch Alarms are not enabled"),
+                'severity': 'warning',
+                'recommendation': "Enable CIS CloudTrail CloudWatch Alarms for monitoring and alerting on suspicious activities"
+            },
+            {
+                'name': 'all_security_hub_regions',
+                'attribute_path': ['EnableAllSecurityHubRegions'],
+                'condition': lambda val: (val is True,
+                                        "Security Hub is enabled in all regions" if val is True else "Security Hub is not enabled in all regions"),
+                'severity': 'warning',
+                'recommendation': "Enable Security Hub in all regions to ensure comprehensive security coverage"
+            },
+            {
+                'name': 'all_inspector_regions',
+                'attribute_path': ['EnableAllInspectorRegions'],
+                'condition': lambda val: (val is True,
+                                        "Inspector is enabled in all regions" if val is True else "Inspector is not enabled in all regions"),
+                'severity': 'warning',
+                'recommendation': "Enable Inspector in all regions to ensure comprehensive vulnerability assessment"
+            },
+            {
+                'name': 'delete_default_vpcs',
+                'attribute_path': ['DeleteDefaultVpcs'],
+                'condition': lambda val: (val is True,
+                                        "Default VPCs are deleted" if val is True else "Default VPCs are not deleted"),
+                'severity': 'warning',
+                'recommendation': "Delete default VPCs to reduce the attack surface and enforce explicit network configuration"
+            },
+            {
+                'name': 'revoke_default_sg_rules',
+                'attribute_path': ['RevokeDefaultSgRules'],
+                'condition': lambda val: (val is True,
+                                        "Default security group rules are revoked" if val is True else "Default security group rules are not revoked"),
+                'severity': 'warning',
+                'recommendation': "Revoke default security group rules to enforce explicit security group configuration"
+            }
+        ]
+        
+        # Use the generic resource check with a list containing just the security resource
+        return self._generic_resource_check(tenant, [security_resource], security_checks)
+    
+    def _check_system_settings(self, tenant: str, resources: Dict[str, Any]) -> Dict[str, Any]:
+        """Check DuploCloud system settings for production readiness"""
+        
+        # Create a synthetic resource to represent system settings
+        system_resource = {
+            'identifier': f"system-settings",
+            'Name': f"system-settings"
+        }
+        
+        # Extract system settings
+        token_expiration_notification_enabled = False
+        token_expiration_notification_days = 0
+        token_expiration_notification_emails = ""
+        
+        if "system_settings" in resources and resources["system_settings"] and isinstance(resources["system_settings"], list):
+            for setting in resources["system_settings"]:
+                if setting.get("Type") == "AppConfig" and setting.get("Key") == "EnableUserTokenExpirationNotification":
+                    try:
+                        days = int(setting.get("Value", "0"))
+                        if days > 0:
+                            token_expiration_notification_enabled = True
+                            token_expiration_notification_days = days
+                    except (ValueError, TypeError):
+                        pass
+                
+                if setting.get("Type") == "AppConfig" and setting.get("Key") == "UserTokenExpirationNotificationEmails":
+                    token_expiration_notification_emails = setting.get("Value", "")
+        
+        # Add settings to resource
+        system_resource["TokenExpirationNotificationEnabled"] = token_expiration_notification_enabled
+        system_resource["TokenExpirationNotificationDays"] = token_expiration_notification_days
+        system_resource["TokenExpirationNotificationEmails"] = token_expiration_notification_emails
+        system_resource["HasTokenExpirationEmails"] = bool(token_expiration_notification_emails)
+        
+        # Define checks for system settings
+        system_checks = [
+            {
+                'name': 'token_expiration_notification',
+                'attribute_path': ['TokenExpirationNotificationEnabled'],
+                'condition': lambda val, resource=None: (
+                    val is True,
+                    f"User token expiration notification is enabled ({resource.get('TokenExpirationNotificationDays', 0)} days)" if val is True 
+                    else "User token expiration notification is not enabled"
+                ),
+                'severity': 'warning',
+                'recommendation': "Enable user token expiration notification to alert users before their tokens expire"
+            },
+            {
+                'name': 'token_expiration_emails',
+                'attribute_path': ['HasTokenExpirationEmails'],
+                'condition': lambda val, resource=None: (
+                    val is True,
+                    f"Token expiration notification emails are configured" if val is True 
+                    else "Token expiration notification emails are not configured"
+                ),
+                'severity': 'warning',
+                'recommendation': "Configure token expiration notification emails to ensure notifications are delivered"
+            }
+        ]
+        
+        # Use the generic resource check with a list containing just the system resource
+        return self._generic_resource_check(tenant, [system_resource], system_checks)
+    
     def _check_duplo_features(self, tenant: str, resources: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Check DuploCloud tenant-specific features for production readiness"""
         
