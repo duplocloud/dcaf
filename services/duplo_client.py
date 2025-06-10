@@ -62,6 +62,7 @@ class DuploClient:
                     token=self.token,
                     tenant=self.tenant_name,
                 )
+                logger.setLevel(logging.INFO)
                 logger.info("Official DuploCloud client initialized successfully")
             except Exception as e:
                 logger.error(f"Failed to initialize official DuploCloud client: {str(e)}")
