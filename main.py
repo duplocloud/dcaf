@@ -13,7 +13,7 @@ import dotenv
 import uvicorn
 
 # Load environment variables from .env file and override existing ones
-# dotenv.load_dotenv(override=True)
+dotenv.load_dotenv(override=True)
 
 # Choose which agent to use
 # agent = EchoAgent()
