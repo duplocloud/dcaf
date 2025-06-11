@@ -158,7 +158,11 @@ class CommandAgent(AgentProtocol):
             traceback_error = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
             logger.error("Error while making LLM API call:\n%s", traceback_error)
 
-            raise Exception(f"Error while making LLM API call: {str(e)}")
+            if "An error occurred (ExpiredTokenException) when calling the InvokeModel operation: The security token included in the request is expired" in str(e):
+                solution = "If running the agent locally with Bedrock, refresh the aws creds in the .env file (use the env_update_aws_creds.sh script if using DuploCloud; refer README)."
+                raise Exception(f"Error while making LLM API call: {str(e)}. {solution}")
+            else:
+                raise Exception(f"Error while making LLM API call: {str(e)}")
     
     def execute_cmd(self, command: str) -> str:
         """
