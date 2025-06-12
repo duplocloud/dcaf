@@ -2,6 +2,14 @@ import logging
 import json
 from typing import List, Dict, Any, Optional
 from agent_server import AgentProtocol
+from agents.tools.CheckK8sDeploymentProdReadinessTool import CheckK8sDeploymentProdReadinessTool
+from agents.tools.CheckElastiCacheProdReadinessTool import CheckElastiCacheProdReadinessTool
+from agents.tools.CheckRdsProdReadinessTool import CheckRdsProdReadinessTool
+from agents.tools.CheckS3BucketProdReadinessTool import CheckS3BucketProdReadinessTool
+from agents.tools.GetElastiCacheInstancesTool import GetElastiCacheInstancesTool
+from agents.tools.GetK8sDeploymentsTools import GetK8sDeploymentsTool
+from agents.tools.GetRdsInstancesTool import GetRdsInstancesTool
+from agents.tools.GetS3BucketsTool import GetS3BucketsTool
 from schemas.messages import AgentMessage
 from services.llm import BedrockAnthropicLLM
 from services.duplo_client import DuploClient
@@ -223,6 +231,24 @@ class ProductionReadinessAgent(AgentProtocol):
                     content="No messages found in the request. Please provide a valid request."
                 )
             
+            tools = [
+                # RDS
+                GetRdsInstancesTool(platform_context),
+                CheckRdsProdReadinessTool(),
+
+                # ecache
+                GetElastiCacheInstancesTool(platform_context),
+                CheckElastiCacheProdReadinessTool(),
+
+                # k8s deployment
+                GetK8sDeploymentsTool(platform_context),
+                CheckK8sDeploymentProdReadinessTool(),
+
+                # s3
+                GetS3BucketsTool(platform_context),
+                CheckS3BucketProdReadinessTool(),
+            ]
+            
             # Initialize DuploClient with platform context from the first message
             platform_context = messages_list[0].get("platform_context")
             if not self._validate_platform_context(platform_context):
@@ -254,6 +280,7 @@ class ProductionReadinessAgent(AgentProtocol):
                 messages=processed_messages, 
                 model_id=self.model_id, 
                 system_prompt=self.system_prompt,
+                tools=[tool.get_definition() for tool in tools],
                 max_tokens=10000
             )
             print("|--------------------------------------------------------------------------|")
@@ -336,28 +363,28 @@ class ProductionReadinessAgent(AgentProtocol):
 
             
             # Check RDS instances
-            logger.info("Checking RDS instances...")
-            if "rds" in resources and resources["rds"]:
-                results["resources"]["rds"] = self._check_rds_instances(tenant, resources["rds"])
-            else:
-                results["resources"]["rds"] = []
-                logger.info("No RDS instances found")
+            # logger.info("Checking RDS instances...")
+            # if "rds" in resources and resources["rds"]:
+            #     results["resources"]["rds"] = self._check_rds_instances(tenant, resources["rds"])
+            # else:
+            #     results["resources"]["rds"] = []
+            #     logger.info("No RDS instances found")
             
             # Check ecache clusters
-            logger.info("Checking ecache clusters...")
-            if "ecache" in resources and resources["ecache"]:
-                results["resources"]["ecache"] = self._check_ecache_clusters(tenant, resources["ecache"])
-            else:
-                results["resources"]["ecache"] = []
-                logger.info("No ecache clusters found")
+            # logger.info("Checking ecache clusters...")
+            # if "ecache" in resources and resources["ecache"]:
+            #     results["resources"]["ecache"] = self._check_ecache_clusters(tenant, resources["ecache"])
+            # else:
+            #     results["resources"]["ecache"] = []
+            #     logger.info("No ecache clusters found")
             
             # Check K8s deployments
-            logger.info("Checking K8s deployments...")
-            if "k8s_deployments" in resources and resources["k8s_deployments"]:
-                results["resources"]["k8s_deployments"] = self._check_k8s_deployments(tenant, resources["k8s_deployments"])
-            else:
-                results["resources"]["k8s_deployments"] = []
-                logger.info("No K8s deployments found")
+            # logger.info("Checking K8s deployments...")
+            # if "k8s_deployments" in resources and resources["k8s_deployments"]:
+            #     results["resources"]["k8s_deployments"] = self._check_k8s_deployments(tenant, resources["k8s_deployments"])
+            # else:
+            #     results["resources"]["k8s_deployments"] = []
+            #     logger.info("No K8s deployments found")
             
             # Check ASGs
             logger.info("Checking ASGs...")
@@ -368,12 +395,12 @@ class ProductionReadinessAgent(AgentProtocol):
                 logger.info("No ASGs found")
             
             # Check S3 buckets
-            logger.info("Checking S3 buckets...")
-            if "s3" in resources and resources["s3"]:
-                results["resources"]["s3"] = self._check_s3_buckets(tenant, resources["s3"])
-            else:
-                results["resources"]["s3"] = []
-                logger.info("No S3 buckets found")
+            # logger.info("Checking S3 buckets...")
+            # if "s3" in resources and resources["s3"]:
+            #     results["resources"]["s3"] = self._check_s3_buckets(tenant, resources["s3"])
+            # else:
+            #     results["resources"]["s3"] = []
+            #     logger.info("No S3 buckets found")
             
             # Check Duplo tenant features
             logger.info("Checking Duplo tenant features...")
@@ -433,10 +460,10 @@ class ProductionReadinessAgent(AgentProtocol):
         """
         # Fetch all resources from DuploCloud
         raw_resources = {
-            "rds": self.duplo_client.official_client.load("rds").list(),
-            "ecache": self.duplo_client.get(f"subscriptions/{self.duplo_client.tenant_id}/GetEcacheInstances"),
-            "k8s_deployments": self.duplo_client.official_client.load("service").list(),
-            "s3": self.duplo_client.official_client.load("s3").list(),
+            # "rds": self.duplo_client.official_client.load("rds").list(),
+            # "ecache": self.duplo_client.get(f"subscriptions/{self.duplo_client.tenant_id}/GetEcacheInstances"),
+            # "k8s_deployments": self.duplo_client.official_client.load("service").list(),
+            # "s3": self.duplo_client.official_client.load("s3").list(),
             "asgs": self.duplo_client.official_client.load("asg").list(),
             "duplo_logging": self.duplo_client.get(f"admin/GetLoggingEnabledTenants"),
             "duplo_monitoring": self.duplo_client.get(f"admin/GetMonitoringConfigForTenant/default"),
@@ -623,216 +650,216 @@ class ProductionReadinessAgent(AgentProtocol):
         
         return results
     
-    def _check_rds_instances(self, tenant: str, instances: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Check RDS instances for production readiness"""
+    # def _check_rds_instances(self, tenant: str, instances: List[Dict[str, Any]]) -> Dict[str, Any]:
+    #     """Check RDS instances for production readiness"""
         
-        # Define checks for RDS instances
-        rds_checks = [
-            {
-                'name': 'encryption',
-                'attribute_path': ['EncryptStorage'],
-                'condition': lambda val: (val is True, 
-                                         "Storage encryption is enabled" if val is True else 
-                                         "Storage encryption is not enabled"),
-                'severity': 'critical',
-                'recommendation': "Enable storage encryption for data protection"
-            },
-            {
-                'name': 'multi_az',
-                'attribute_path': ['MultiAZ'],
-                'condition': lambda val: (val is True, 
-                                         "Multi-AZ deployment is enabled" if val is True else 
-                                         "Multi-AZ deployment is not enabled"),
-                'severity': 'critical',
-                'recommendation': "Enable Multi-AZ deployment for high availability"
-            },
-            {
-                'name': 'backup_retention',
-                'attribute_path': ['BackupRetentionPeriod'],
-                'condition': lambda val: (val >= 0 if isinstance(val, (int, float)) else False,
-                                         f"Backup retention period is {val} days" if isinstance(val, (int, float)) else
-                                         "Backup retention period not set"),
-                'severity': 'critical',
-                'recommendation': "Set backup retention period to at least 7 days"
-            },
-            {
-                'name': 'deletion_protection',
-                'attribute_path': ['DeletionProtection'],
-                'condition': lambda val: (val is True, 
-                                         "Deletion protection is enabled" if val is True else 
-                                         "Deletion protection is not enabled"),
-                'severity': 'critical',
-                'recommendation': "Enable deletion protection to prevent accidental deletion"
-            },
-            {
-                'name': 'logging',
-                'attribute_path': ['EnableLogging'],
-                'condition': lambda val: (val is True, 
-                                         "Logging is enabled" if val is True else 
-                                         "Logging is not enabled"),
-                'severity': 'warning',
-                'recommendation': "Enabling logging is crucial for observability, performance tuning, security auditing, and troubleshooting"
-            },
-            {
-                'name': 'performance_insights',
-                'attribute_path': ['EnablePerformanceInsights'],
-                'condition': lambda val: (val is True, 
-                                         "Performance insights is enabled" if val is True else 
-                                         "Performance insights is not enabled"),
-                'severity': 'warning',
-                'recommendation': "Enable performance insights for better database performance over time"
-            }
-        ]
+    #     # Define checks for RDS instances
+    #     rds_checks = [
+    #         {
+    #             'name': 'encryption',
+    #             'attribute_path': ['EncryptStorage'],
+    #             'condition': lambda val: (val is True, 
+    #                                      "Storage encryption is enabled" if val is True else 
+    #                                      "Storage encryption is not enabled"),
+    #             'severity': 'critical',
+    #             'recommendation': "Enable storage encryption for data protection"
+    #         },
+    #         {
+    #             'name': 'multi_az',
+    #             'attribute_path': ['MultiAZ'],
+    #             'condition': lambda val: (val is True, 
+    #                                      "Multi-AZ deployment is enabled" if val is True else 
+    #                                      "Multi-AZ deployment is not enabled"),
+    #             'severity': 'critical',
+    #             'recommendation': "Enable Multi-AZ deployment for high availability"
+    #         },
+    #         {
+    #             'name': 'backup_retention',
+    #             'attribute_path': ['BackupRetentionPeriod'],
+    #             'condition': lambda val: (val >= 0 if isinstance(val, (int, float)) else False,
+    #                                      f"Backup retention period is {val} days" if isinstance(val, (int, float)) else
+    #                                      "Backup retention period not set"),
+    #             'severity': 'critical',
+    #             'recommendation': "Set backup retention period to at least 7 days"
+    #         },
+    #         {
+    #             'name': 'deletion_protection',
+    #             'attribute_path': ['DeletionProtection'],
+    #             'condition': lambda val: (val is True, 
+    #                                      "Deletion protection is enabled" if val is True else 
+    #                                      "Deletion protection is not enabled"),
+    #             'severity': 'critical',
+    #             'recommendation': "Enable deletion protection to prevent accidental deletion"
+    #         },
+    #         {
+    #             'name': 'logging',
+    #             'attribute_path': ['EnableLogging'],
+    #             'condition': lambda val: (val is True, 
+    #                                      "Logging is enabled" if val is True else 
+    #                                      "Logging is not enabled"),
+    #             'severity': 'warning',
+    #             'recommendation': "Enabling logging is crucial for observability, performance tuning, security auditing, and troubleshooting"
+    #         },
+    #         {
+    #             'name': 'performance_insights',
+    #             'attribute_path': ['EnablePerformanceInsights'],
+    #             'condition': lambda val: (val is True, 
+    #                                      "Performance insights is enabled" if val is True else 
+    #                                      "Performance insights is not enabled"),
+    #             'severity': 'warning',
+    #             'recommendation': "Enable performance insights for better database performance over time"
+    #         }
+    #     ]
         
-        return self._generic_resource_check(tenant, instances, rds_checks)
+    #     return self._generic_resource_check(tenant, instances, rds_checks)
     
-    def _check_ecache_clusters(self, tenant: str, clusters: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Check ecache clusters for production readiness"""
+    # def _check_ecache_clusters(self, tenant: str, clusters: List[Dict[str, Any]]) -> Dict[str, Any]:
+    #     """Check ecache clusters for production readiness"""
         
-        # Define checks for ecache clusters
-        ecache_checks = [
-            {
-                'name': 'encryption_at_rest',
-                'attribute_path': ['EnableEncryptionAtRest'],
-                'condition': lambda val: (val is True, 
-                                         "Encryption at rest is enabled" if val is True else 
-                                         "Encryption at rest is not enabled"),
-                'severity': 'critical',
-                'recommendation': "Enable encryption at rest for data protection"
-            },
-            {
-                'name': 'encryption_at_transit',
-                'attribute_path': ['EnableEncryptionAtTransit'],
-                'condition': lambda val: (val is True, 
-                                         "Encryption at transit is enabled" if val is True else 
-                                         "Encryption at transit is not enabled"),
-                'severity': 'critical',
-                'recommendation': "Enable encryption at transit for data protection"
-            },
-            {
-                'name': 'multi_az',
-                'attribute_path': ['MultiAZEnabled'],
-                'condition': lambda val: (val is True, 
-                                         "Multi-AZ deployment is enabled" if val is True else 
-                                         "Multi-AZ deployment is not enabled"),
-                'severity': 'critical',
-                'recommendation': "Enable Multi-AZ deployment for high availability"
-            },
-            {
-                'name': 'automatic_failover',
-                'attribute_path': ['AutomaticFailoverEnabled'],
-                'condition': lambda val: (val is True, 
-                                         "Automatic failover is enabled" if val is True else 
-                                         "Automatic failover is not enabled"),
-                'severity': 'warning',
-                'recommendation': "Enable automatic failover for high availability"
-            }
-        ]
+    #     # Define checks for ecache clusters
+    #     ecache_checks = [
+    #         {
+    #             'name': 'encryption_at_rest',
+    #             'attribute_path': ['EnableEncryptionAtRest'],
+    #             'condition': lambda val: (val is True, 
+    #                                      "Encryption at rest is enabled" if val is True else 
+    #                                      "Encryption at rest is not enabled"),
+    #             'severity': 'critical',
+    #             'recommendation': "Enable encryption at rest for data protection"
+    #         },
+    #         {
+    #             'name': 'encryption_at_transit',
+    #             'attribute_path': ['EnableEncryptionAtTransit'],
+    #             'condition': lambda val: (val is True, 
+    #                                      "Encryption at transit is enabled" if val is True else 
+    #                                      "Encryption at transit is not enabled"),
+    #             'severity': 'critical',
+    #             'recommendation': "Enable encryption at transit for data protection"
+    #         },
+    #         {
+    #             'name': 'multi_az',
+    #             'attribute_path': ['MultiAZEnabled'],
+    #             'condition': lambda val: (val is True, 
+    #                                      "Multi-AZ deployment is enabled" if val is True else 
+    #                                      "Multi-AZ deployment is not enabled"),
+    #             'severity': 'critical',
+    #             'recommendation': "Enable Multi-AZ deployment for high availability"
+    #         },
+    #         {
+    #             'name': 'automatic_failover',
+    #             'attribute_path': ['AutomaticFailoverEnabled'],
+    #             'condition': lambda val: (val is True, 
+    #                                      "Automatic failover is enabled" if val is True else 
+    #                                      "Automatic failover is not enabled"),
+    #             'severity': 'warning',
+    #             'recommendation': "Enable automatic failover for high availability"
+    #         }
+    #     ]
         
-        return self._generic_resource_check(tenant, clusters, ecache_checks)
+    #     return self._generic_resource_check(tenant, clusters, ecache_checks)
     
-    def _check_k8s_deployments(self, tenant: str, deployments: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Check Kubernetes deployments for production readiness"""
+    # def _check_k8s_deployments(self, tenant: str, deployments: List[Dict[str, Any]]) -> Dict[str, Any]:
+    #     """Check Kubernetes deployments for production readiness"""
         
-        # Define checks for Kubernetes deployments
-        k8s_checks = [
-            {
-                'name': 'replicas',
-                'attribute_path': ['Replicas'],
-                'condition': lambda val: (val >= 2 if isinstance(val, (int, float)) else False,
-                                         f"Deployment has {val} replicas" if isinstance(val, (int, float)) else
-                                         "Replica count not determined"),
-                'severity': 'critical',
-                'recommendation': "Configure at least 2 replicas for high availability"
-            },
-            {
-                'name': 'hpa_configured',
-                'attribute_path': ['HPASpecs'],
-                'condition': lambda val: (
-                    val is not None,
-                    "HPA is configured" if val is not None else "HPA is not configured"
-                ),
-                'severity': 'warning',
-                'recommendation': "Configure Horizontal Pod Autoscaler (HPA) for automatic scaling"
-            },
-            {
-                'name': 'hpa_min_replicas',
-                'attribute_path': ['HPASpecs', 'minReplicas'],
-                'condition': lambda val: (
-                    isinstance(val, (int, float)) and val >= 2,
-                    f"HPA minimum replicas is {val}" if isinstance(val, (int, float)) else "HPA minimum replicas not determined"
-                ),
-                'severity': 'critical',
-                'recommendation': "Configure HPA with at least 2 minimum replicas for high availability"
-            },
-            {
-                'name': 'hpa_metrics_configured',
-                'attribute_path': ['HPASpecs', 'metrics'],
-                'condition': lambda metrics: (
-                    isinstance(metrics, list) and len(metrics) > 0,
-                    f"HPA has {len(metrics)} metrics configured" if isinstance(metrics, list) else "HPA metrics not configured"
-                ),
-                'severity': 'warning',
-                'recommendation': "Configure HPA with appropriate metrics (CPU/memory)"
-            },
-            {
-                'name': 'resource_limits',
-                'attribute_path': ['Template', 'OtherDockerConfig'],
-                'condition': lambda config: (
-                    isinstance(config, str) and '"Resources"' in config and '"limits"' in config,
-                    "Resource limits are configured" if isinstance(config, str) and '"Resources"' in config and '"limits"' in config else
-                    "Resource limits are not configured"
-                ),
-                'severity': 'warning',
-                'recommendation': "Set resource limits for all containers"
-            },
-            {
-                'name': 'resource_requests',
-                'attribute_path': ['Template', 'OtherDockerConfig'],
-                'condition': lambda config: (
-                    isinstance(config, str) and '"Resources"' in config and '"requests"' in config,
-                    "Resource requests are configured" if isinstance(config, str) and '"Resources"' in config and '"requests"' in config else
-                    "Resource requests are not configured"
-                ),
-                'severity': 'warning',
-                'recommendation': "Set resource requests for all containers"
-            },
-            {
-                'name': 'liveness_probe',
-                'attribute_path': ['Template', 'OtherDockerConfig'],
-                'condition': lambda config: (
-                    isinstance(config, str) and '"LivenessProbe"' in config,
-                    "Liveness probe is configured" if isinstance(config, str) and '"LivenessProbe"' in config else
-                    "Liveness probe is not configured"
-                ),
-                'severity': 'warning',
-                'recommendation': "Configure liveness probe to ensure automatic restart of unhealthy containers"
-            },
-            {
-                'name': 'readiness_probe',
-                'attribute_path': ['Template', 'OtherDockerConfig'],
-                'condition': lambda config: (
-                    isinstance(config, str) and '"ReadinessProbe"' in config,
-                    "Readiness probe is configured" if isinstance(config, str) and '"ReadinessProbe"' in config else
-                    "Readiness probe is not configured"
-                ),
-                'severity': 'warning',
-                'recommendation': "Configure readiness probe to prevent routing traffic to containers that aren't ready"
-            },
-            {
-                'name': 'rolling_update_strategy',
-                'attribute_path': ['Template', 'OtherDockerConfig'],
-                'condition': lambda config: (
-                    isinstance(config, str) and '"DeploymentStrategy"' in config and '"RollingUpdate"' in config,
-                    "Rolling update strategy is configured" if isinstance(config, str) and '"DeploymentStrategy"' in config and '"RollingUpdate"' in config else
-                    "Rolling update strategy is not configured"
-                ),
-                'severity': 'warning',
-                'recommendation': "Configure rolling update strategy for zero-downtime deployments"
-            }
-        ]
+    #     # Define checks for Kubernetes deployments
+    #     k8s_checks = [
+    #         {
+    #             'name': 'replicas',
+    #             'attribute_path': ['Replicas'],
+    #             'condition': lambda val: (val >= 2 if isinstance(val, (int, float)) else False,
+    #                                      f"Deployment has {val} replicas" if isinstance(val, (int, float)) else
+    #                                      "Replica count not determined"),
+    #             'severity': 'critical',
+    #             'recommendation': "Configure at least 2 replicas for high availability"
+    #         },
+    #         {
+    #             'name': 'hpa_configured',
+    #             'attribute_path': ['HPASpecs'],
+    #             'condition': lambda val: (
+    #                 val is not None,
+    #                 "HPA is configured" if val is not None else "HPA is not configured"
+    #             ),
+    #             'severity': 'warning',
+    #             'recommendation': "Configure Horizontal Pod Autoscaler (HPA) for automatic scaling"
+    #         },
+    #         {
+    #             'name': 'hpa_min_replicas',
+    #             'attribute_path': ['HPASpecs', 'minReplicas'],
+    #             'condition': lambda val: (
+    #                 isinstance(val, (int, float)) and val >= 2,
+    #                 f"HPA minimum replicas is {val}" if isinstance(val, (int, float)) else "HPA minimum replicas not determined"
+    #             ),
+    #             'severity': 'critical',
+    #             'recommendation': "Configure HPA with at least 2 minimum replicas for high availability"
+    #         },
+    #         {
+    #             'name': 'hpa_metrics_configured',
+    #             'attribute_path': ['HPASpecs', 'metrics'],
+    #             'condition': lambda metrics: (
+    #                 isinstance(metrics, list) and len(metrics) > 0,
+    #                 f"HPA has {len(metrics)} metrics configured" if isinstance(metrics, list) else "HPA metrics not configured"
+    #             ),
+    #             'severity': 'warning',
+    #             'recommendation': "Configure HPA with appropriate metrics (CPU/memory)"
+    #         },
+    #         {
+    #             'name': 'resource_limits',
+    #             'attribute_path': ['Template', 'OtherDockerConfig'],
+    #             'condition': lambda config: (
+    #                 isinstance(config, str) and '"Resources"' in config and '"limits"' in config,
+    #                 "Resource limits are configured" if isinstance(config, str) and '"Resources"' in config and '"limits"' in config else
+    #                 "Resource limits are not configured"
+    #             ),
+    #             'severity': 'warning',
+    #             'recommendation': "Set resource limits for all containers"
+    #         },
+    #         {
+    #             'name': 'resource_requests',
+    #             'attribute_path': ['Template', 'OtherDockerConfig'],
+    #             'condition': lambda config: (
+    #                 isinstance(config, str) and '"Resources"' in config and '"requests"' in config,
+    #                 "Resource requests are configured" if isinstance(config, str) and '"Resources"' in config and '"requests"' in config else
+    #                 "Resource requests are not configured"
+    #             ),
+    #             'severity': 'warning',
+    #             'recommendation': "Set resource requests for all containers"
+    #         },
+    #         {
+    #             'name': 'liveness_probe',
+    #             'attribute_path': ['Template', 'OtherDockerConfig'],
+    #             'condition': lambda config: (
+    #                 isinstance(config, str) and '"LivenessProbe"' in config,
+    #                 "Liveness probe is configured" if isinstance(config, str) and '"LivenessProbe"' in config else
+    #                 "Liveness probe is not configured"
+    #             ),
+    #             'severity': 'warning',
+    #             'recommendation': "Configure liveness probe to ensure automatic restart of unhealthy containers"
+    #         },
+    #         {
+    #             'name': 'readiness_probe',
+    #             'attribute_path': ['Template', 'OtherDockerConfig'],
+    #             'condition': lambda config: (
+    #                 isinstance(config, str) and '"ReadinessProbe"' in config,
+    #                 "Readiness probe is configured" if isinstance(config, str) and '"ReadinessProbe"' in config else
+    #                 "Readiness probe is not configured"
+    #             ),
+    #             'severity': 'warning',
+    #             'recommendation': "Configure readiness probe to prevent routing traffic to containers that aren't ready"
+    #         },
+    #         {
+    #             'name': 'rolling_update_strategy',
+    #             'attribute_path': ['Template', 'OtherDockerConfig'],
+    #             'condition': lambda config: (
+    #                 isinstance(config, str) and '"DeploymentStrategy"' in config and '"RollingUpdate"' in config,
+    #                 "Rolling update strategy is configured" if isinstance(config, str) and '"DeploymentStrategy"' in config and '"RollingUpdate"' in config else
+    #                 "Rolling update strategy is not configured"
+    #             ),
+    #             'severity': 'warning',
+    #             'recommendation': "Configure rolling update strategy for zero-downtime deployments"
+    #         }
+    #     ]
         
-        return self._generic_resource_check(tenant, deployments, k8s_checks)
+    #     return self._generic_resource_check(tenant, deployments, k8s_checks)
     
     def _check_autoscaling_groups(self, tenant: str, asgs: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Check Auto Scaling Groups for production readiness"""
@@ -874,49 +901,49 @@ class ProductionReadinessAgent(AgentProtocol):
         
         return self._generic_resource_check(tenant, asgs, asg_checks)
 
-    def _check_s3_buckets(self, tenant: str, buckets: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Check S3 Buckets for production readiness"""
+    # def _check_s3_buckets(self, tenant: str, buckets: List[Dict[str, Any]]) -> Dict[str, Any]:
+    #     """Check S3 Buckets for production readiness"""
         
-        s3_checks = [
-            {
-                'name': 'encryption',
-                'attribute_path': ['DefaultEncryption'],
-                'condition': lambda val: (val is not None, 
-                    "Server-side encryption is enabled" if val is not None else 
-                    "Server-side encryption is not enabled"),
-                'severity': 'critical',
-                'recommendation': "Enable server-side encryption"
-            },
-            {
-                'name': 'public_access_block',
-                'attribute_path': ['AllowPublicAccess'],
-                'condition': lambda val: (val is False,
-                    "Block public access is enabled" if val is False else
-                    "Block public access is not enabled"),
-                'severity': 'critical',
-                'recommendation': "Enable block public access"
-            },
-            {
-                'name': 'versioning',
-                'attribute_path': ['EnableVersioning'],
-                'condition': lambda val: (val is True, 
-                    "Versioning is enabled" if val is True else 
-                    "Versioning is not enabled"),
-                'severity': 'warning',
-                'recommendation': "Enable versioning for data protection"
-            },
-            {
-                'name': 'logging',
-                'attribute_path': ['EnableAccessLogs'],
-                'condition': lambda val: (val is True, 
-                    "Logging is enabled" if val is True else 
-                    "Logging is not enabled"),
-                'severity': 'warning',
-                'recommendation': "Enable logging to track bucket access"
-            },
-        ]
+    #     s3_checks = [
+    #         {
+    #             'name': 'encryption',
+    #             'attribute_path': ['DefaultEncryption'],
+    #             'condition': lambda val: (val is not None, 
+    #                 "Server-side encryption is enabled" if val is not None else 
+    #                 "Server-side encryption is not enabled"),
+    #             'severity': 'critical',
+    #             'recommendation': "Enable server-side encryption"
+    #         },
+    #         {
+    #             'name': 'public_access_block',
+    #             'attribute_path': ['AllowPublicAccess'],
+    #             'condition': lambda val: (val is False,
+    #                 "Block public access is enabled" if val is False else
+    #                 "Block public access is not enabled"),
+    #             'severity': 'critical',
+    #             'recommendation': "Enable block public access"
+    #         },
+    #         {
+    #             'name': 'versioning',
+    #             'attribute_path': ['EnableVersioning'],
+    #             'condition': lambda val: (val is True, 
+    #                 "Versioning is enabled" if val is True else 
+    #                 "Versioning is not enabled"),
+    #             'severity': 'warning',
+    #             'recommendation': "Enable versioning for data protection"
+    #         },
+    #         {
+    #             'name': 'logging',
+    #             'attribute_path': ['EnableAccessLogs'],
+    #             'condition': lambda val: (val is True, 
+    #                 "Logging is enabled" if val is True else 
+    #                 "Logging is not enabled"),
+    #             'severity': 'warning',
+    #             'recommendation': "Enable logging to track bucket access"
+    #         },
+    #     ]
     
-        return self._generic_resource_check(tenant, buckets, s3_checks)
+    #     return self._generic_resource_check(tenant, buckets, s3_checks)
         
     def _check_aws_security(self, tenant: str, resources: Dict[str, Any]) -> Dict[str, Any]:
         """Check AWS security features for production readiness"""
