@@ -1,11 +1,15 @@
 import logging
 import json
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 from agent_server import AgentProtocol
-from schemas.messages import AgentMessage
+from schemas.messages import AgentMessage, Data, Command, ExecutedCommand
 from services.llm import BedrockAnthropicLLM
 from services.duplo_client import DuploClient
 import os
+import json
+import time
+import re
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -26,9 +30,55 @@ class ProductionReadinessAgent(AgentProtocol):
         logger.info("Initializing ProductionReadinessAgent")
         # self.model_id = os.getenv("BEDROCK_MODEL_ID", "anthropic.claude-3-5-sonnet-20240620-v1:0")
         self.model_id = os.getenv("BEDROCK_MODEL_ID", "us.anthropic.claude-3-5-sonnet-20240620-v1:0")
+        # self.model_id = os.getenv("BEDROCK_MODEL_ID", "us.anthropic.claude-sonnet-4-20250514-v1:0")
         self.llm = llm
         self.system_prompt = system_prompt or self._default_system_prompt()
+        self.response_schema = self._create_response_schema()
     
+    def _create_response_schema(self) -> Dict[str, Any]:
+        """
+        Create the JSON schema for structured LLM responses.
+        
+        Returns:
+            The response schema as a dictionary
+        """
+        return {
+            "name": "return_assessment",
+            "description": "Generate a structured production readiness assessment with remediation actions",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "content": {
+                        "type": "string",
+                        "description": "The main response text to display to the user. Should provide a clear explanation."
+                    },
+                    "check_prod_readiness": {
+                        "type": "boolean",
+                        "description": "Set this to true if the user asks to check production readiness. This triggers a check of the DuploCloud tenant's production readiness and determines whether to invoke the production readiness tool or function for a tenant, returning the assessment details to the agent."
+                    },
+                    "remediation_actions": {
+                        "type": "array",
+                        "description": "Specify remediation actions to address issues. If check_prod_readiness is true, provide each action in the format action_type:parameters. If check_prod_readiness is false, this field should be empty.",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "action": {
+                                    "type": "string",
+                                    "description": "The remediation action in format action_type:parameters"
+                                },
+                                "explanation": {
+                                    "type": "string",
+                                    "description": "A brief explanation of what this action does."
+                                },
+                            },
+                            "required": ["action", "explanation"]
+                        }
+                    }
+                },
+                "required": ["content"]
+            }
+        }
+
     def _default_system_prompt(self) -> str:
         """Return the default system prompt for the Production Readiness Agent"""
         return """You are a Production Readiness Assessment Agent for DuploCloud, an expert in cloud infrastructure and DevOps best practices.
@@ -78,36 +128,57 @@ class ProductionReadinessAgent(AgentProtocol):
         
         For each resource category (like DuploCloud Services, S3 Buckets, RDS, etc.):
         1. Create a main heading for the category
-        2. For each individual resource in that category:
-           - Create a subheading with the resource name
-           - Show the resource-specific score
-           - Create a table with columns for Check, Status (✅/❌), Severity, and Recommendation
-           - Include all checks performed on that resource
+        2. Show a category-level score
+        3. For each resource in that category, create a subsection with:
+           - Resource name as a subheading
+           - Table with columns: Check, Status (✅/❌), Severity, Recommendation
         
-        Example format for a resource category:
+        Example structure:
         
-        ### [Resource Category Name]
-        
-        #### [Resource Name]
+        ### DuploCloud Services
         **Score: X/100**
+        
+        #### Service: my-api-service
         
         | Check | Status | Severity | Recommendation |
         |-------|--------|----------|----------------|
-        | [check1] | ✅/❌ | CRITICAL/WARNING | [brief recommendation] |
-        | [check2] | ✅/❌ | CRITICAL/WARNING | [brief recommendation] |
+        | Replicas >= 2 | ✅/❌ | CRITICAL | [brief recommendation] |
+        | Resource Limits | ✅/❌ | WARNING | [brief recommendation] |
+        | Health Checks | ✅/❌ | WARNING | [brief recommendation] |
         
-        Common resource categories to include:
-        - DuploCloud Services
-        - S3 Buckets
-        - RDS Databases
+        #### Service: my-worker-service
+        
+        | Check | Status | Severity | Recommendation |
+        |-------|--------|----------|----------------|
+        | Replicas >= 2 | ✅/❌ | CRITICAL | [brief recommendation] |
+        | Resource Limits | ✅/❌ | WARNING | [brief recommendation] |
+        | Health Checks | ✅/❌ | WARNING | [brief recommendation] |
+        
+        ### AWS Resources
+        **Score: X/100**
+        
+        #### S3 Buckets
+        
+        | Check | Status | Severity | Recommendation |
+        |-------|--------|----------|----------------|
+        | Encryption | ✅/❌ | CRITICAL | [brief recommendation] |
+        | Versioning | ✅/❌ | WARNING | [brief recommendation] |
+        | Lifecycle Policy | ✅/❌ | INFO | [brief recommendation] |
+        
+        #### RDS Databases
+        
+        | Check | Status | Severity | Recommendation |
+        |-------|--------|----------|----------------|
+        | Multi-AZ | ✅/❌ | CRITICAL | [brief recommendation] |
+        | Automated Backups | ✅/❌ | CRITICAL | [brief recommendation] |
+        | Encryption | ✅/❌ | CRITICAL | [brief recommendation] |
+        
+        Other AWS resources to include if present:
         - ElastiCache
         - DynamoDB Tables
         - EFS
         - DuploCloud Features (Logging, Monitoring, Alerting, Notification)
         - AWS Security Features
-        - DuploCloud System Settings
-        
-        YOU MUST ALWAYS INCLUDE THE FOLLOWING TWO SECTIONS IN YOUR RESPONSE, REGARDLESS OF THE DATA PROVIDED:
         
         ### AWS Security Features
         **Score: X/100**
@@ -140,13 +211,50 @@ class ProductionReadinessAgent(AgentProtocol):
         ### Immediate Actions (Critical)
         - [List of critical recommendations]
         
-        ### Short-term Actions (Warnings)
+        ### Short-term Improvements (Warnings)
         - [List of warning recommendations]
         
-        ### Long-term Improvements
-        - [List of improvement recommendations]
+        ### Long-term Optimizations (Info)
+        - [List of info recommendations]
+        
+        ## Remediation Actions
+        
+        If the user asks for help implementing any of the recommendations, suggest specific remediation actions they can take. Format these actions in a special code block that starts with ```remediation and ends with ```. Each line in the code block should represent one action in the following format:
+        
+        ```remediation
+        action_type:parameters
         ```
         
+        Use the following action types:
+        
+        1. enable_aws_security_feature - To enable AWS security features
+           Example: enable_aws_security_feature:guardduty
+           Supported features: vpc_flow_logs, security_hub, guardduty, cloudtrail, s3_public_access_block, inspector
+        
+        2. update_duplo_system_setting - To update DuploCloud system settings
+           Example: update_duplo_system_setting:token_expiration_notification_email=alerts@example.com
+           Supported settings: user_token_expiration, token_expiration_notification_email
+        
+        3. enable_duplo_monitoring - To enable monitoring for a tenant
+           Example: enable_duplo_monitoring:true
+        
+        4. enable_duplo_logging - To enable logging for a tenant
+           Example: enable_duplo_logging:true
+        
+        5. enable_duplo_alerting - To configure alerting for a tenant
+           Example: enable_duplo_alerting:pagerduty=YOUR_PD_SERVICE_KEY
+           Supported channels: pagerduty, sentry, newrelic, opsgenie
+
+        6. enable_fault_notification_channel - To configure fault notification channel for a tenant
+           Example: enable_fault_notification_channel:pagerduty=YOUR_PD_SERVICE_KEY
+           Supported channels: pagerduty, sentry, newrelic, opsgenie
+
+        7. update_duplo_service - To update a DuploCloud Service configuration
+           Example: update_duplo_service:my-api-service:replicas=3
+           Supported settings: replicas, cpu, memory, health_check
+        
+        The user must explicitly type "APPROVE" to execute any of these remediation actions. Always explain what each action will do before suggesting it.
+        ```        
         Always use tables for showing check results with columns for Check Name, Status (✅/❌), Severity, and Recommendation
 
         Remember that your assessment directly impacts production deployment decisions, so be thorough, accurate, and provide practical, implementable recommendations."""
@@ -213,82 +321,578 @@ class ProductionReadinessAgent(AgentProtocol):
             messages: A dictionary containing message history in the format {"messages": [...]}
             
         Returns:
-            An AgentMessage containing the response and production readiness assessment
+            An AgentMessage containing the response, remediation actions, and executed actions
         """
         try:
-            # Extract messages list from the messages dictionary
-            messages_list = messages.get("messages", [])
-            if not messages_list:
-                return AgentMessage(
-                    content="No messages found in the request. Please provide a valid request."
-                )
+            # Extract platform context from the first user message
+            platform_context = None
+            if messages and "messages" in messages and messages["messages"]:
+                for message in messages["messages"]:
+                    if message.get("role") == "user" and message.get("platform_context"):
+                        platform_context = message.get("platform_context")
+                        break
             
-            # Initialize DuploClient with platform context from the first message
-            platform_context = messages_list[0].get("platform_context")
-            if not self._validate_platform_context(platform_context):
-                return AgentMessage(
-                    content="I couldn't access your DuploCloud environment. Please ensure you're logged in to DuploCloud with valid credentials and have the necessary permissions."
-                )
-                
+            # Initialize DuploClient with platform context
             self.duplo_client = self._initialize_duplo_client(platform_context)
+            
+            # Process messages to handle remediation actions and prepare for LLM
+            processed_messages, executed_cmds = self._process_messages(messages)
+
             if not self.duplo_client:
-                return AgentMessage(
-                    content="Failed to initialize connection to DuploCloud. Please check your credentials and try again."
-                )
+                return AgentMessage(content="Unable to initialize DuploClient. Please provide valid credentials.")
             
-            # Process messages to prepare for LLM
-            processed_messages = self._preprocess_messages(messages)
+            # Determine if this is a remediation-only request
+            is_remediation_only = False
+            if messages and "messages" in messages and messages["messages"]:
+                latest_message = messages["messages"][-1]
+                if latest_message.get("role") == "user":
+                    content = latest_message.get("content", "").lower()
+                    keywords = {"approve", "remediate", "fix", "execute", "remediation"}
+                    if not content or any(keyword in content for keyword in keywords):
+                        is_remediation_only = True
+                        logger.info("Detected remediation-only request")
             
-            # Check resources for production readiness
-            readiness_results = self.check_production_readiness()
-            logger.debug(f"Readiness results: {json.dumps(readiness_results, indent=2)}")
+            logger.info("#### processed_messages:")
+            logger.info(processed_messages)
+            logger.info("#### executed_commands:")
+            logger.info(executed_cmds)
             
-            # Add readiness results to processed messages
-            if readiness_results:
-                processed_messages.append({
-                    "role": "assistant", "content": f"Here are the production readiness results: {json.dumps(readiness_results, indent=2)}"
-                })
-            
-            # Generate response from LLM
-            llm_response = self.llm.invoke(
+            tool_choice = {
+                "type": "tool",
+                "name": "return_assessment"
+            }
+
+            # First LLM call to determine if production readiness check is needed
+            logger.info("Making initial LLM call to determine if production readiness check is needed")
+            initial_response = self.llm.invoke(
                 messages=processed_messages, 
                 model_id=self.model_id, 
                 system_prompt=self.system_prompt,
-                max_tokens=10000
+                max_tokens=20000, 
+                tools=[self.response_schema],
+                tool_choice=tool_choice
             )
-            print("|--------------------------------------------------------------------------|")
-            print(llm_response)
-            print("|--------------------------------------------------------------------------|")
-            # Create and return the agent message with assessment results
-            return AgentMessage(content=llm_response)
+            logger.info("#### initial_response:")
+            logger.info(initial_response)
             
+            # Check if production readiness assessment is requested
+            should_check_readiness = False
+            if isinstance(initial_response, dict) and initial_response.get("check_prod_readiness") is True:
+                should_check_readiness = True
+                logger.info("LLM indicated production readiness check is needed")
+            
+            final_response = initial_response
+
+            # Run production readiness check if needed and not in remediation-only mode
+            if should_check_readiness or is_remediation_only:
+                logger.info("Performing production readiness assessment")
+                # Check resources for production readiness
+                results = self.check_production_readiness()
+                
+                # Calculate summary statistics
+                self._calculate_summary(results)
+                
+                # Add the assessment results to the messages
+                processed_messages.append({
+                    "role": "user",
+                    "content": f"Here are the production readiness assessment results for tenant {results['tenant']}:\n\n{json.dumps(results, indent=2)}"
+                })
+                
+                # Second LLM call with assessment results
+                logger.info("Making second LLM call with assessment results")
+                final_response = self.llm.invoke(
+                    messages=processed_messages, 
+                    model_id=self.model_id, 
+                    system_prompt=self.system_prompt,
+                    max_tokens=20000, 
+                    tools=[self.response_schema],
+                    tool_choice=tool_choice
+                )
+                
+                logger.info("Final LLM response with assessment results:")
+                logger.info(final_response)
+                
+                # Print the LLM response content in string format for easy copy-pasting
+                if final_response and 'content' in final_response:
+                    print("\n\n=== ASSESSMENT REPORT (MARKDOWN) ===\n")
+                    print(final_response['content'])
+                    print("\n=== END OF ASSESSMENT REPORT ===\n\n")
+                
+            # Extract remediation actions from LLM response
+            remediation_actions = []
+            if isinstance(final_response, dict) and "remediation_actions" in final_response:
+                remediation_actions = final_response.get("remediation_actions", [])
+            print("#### remediation_actions:")
+            print(remediation_actions)
+            cmds=[]
+            for action in remediation_actions:
+                cmds.append(Command(command=action["action"]))
+            # Create and return the agent message with assessment results and remediation actions
+            return AgentMessage(
+                content=final_response.get("content", "I'm unable to provide a response at this time."),
+                data=Data(
+                    cmds=cmds,
+                    executed_cmds=[ExecutedCommand(command=executed_cmd["command"], output=executed_cmd["output"]) 
+                                  for executed_cmd in executed_cmds]
+                )
+            )
+                
         except Exception as e:
             logger.error(f"Error in ProductionReadinessAgent.invoke: {str(e)}", exc_info=True)
             return AgentMessage(
                 content=f"I encountered an error while assessing your resources: {str(e)}\n\nPlease try again or contact support if the issue persists."
             )
     
-    def _preprocess_messages(self, messages: Dict[str, List[Dict[str, Any]]]) -> List[Dict[str, Any]]:
+    def _process_messages(self, messages: Dict[str, List[Dict[str, Any]]]) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
         """
-        Preprocess messages for the LLM.
+        Process messages to handle remediation actions and prepare for LLM.
         
         Args:
             messages: A dictionary containing message history
             
         Returns:
-            List of processed messages for the LLM
+            Tuple of (processed_messages, executed_cmds)
         """
-        messages_list = messages.get("messages", [])
+        logger.info("Processing messages...")
+        print("#### Processing messages...")
+        
         processed_messages = []
+        executed_cmds = []
         
+        # Extract messages list from the messages dictionary
+        messages_list = messages.get("messages", [])
+        
+        # Process each message
         for message in messages_list:
-            # Only include role and content for LLM
-            processed_messages.append({
-                "role": message.get("role", "user"),
-                "content": message.get("content", "")
-            })
+            # Skip platform_context and other metadata
+            if not message.get("content") or message.get("role") not in ["user", "assistant"]:
+                continue
+
+            processed_msg = {"role": message.get("role"), "content": message.get("content", "")}
+
+            if message.get("role") == "user":
+                data = message.get("data", {})
+
+                # Check for approved remediation actions
+                if "cmds" in data and message == messages_list[-1]:  # Only check the most recent message
+                    for cmd in data["cmds"]:
+                        if cmd.get("execute", False):
+                            print("#### Executing approved command:", cmd)
+                            logger.info(f"Executing approved command: {cmd['command']}")
+                            # Execute the approved command
+                            output = self._execute_remediation_action(cmd["command"])
+                            # Track executed commands
+                            executed_cmds.append({
+                                "command": cmd["command"],
+                                "output": output
+                            })
+                            
+                            # Append command output to the message content
+                            cmd_info = f"\n\nExecuted command: {cmd['command']}\nOutput: {output}"
+                            processed_msg["content"] += cmd_info
+                        else:
+                            logger.info(f"Skipping command without execute flag: {cmd['command']}")
+
+                # Include previously executed commands
+                if "executed_cmds" in data and data["executed_cmds"]:
+                    for cmd in data["executed_cmds"]:
+                        executed_cmds.append(cmd)
+                        cmd_info = f"\n\nPreviously executed: {cmd['command']}\nOutput: {cmd['output']}"
+                        processed_msg["content"] += cmd_info
+
+             # Add the processed message to the list
+            processed_messages.append(processed_msg)
         
-        return processed_messages
+        return processed_messages, executed_cmds
+        
+    def _extract_remediation_actions(self, content: str) -> List[Dict[str, Any]]:
+        """
+        Extract remediation actions from LLM response.
+        
+        Args:
+            content: LLM response content
+            
+        Returns:
+            List of remediation actions
+        """
+        actions = []
+        
+        # First try to extract from structured response
+        if isinstance(content, dict) and "remediation_actions" in content:
+            for action_item in content["remediation_actions"]:
+                actions.append({
+                    "action": action_item["action"],
+                    "explanation": action_item.get("explanation", "")
+                })
+            return actions
+    
+        # Fallback to regex extraction from markdown code blocks
+        action_pattern = r"```remediation\s*\n([\s\S]*?)\n```"
+        matches = re.findall(action_pattern, content)
+        
+        for match in matches:
+            action_lines = match.strip().split("\n")
+            for line in action_lines:
+                if line.strip():
+                    actions.append({
+                        "action": line.strip(),
+                        "explanation": ""
+                    })
+        
+        return actions
+        
+    def _execute_remediation_action(self, action: str) -> str:
+        """
+        Execute a remediation action using the DuploClient.
+        
+        Args:
+            action: Action to execute
+            
+        Returns:
+            Result of the action execution
+        """
+        logger.info(f"Executing remediation action: {action}")
+        
+        try:
+            # Parse the action string
+            parts = action.split(":", 1)
+            if len(parts) != 2:
+                return f"Invalid action format: {action}"
+                
+            action_type = parts[0].strip().lower()
+            action_params = parts[1].strip()
+            
+            # Handle different action types
+            if action_type == "enable_aws_security_feature":
+                return self._enable_aws_security_feature(action_params)
+            elif action_type == "update_duplo_system_setting":
+                return self._update_duplo_system_setting(action_params)
+            elif action_type == "enable_duplo_monitoring":
+                return self._enable_duplo_monitoring(action_params)
+            elif action_type == "enable_duplo_logging":
+                return self._enable_duplo_logging(action_params)
+            elif action_type == "enable_fault_notification_channel":
+                return self._enable_fault_notification_channel(action_params)
+            elif action_type == "enable_tenant_notifications":
+                return self._enable_tenant_alerting(action_params)    
+            elif action_type == "update_duplo_service":
+                return self._update_duplo_service(action_params)
+            else:
+                return f"Unknown action type: {action_type}"
+        except Exception as e:
+            logger.error(f"Error executing remediation action: {str(e)}", exc_info=True)
+            return f"Error executing action: {str(e)}"
+            
+    def _enable_aws_security_feature(self, params: str) -> str:
+        """
+        Enable an AWS security feature using the AWS account security features API.
+        
+        Args:
+            params: Parameters for enabling the security feature (format: "feature_name:true/false")
+            
+        Returns:
+            Result of the action
+        """
+        # Parse parameters (format: "feature_name:true/false")
+        try:
+            parts = params.split(":", 1)
+            if len(parts) == 1:
+                feature_name = parts[0].strip().lower()
+                enable = True  # Default to enabling if no value specified
+            else:
+                feature_name, value_str = parts
+                feature_name = feature_name.strip().lower()
+                value_str = value_str.strip().lower()
+                enable = value_str == "true"
+        except ValueError:
+            return f"Invalid security feature format: {params}"
+        
+        # Map feature names to API parameters
+        feature_map = {
+            "vpc_flow_logs": "EnableVpcFlowLogs",
+            "security_hub": "EnableSecurityHub",
+            "guardduty": "EnableGuardDuty",
+            "cloudtrail": "EnableCloudTrail",
+            "s3_public_access_block": "EnableGlobalS3PublicAccessBlock",
+            "inspector": "EnableInspector",
+            "password_policy": "EnablePasswordPolicy",
+            "delete_default_vpcs": "DeleteDefaultVpcs",
+            "revoke_default_sg_rules": "RevokeDefaultSgRules",
+            "delete_default_nacl_rules": "DeleteDefaultNaclRules"
+        }
+        
+        # Check if feature is supported
+        if feature_name not in feature_map:
+            return f"Unsupported security feature: {feature_name}"
+        
+        api_param = feature_map[feature_name]
+        
+        try:
+            # Get current AWS security settings
+            current_settings = self.duplo_client.get("/v3/admin/systemSettings/awsAccountSecurityFeatures")
+            if not current_settings:
+                current_settings = {}
+            
+            # Update the specific feature
+            current_settings[api_param] = enable
+            
+            # Call the API to update AWS account security features
+            logger.info(f"Updating AWS security feature {feature_name} to {enable}")
+            logger.debug(f"Request body: {current_settings}")
+            
+            result = self.duplo_client.post("/v3/admin/systemSettings/awsAccountSecurityFeatures", current_settings)
+            logger.info(f"Successfully {'enabled' if enable else 'disabled'} {feature_name}")
+            
+            return f"Successfully {'enabled' if enable else 'disabled'} {feature_name}"
+        except Exception as e:
+            logger.error(f"Failed to update security feature {feature_name}: {str(e)}", exc_info=True)
+            return f"Failed to {'enable' if enable else 'disable'} {feature_name}: {str(e)}"
+            
+    def _update_duplo_system_setting(self, params: str) -> str:
+        """
+        Update a DuploCloud system setting.
+        
+        Args:
+            params: Parameters for updating the system setting
+            
+        Returns:
+            Result of the action
+        """
+        print("#### Updating DuploCloud system setting:", params)
+        logger.info(f"Updating DuploCloud system setting: {params}")
+        # Parse parameters (format: "setting_name=value")
+        try:
+            setting_name, value = params.split("=", 1)
+            setting_name = setting_name.strip()
+            value = value.strip()
+        except ValueError:
+            return f"Invalid system setting format: {params}"
+        
+        # Map setting names to API keys
+        setting_map = {
+            "user_token_expiration": "EnableUserTokenExpirationNotification",
+            "token_expiration_notification_email": "UserTokenExpirationNotificationEmails"
+        }
+        
+        # Check if setting is supported
+        if setting_name.lower() not in setting_map:
+            return f"Unsupported system setting: {setting_name}"
+        
+        # Prepare request body
+        key = setting_map[setting_name.lower()]
+        request_body = {
+            "Type": "AppConfig",
+            "Key": key,
+            "Value": value
+        }
+        
+        
+        # Direct API call fallback
+        try:
+            # Use the POST endpoint as specified in the API
+            logger.debug(f"Request body: {request_body}")
+            result = self.duplo_client.post("/v3/admin/systemSettings/config", request_body)
+            logger.info(f"Response: {result}")
+            logger.info(f"Successfully updated {setting_name} to {value}")
+            return f"Successfully updated {setting_name} to {value}"
+        except Exception as e:
+            logger.error(f"Failed to update {setting_name}: {str(e)}", exc_info=True)
+            return f"Failed to update {setting_name}: {str(e)}"
+            
+    def _enable_duplo_monitoring(self, params: str) -> str:
+        """
+        Enable monitoring for a tenant.
+        
+        Args:
+            params: Parameters for enabling monitoring
+            
+        Returns:
+            Result of the action
+        """
+        # Parse parameters if needed
+        monitoring_type = params.strip()
+        
+        # Call the API
+        try:
+            # This is a placeholder - you'll need to implement the actual API calls
+            result = self.duplo_client.post("v3/admin/tenant/monitoring/enable", {"Type": monitoring_type})
+            return f"Successfully enabled {monitoring_type} monitoring"
+        except Exception as e:
+            return f"Failed to enable monitoring: {str(e)}"
+            
+    def _enable_duplo_logging(self, params: str) -> str:
+        """
+        Enable logging for a tenant.
+        
+        Args:
+            params: Parameters for enabling logging
+            
+        Returns:
+            Result of the action
+        """
+        # Parse parameters if needed
+        logging_type = params.strip()
+        
+        # Call the API
+        try:
+            # This is a placeholder - you'll need to implement the actual API calls
+            result = self.duplo_client.post("v3/admin/tenant/logging/enable", {"Type": logging_type})
+            return f"Successfully enabled {logging_type} logging"
+        except Exception as e:
+            return f"Failed to enable logging: {str(e)}"
+
+    def _enable_tenant_alerting(self, params: str) -> str:
+        """
+        Enable alerting for a tenant.
+        
+        Args:
+            params: Parameters for enabling alerting
+            
+        Returns:
+            Result of the action
+        """
+        # Parse parameters (format: "channel_type=endpoint")
+        try:
+            channel_type, endpoint = params.split("=", 1)
+            channel_type = channel_type.strip().lower()
+            endpoint = endpoint.strip()
+        except ValueError:
+            return f"Invalid alerting format: {params}"
+        
+        # Map channel types to API parameters
+        channel_map = {
+            "pagerduty": "PagerDutyServiceKey",
+            "sentry": "SentryDSN",
+            "newrelic": "NewRelicKey",
+            "opsgenie": "OpsGenieKey"
+        }
+        
+        # Check if channel type is supported
+        if channel_type not in channel_map:
+            return f"Unsupported alerting channel: {channel_type}"
+        
+        # Prepare request body
+        api_param = channel_map[channel_type]
+        request_body = {api_param: endpoint}
+        
+        # Call the API
+        try:
+            # This is a placeholder - you'll need to implement the actual API calls
+            result = self.duplo_client.post(f"subscriptions/{self.duplo_client.tenant_id}/UpdateTenantMonConfig", request_body)
+            return f"Successfully configured {channel_type} alerting"
+        except Exception as e:
+            return f"Failed to configure alerting: {str(e)}"
+
+    def _enable_fault_notification_channel(self, params: str) -> str:
+        """
+        Enable fault notification channels for a tenant using the UpdateTenantMonConfig API.
+        
+        Args:
+            params: Parameters for enabling notification channels (format: "channel_type=endpoint")
+            
+        Returns:
+            Result of the action
+        """
+        # Parse parameters (format: "channel_type=endpoint")
+        try:
+            channel_type, endpoint = params.split("=", 1)
+            channel_type = channel_type.strip().lower()
+            endpoint = endpoint.strip()
+        except ValueError:
+            return f"Invalid notification channel format: {params}"
+        
+        # Map channel types to API parameters
+        channel_map = {
+            "pagerduty": "RoutingKey",
+            "sentry": "Dsn",
+            "newrelic": "NrApiKey",
+            "opsgenie": "OpsGenieApiKey"
+        }
+        
+        # Check if channel type is supported
+        if channel_type not in channel_map:
+            return f"Unsupported notification channel: {channel_type}"
+        
+        # Get current tenant monitoring configuration if available
+        try:
+            current_config = self.duplo_client.get(f"subscriptions/{self.duplo_client.tenant_id}/GetTenantMonConfig")
+        except Exception:
+            # If we can't get the current config, start with an empty one
+            current_config = {}
+        
+        # Set default alert publish frequency if not already set
+        if "AlertPublishFrequency" not in current_config:
+            current_config["AlertPublishFrequency"] = 90  # Default to 90 minutes
+        
+        # Update the specific channel
+        api_param = channel_map[channel_type]
+        current_config[api_param] = endpoint
+        
+        # Call the API
+        try:
+            logger.info(f"Configuring {channel_type} notification channel")
+            logger.debug(f"Request body: {current_config}")
+            
+            self.duplo_client.post(f"subscriptions/{self.duplo_client.tenant_id}/UpdateTenantMonConfig", current_config)
+            logger.info(f"Successfully configured {channel_type} notification channel")
+            
+            return f"Successfully configured {channel_type} notification channel"
+        except Exception as e:
+            logger.error(f"Failed to configure {channel_type} notification channel: {str(e)}", exc_info=True)
+            return f"Failed to configure {channel_type} notification channel: {str(e)}"
+            
+    def _update_duplo_service(self, params: str) -> str:
+        """
+        Update a DuploCloud Service configuration.
+        
+        Args:
+            params: Parameters for updating the service
+            
+        Returns:
+            Result of the action
+        """
+        # Parse parameters (format: "service_name:setting=value")
+        try:
+            service_name, setting_str = params.split(":", 1)
+            setting_name, value = setting_str.split("=", 1)
+            service_name = service_name.strip()
+            setting_name = setting_name.strip().lower()
+            value = value.strip()
+        except ValueError:
+            return f"Invalid service update format: {params}"
+        
+        # Map setting names to API parameters
+        setting_map = {
+            "replicas": "Replicas",
+            "cpu": "AllocatedCpu",
+            "memory": "AllocatedMemoryMB",
+            "health_check": "HealthCheckConfig"
+        }
+        
+        # Check if setting is supported
+        if setting_name not in setting_map:
+            return f"Unsupported service setting: {setting_name}"
+        
+        # Get current service configuration
+        try:
+            service = self.duplo_client.get(f"v3/admin/tenant/replicationcontroller/{service_name}")
+            if not service:
+                return f"Service not found: {service_name}"
+        except Exception as e:
+            return f"Failed to get service {service_name}: {str(e)}"
+        
+        # Update the setting
+        api_param = setting_map[setting_name]
+        service[api_param] = value
+        
+        # Call the API to update the service
+        try:
+            # This is a placeholder - you'll need to implement the actual API calls
+            result = self.duplo_client.put(f"v3/admin/tenant/replicationcontroller/{service_name}", service)
+            return f"Successfully updated {service_name} {setting_name} to {value}"
+        except Exception as e:
+            return f"Failed to update service: {str(e)}"
+
     
     def check_production_readiness(self) -> Dict[str, Any]:
         """
