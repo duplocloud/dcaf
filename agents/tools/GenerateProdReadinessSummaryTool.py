@@ -8,7 +8,7 @@ from schemas.messages import PlatformContext
 class GenerateProdReadinessSummaryTool:
 
     def __init__(self, platform_context: PlatformContext):
-        self.tenant_name = platform_context.tenant_name
+        self.tenant_name = platform_context["tenant_name"]
 
     def get_definition(self):
         return {

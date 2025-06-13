@@ -222,16 +222,6 @@ class ProductionReadinessAgent(AgentProtocol):
             # Process messages to prepare for LLM
             processed_messages = self._preprocess_messages(messages)
             
-            # Check resources for production readiness
-            readiness_results = self.check_production_readiness()
-            logger.debug(f"Readiness results: {json.dumps(readiness_results, indent=2)}")
-            
-            # Add readiness results to processed messages
-            if readiness_results:
-                processed_messages.append({
-                    "role": "assistant", "content": f"Here are the production readiness results: {json.dumps(readiness_results, indent=2)}"
-                })
-            
             # Generate response from LLM
             llm_response = self.llm.invoke(
                 messages=processed_messages, 
