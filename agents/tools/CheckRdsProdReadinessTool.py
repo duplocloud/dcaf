@@ -64,34 +64,39 @@ class CheckRdsProdReadinessTool:
             "name": "check_rds_prod_readiness",
             "description": "Checks input rds instances for prod readiness",
             "input_schema": {
-                "type": "array",
-                "description": "List of RDS instances needing prod readiness assessment",
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "EncryptStorage": {
-                            "type": "boolean",
-                            "description": "Whether RDS instance has been configured with encryption at rest"
-                        },
-                        "MultiAZ": {
-                            "type": "boolean",
-                            "description": "Whether RDS has been configured with multi Availability Zone"
-                        },
-                        "BackupRetentionPeriod": {
-                            "type": "integer",
-                            "description": "The retention period for backups made out of this RDS instance"
-                        },
-                        "EnableLogging": {
-                            "type": "bollean",
-                            "description": "Whether logging has been enabled for this RDS instance"
-                        },
-                        "DeletionProtection": {
-                            "type": "boolean",
-                            "description": "Whether RDS instance is configured with duplocloud's delete protection feature"
-                        },
-                        "EnablePerformanceInsights": {
-                            "type": "boolean",
-                            "description": "Whether RDS has performance insights enabled"
+                "type": "object",
+                "properties": {
+                    "entities": {
+                        "type": "array",
+                        "description": "List of RDS instances needing prod readiness assessment",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "EncryptStorage": {
+                                    "type": "boolean",
+                                    "description": "Whether RDS instance has been configured with encryption at rest"
+                                },
+                                "MultiAZ": {
+                                    "type": "boolean",
+                                    "description": "Whether RDS has been configured with multi Availability Zone"
+                                },
+                                "BackupRetentionPeriod": {
+                                    "type": "integer",
+                                    "description": "The retention period for backups made out of this RDS instance"
+                                },
+                                "EnableLogging": {
+                                    "type": "boolean",
+                                    "description": "Whether logging has been enabled for this RDS instance"
+                                },
+                                "DeletionProtection": {
+                                    "type": "boolean",
+                                    "description": "Whether RDS instance is configured with duplocloud's delete protection feature"
+                                },
+                                "EnablePerformanceInsights": {
+                                    "type": "boolean",
+                                    "description": "Whether RDS has performance insights enabled"
+                                }
+                            }
                         }
                     }
                 }

@@ -11,7 +11,11 @@ class GetSystemSecurityFeaturesTool(BaseDuploInterfaceTool):
         return {
             "name": "get_system_security_features",
             "description": "Gets the security related features configured in the DuploCloud system",
-            "input_schema": {}
+            "input_schema": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": False
+            }
         }
     
     def execute(self, tool_id: str) -> ToolResult:

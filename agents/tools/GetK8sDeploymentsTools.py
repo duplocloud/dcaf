@@ -12,7 +12,11 @@ class GetK8sDeploymentsTool(BaseDuploInterfaceTool):
         return {
             "name": "list_tenant_k8s_deployments",
             "description": "Lists K8s deployments in the tenant configured in platform_context",
-            "input_schema": {}
+            "input_schema": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": False
+            }
         }
     
     def execute(self, tool_id: str) -> ToolResult:

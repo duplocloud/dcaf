@@ -15,20 +15,26 @@ class GenerateProdReadinessSummaryTool:
             "name": "generate_full_prod_readyness_report",
             "description": "Aggregates results from previously computed prod readiness assessments into one full report",
             "input_schema": {
-                "type": "array",
-                "description": "A list of prod readiness reports from various resources whose data needs aggregation",
-                "items": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "object",
-                        "properties": {
-                        "passed": { "type": "boolean" },
-                        "message": { "type": "string" },
-                        "severity": { "type": "string" },
-                        "recommendation": { "type": "string" },
-                        "score": { "type": "number" }
-                        },
-                        "required": ["passed","message","severity","recommendation"]
+                "type": "object",
+                "properties": {
+                    "entities": {
+
+                        "type": "array",
+                        "description": "A list of prod readiness reports from various resources whose data needs aggregation",
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "object",
+                                "properties": {
+                                    "passed": { "type": "boolean" },
+                                    "message": { "type": "string" },
+                                    "severity": { "type": "string" },
+                                    "recommendation": { "type": "string" },
+                                    "score": { "type": "number" }
+                                },
+                                "required": ["passed","message","severity","recommendation"]
+                            }
+                        }
                     }
                 }
             }

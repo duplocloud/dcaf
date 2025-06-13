@@ -12,7 +12,11 @@ class GetAutoScalingGroupsTool(BaseDuploInterfaceTool):
         return {
             "name": "list_tenant_asgs",
             "description": "Lists ASGs in the tenant configured in platform_context",
-            "input_schema": {}
+            "input_schema": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": False
+            }
         }
     
     def execute(self, tool_id: str) -> ToolResult:

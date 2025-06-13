@@ -48,26 +48,32 @@ class CheckElastiCacheProdReadinessTool:
             "name": "check_elasticache_prod_readiness",
             "description": "Checks input elasticache clusters for prod readiness",
             "input_schema": {
-                "type": "array",
-                "description": "List of ElastiCache clusters needing prod readiness assessment",
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "EnableEncryptionAtRest": {
-                            "type": "boolean",
-                            "description": "Whether ElastiCache Cluster has been configured with encryption at rest"
-                        },
-                        "EnableEncryptionAtTransit": {
-                            "type": "boolean",
-                            "description": "Whether ElastiCache Cluster has been configured with encryption in transit"
-                        },
-                        "MultiAZEnabled": {
-                            "type": "boolean",
-                            "description": "Whether ElastiCache Cluster has been configured with multi availability zone"
-                        },
-                        "AutomaticFailoverEnabled": {
-                            "type": "boolean",
-                            "description": "Whether ElastiCache Cluster has multi failover enabled or not"
+                "type": "object",
+                "properties": {
+                    "entities": {
+
+                        "type": "array",
+                        "description": "List of ElastiCache clusters needing prod readiness assessment",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "EnableEncryptionAtRest": {
+                                    "type": "boolean",
+                                    "description": "Whether ElastiCache Cluster has been configured with encryption at rest"
+                                },
+                                "EnableEncryptionAtTransit": {
+                                    "type": "boolean",
+                                    "description": "Whether ElastiCache Cluster has been configured with encryption in transit"
+                                },
+                                "MultiAZEnabled": {
+                                    "type": "boolean",
+                                    "description": "Whether ElastiCache Cluster has been configured with multi availability zone"
+                                },
+                                "AutomaticFailoverEnabled": {
+                                    "type": "boolean",
+                                    "description": "Whether ElastiCache Cluster has multi failover enabled or not"
+                                }
+                            }
                         }
                     }
                 }

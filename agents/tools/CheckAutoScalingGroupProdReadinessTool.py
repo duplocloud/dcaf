@@ -9,21 +9,27 @@ class CheckAutoScalingGroupProdReadinessTool:
             "name": "check_asg_prod_readiness",
             "description": "Checks input ASG for prod readiness",
             "input_schema": {
-                "type": "array",
-                "description": "List of Auto Scaling Groups needing prod readiness assessment",
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "IsClusterAutoscaled": {
-                            "type": "boolean",
-                            "description": "Whether or not Cluster autoscaling is enabled for this ASG"
-                        },
-                        "Zones": {
-                            "type": "array",
-                            "description": "List of zones the ASG is configured in",
-                            "items": {
-                                "type": "string",
-                                "description": "Name of an AWS zone"
+                "type": "object",
+                "properties": {
+                    "entities": {
+
+                        "type": "array",
+                        "description": "List of Auto Scaling Groups needing prod readiness assessment",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "IsClusterAutoscaled": {
+                                    "type": "boolean",
+                                    "description": "Whether or not Cluster autoscaling is enabled for this ASG"
+                                },
+                                "Zones": {
+                                    "type": "array",
+                                    "description": "List of zones the ASG is configured in",
+                                    "items": {
+                                        "type": "string",
+                                        "description": "Name of an AWS zone"
+                                    }
+                                }
                             }
                         }
                     }

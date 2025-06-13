@@ -11,7 +11,11 @@ class GetSystemSettingsTool(BaseDuploInterfaceTool):
         return {
             "name": "get_duplocloud_system_settings",
             "description": "Lists system level settings currently configured in the DuploCloud platform",
-            "input_schema": {}
+            "input_schema": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": False
+            }
         }
     
     def execute(self, tool_id: str) -> ToolResult:

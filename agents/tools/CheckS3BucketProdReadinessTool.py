@@ -48,26 +48,32 @@ class CheckS3BucketProdReadinessTool:
             "name": "check_s3_prod_readiness",
             "description": "Checks input s3 buckets for prod readiness",
             "input_schema": {
-                "type": "array",
-                "description": "List of s3 bucket resources needing prod readiness assessment",
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "DefaultEncryption": {
-                            "type": "string",
-                            "description": "Default encryption method the s3 bucket is configured to use"
-                        },
-                        "AllowPublicAccess": {
-                            "type": "boolean",
-                            "description": "whether or not the bucket allows access from the public internet"
-                        },
-                        "EnableVersioning": {
-                            "type": "boolean",
-                            "description": "Whether or not bucket versioning is enabled for the s3 bucket"
-                        },
-                        "EnableAccessLogs": {
-                            "type": "boolean",
-                            "description": "Whether or not access logs is enabled for monitoring access of s3 bucket"
+                "type": "object",
+                "properties": {
+                    "entities": {
+                        
+                        "type": "array",
+                        "description": "List of s3 bucket resources needing prod readiness assessment",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "DefaultEncryption": {
+                                    "type": "string",
+                                    "description": "Default encryption method the s3 bucket is configured to use"
+                                },
+                                "AllowPublicAccess": {
+                                    "type": "boolean",
+                                    "description": "whether or not the bucket allows access from the public internet"
+                                },
+                                "EnableVersioning": {
+                                    "type": "boolean",
+                                    "description": "Whether or not bucket versioning is enabled for the s3 bucket"
+                                },
+                                "EnableAccessLogs": {
+                                    "type": "boolean",
+                                    "description": "Whether or not access logs is enabled for monitoring access of s3 bucket"
+                                }
+                            }
                         }
                     }
                 }

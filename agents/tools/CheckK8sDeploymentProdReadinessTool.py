@@ -105,39 +105,45 @@ class CheckK8sDeploymentProdReadinessTool:
             "name": "check_k8s_deployment_readiness",
             "description": "Checks input k8s deployment for prod readiness",
             "input_schema": {
-                "type": "array",
-                "description": "List of kubernetes deployments needing prod readiness assessment",
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "Replicas": {
-                            "type": "integer",
-                            "description": "The set number of replicas configured for the k8s deployment"
-                        },
-                        "HPASpecs": {
+                "type": "object",
+                "properties": {
+                    "entities": {
+
+                        "type": "array",
+                        "description": "List of kubernetes deployments needing prod readiness assessment",
+                        "items": {
                             "type": "object",
-                            "description": "The horizontal pod autoscaler (HPA) configuration for the k8s deployment",
                             "properties": {
-                                "minReplicas": {
+                                "Replicas": {
                                     "type": "integer",
-                                    "description": "The minimum number of replicas that should host the k8s deployment"
+                                    "description": "The set number of replicas configured for the k8s deployment"
                                 },
-                                "metrics": {
-                                    "type": "array",
-                                    "description": "Metrics configured for monitoring the k8s deployment's HPA",
-                                    "items": {
-                                        "type": "object",
-                                        "description": "Individual metric of the HPA"
+                                "HPASpecs": {
+                                    "type": "object",
+                                    "description": "The horizontal pod autoscaler (HPA) configuration for the k8s deployment",
+                                    "properties": {
+                                        "minReplicas": {
+                                            "type": "integer",
+                                            "description": "The minimum number of replicas that should host the k8s deployment"
+                                        },
+                                        "metrics": {
+                                            "type": "array",
+                                            "description": "Metrics configured for monitoring the k8s deployment's HPA",
+                                            "items": {
+                                                "type": "object",
+                                                "description": "Individual metric of the HPA"
+                                            }
+                                        }
                                     }
-                                }
-                            }
-                        },
-                        "Template": {
-                            "type": "object",
-                            "properties": {
-                                "OtherDockerConfig": {
-                                    "type": "string",
-                                    "description": "Stringified miscelaneous docker configurations that apply to the k8s deployment"
+                                },
+                                "Template": {
+                                    "type": "object",
+                                    "properties": {
+                                        "OtherDockerConfig": {
+                                            "type": "string",
+                                            "description": "Stringified miscelaneous docker configurations that apply to the k8s deployment"
+                                        }
+                                    }
                                 }
                             }
                         }
