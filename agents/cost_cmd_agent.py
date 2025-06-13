@@ -39,6 +39,17 @@ class CostOptimizationCommandAgent(AgentProtocol):
         Returns:
             An AgentMessage containing the response, suggested commands, and executed commands
         """
+        # Extract platform context from the first user message
+        platform_context = None
+        if messages and "messages" in messages and messages["messages"]:
+            for message in messages["messages"]:
+                if message.get("role") == "user" and message.get("platform_context"):
+                    platform_context = message.get("platform_context")
+                    break
+
+        # Extract tenant name from platform context
+        tenant_name = self.extract_tenant_name(platform_context)
+        print(f"[DEBUG] Extracted tenant name: {tenant_name}")
         # Process messages to handle command execution and prepare for LLM
         processed_messages, executed_commands = self.process_messages(messages)
         resource_type = self.detect_resource_types(processed_messages)
@@ -47,14 +58,14 @@ class CostOptimizationCommandAgent(AgentProtocol):
         prompt = ''
         if 'ec2' == resource_type:
                 print(f"[DEBUG] Inside Detected resource: {resource_type}")
-                ec2_stats = self.aws.get_ec2_instance_stats()
+                ec2_stats = self.aws.get_ec2_instance_stats(tenant_name)
                 prompt += "**EC2 Instances:**\n"
                 for i in ec2_stats:
                     prompt += f"- {i['id']} | Type: {i['type']} | CPU: {i['cpu']}% | Mem: {i['memory']}% | State: {i['state']}\n"
                     prompt += "\nPlease suggest optimizations if you see any scope. Keep it crisp , clean & concise"
         if 'rds' == resource_type:
                 print(f"[DEBUG] Inside Detected resource: {resource_type}")
-                rds_stats = self.aws.get_rds_instance_stats()
+                rds_stats = self.aws.get_rds_instance_stats(tenant_name)
                 prompt += "\n**RDS Instances:**\n"
                 for db in rds_stats:
                     prompt += f"- {db['id']} | Class: {db['class']} | CPU: {db['cpu']}% | Mem: {db['memory']}% | State: {db['state']}\n"
@@ -78,7 +89,32 @@ class CostOptimizationCommandAgent(AgentProtocol):
                               for cmd in executed_commands]
             )
         )
-    
+
+    def extract_tenant_name(self, platform_context: Optional[Dict[str, Any]]) -> str:
+        """
+        Initialize Tenant name with platform context.
+        
+        Args:
+            platform_context: Dictionary containing tenant_name.
+        
+        Returns:
+            Tenant name as a string or an empty string if validation fails
+        """
+        if not platform_context:
+            logger.warning("No platform context provided for Tenant initialization")
+            return "default"
+            
+        try:
+            tenant_name = platform_context.get("tenant_name", "default")
+            if not tenant_name:
+                logger.error("Tenant name not found in platform context")
+            logger.info(f"Tenant name {tenant_name} found in platform context")
+            return tenant_name
+                
+        except Exception as e:
+            logger.error(f"Error initializing Tenant: {str(e)}")
+            return "default"
+
     def process_messages(self, messages: Dict[str, List[Dict[str, Any]]]) -> tuple[List[Dict[str, Any]], List[Dict[str, str]]]:
         """
         Process the raw messages to handle command execution and prepare for LLM.

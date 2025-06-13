@@ -58,8 +58,22 @@ class AWSService:
             return 0.0
 
 
-    def get_ec2_instance_stats(self):
-        response = self.ec2.describe_instances()
+    def get_ec2_instance_stats(self, tenant_name=None):
+        tenant_name = tenant_name or "default"
+        
+        try:
+            response = self.ec2.describe_instances(Filters=[
+                    {
+                        'Name': 'tag:TENANT_NAME',
+                        'Values': [tenant_name]
+                    }
+                ])
+            if not response.get("Reservations"):
+                print(f"No instances found for tenant: {tenant_name}")
+                return []
+        except Exception as e:
+            print(f"Failed to fetch instances for tenant {tenant_name}: {e}")
+            return []
         stats = []
         for reservation in response["Reservations"]:
             for instance in reservation["Instances"]:
@@ -75,8 +89,13 @@ class AWSService:
                 })
         return stats
 
-    def get_rds_instance_stats(self):
-        response = self.rds.describe_db_instances()
+    def get_rds_instance_stats(self, tenant_name=None):
+        tenant_name = tenant_name or "default"
+        tenant_name = f"duploservices-{tenant_name}"
+        tenant_filter = {"Name": "tag:Name", "Values": [tenant_name]}
+        response = self.rds.describe_db_instances(Filters=[
+                    tenant_filter
+                ])
         stats = []
         for db in response["DBInstances"]:
             db_id = db["DBInstanceIdentifier"]
