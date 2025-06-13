@@ -1,13 +1,13 @@
 from typing import Any, Dict, List
 
 from schemas.ProdReadinessCheck import ProdReadinessCheck
-
+from schemas.ResourceProdReadinessReport import ResourceProdReadinessReport
 
 class ProdReadinessChecksEvaluator:
     def __init__(self, checks: List[ProdReadinessCheck]):
         self.checks = checks
 
-    def evaluate(self, resources: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def evaluate(self, resources: List[Dict[str, Any]]) -> Dict[str, ResourceProdReadinessReport]:
         """
         Generic function to check attributes on resources.
         

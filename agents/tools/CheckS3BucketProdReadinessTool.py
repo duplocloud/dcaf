@@ -1,5 +1,6 @@
 from typing import Any, Dict, List
 from agents.tools.ProdReadinessChecksEvaluator import ProdReadinessChecksEvaluator
+from schemas.ToolResult import ToolResult
 
 class CheckS3BucketProdReadinessTool:
     def __init__(self):
@@ -45,29 +46,37 @@ class CheckS3BucketProdReadinessTool:
     def get_definition(self) -> Dict[str, Any]:
         return {
             "name": "check_s3_prod_readiness",
-            "description": "Checks input s3 instances for prod readiness",
+            "description": "Checks input s3 buckets for prod readiness",
             "input_schema": {
-                "type": "object",
-                "properties": {
-                     "DefaultEncryption": {
-                         "type": "string",
-                         "description": "Default encryption method the s3 bucket is configured to use"
-                     },
-                     "AllowPublicAccess": {
-                         "type": "boolean",
-                         "description": "whether or not the bucket allows access from the public internet"
-                     },
-                     "EnableVersioning": {
-                         "type": "boolean",
-                         "description": "Whether or not bucket versioning is enabled for the s3 bucket"
-                     },
-                     "EnableAccessLogs": {
-                         "type": "boolean",
-                         "description": "Whether or not access logs is enabled for monitoring access of s3 bucket"
-                     }
+                "type": "array",
+                "description": "List of s3 bucket resources needing prod readiness assessment",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "DefaultEncryption": {
+                            "type": "string",
+                            "description": "Default encryption method the s3 bucket is configured to use"
+                        },
+                        "AllowPublicAccess": {
+                            "type": "boolean",
+                            "description": "whether or not the bucket allows access from the public internet"
+                        },
+                        "EnableVersioning": {
+                            "type": "boolean",
+                            "description": "Whether or not bucket versioning is enabled for the s3 bucket"
+                        },
+                        "EnableAccessLogs": {
+                            "type": "boolean",
+                            "description": "Whether or not access logs is enabled for monitoring access of s3 bucket"
+                        }
+                    }
                 }
             }
         }
     
-    def execute(self, resources: List[Dict[str, Any]]) -> Dict[str, Any]:
-        return self.evaluator.evaluate(resources)
+    def execute(self, resources: List[Dict[str, Any]], tool_id: str) -> ToolResult:
+        return {
+            "type": "tool_result",
+            "tool_use_id": tool_id,
+            "content": self.evaluator.evaluate(resources)
+        }

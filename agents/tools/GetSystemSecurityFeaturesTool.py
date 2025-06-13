@@ -42,5 +42,5 @@ class GetSystemSecurityFeaturesTool(BaseDuploInterfaceTool):
         return {
             "type": "tool_result",
             "tool_use_id": tool_id,
-            "content": security_resource
+            "content": [security_resource]
         }

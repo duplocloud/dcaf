@@ -1,9 +1,9 @@
-from typing import Callable, TypedDict
+from typing import Callable, Tuple, TypedDict
 
 
 class ProdReadinessCheck(TypedDict):
     name: str
     attribute_path: str
-    condition: Callable[object, bool]
+    condition: Callable[object, Tuple[bool, str]]
     severity: str
     recommendation: str

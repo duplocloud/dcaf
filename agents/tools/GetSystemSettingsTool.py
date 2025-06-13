@@ -51,5 +51,5 @@ class GetSystemSettingsTool(BaseDuploInterfaceTool):
         return {
             "type": "tool_result",
             "tool_use_id": tool_id,
-            "content": system_resource
+            "content": [system_resource]
         }

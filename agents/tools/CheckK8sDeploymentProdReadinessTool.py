@@ -1,5 +1,6 @@
 from typing import Any, Dict, List
 from agents.tools.ProdReadinessChecksEvaluator import ProdReadinessChecksEvaluator
+from schemas.ToolResult import ToolResult
 
 class CheckK8sDeploymentProdReadinessTool:
     def __init__(self):
@@ -104,36 +105,40 @@ class CheckK8sDeploymentProdReadinessTool:
             "name": "check_k8s_deployment_readiness",
             "description": "Checks input k8s deployment for prod readiness",
             "input_schema": {
-                "type": "object",
-                "properties": {
-                    "Replicas": {
-                        "type": "integer",
-                        "description": "The set number of replicas configured for the k8s deployment"
-                    },
-                    "HPASpecs": {
-                        "type": "object",
-                        "description": "The horizontal pod autoscaler (HPA) configuration for the k8s deployment",
-                        "properties": {
-                            "minReplicas": {
-                                "type": "integer",
-                                "description": "The minimum number of replicas that should host the k8s deployment"
-                            },
-                            "metrics": {
-                                "type": "array",
-                                "description": "Metrics configured for monitoring the k8s deployment's HPA",
-                                "items": {
-                                    "type": "object",
-                                    "description": "Individual metric of the HPA"
+                "type": "array",
+                "description": "List of kubernetes deployments needing prod readiness assessment",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "Replicas": {
+                            "type": "integer",
+                            "description": "The set number of replicas configured for the k8s deployment"
+                        },
+                        "HPASpecs": {
+                            "type": "object",
+                            "description": "The horizontal pod autoscaler (HPA) configuration for the k8s deployment",
+                            "properties": {
+                                "minReplicas": {
+                                    "type": "integer",
+                                    "description": "The minimum number of replicas that should host the k8s deployment"
+                                },
+                                "metrics": {
+                                    "type": "array",
+                                    "description": "Metrics configured for monitoring the k8s deployment's HPA",
+                                    "items": {
+                                        "type": "object",
+                                        "description": "Individual metric of the HPA"
+                                    }
                                 }
                             }
-                        }
-                    },
-                    "Template": {
-                        "type": "object",
-                        "properties": {
-                            "OtherDockerConfig": {
-                                "type": "string",
-                                "description": "Stringified miscelaneous docker configurations that apply to the k8s deployment"
+                        },
+                        "Template": {
+                            "type": "object",
+                            "properties": {
+                                "OtherDockerConfig": {
+                                    "type": "string",
+                                    "description": "Stringified miscelaneous docker configurations that apply to the k8s deployment"
+                                }
                             }
                         }
                     }
@@ -141,5 +146,9 @@ class CheckK8sDeploymentProdReadinessTool:
             }
         }
     
-    def execute(self, resources: List[Dict[str, Any]]) -> Dict[str, Any]:
-        return self.evaluator.evaluate(resources)
+    def execute(self, resources: List[Dict[str, Any]], tool_id: str) -> ToolResult:
+        return {
+            "type": "tool_result",
+            "tool_use_id": tool_id,
+            "content": self.evaluator.evaluate(resources)
+        }

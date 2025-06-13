@@ -31,7 +31,7 @@ class GetTenantSettingsTool(BaseDuploInterfaceTool):
         return {
             "type": "tool_result",
             "tool_use_id": tool_id,
-            "content": tenant_resource
+            "content": [tenant_resource]
         }
     
     def _is_tenant_logging_enabled(self) -> bool:

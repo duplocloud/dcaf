@@ -1,5 +1,6 @@
 from typing import Any, Dict, List
 from agents.tools.ProdReadinessChecksEvaluator import ProdReadinessChecksEvaluator
+from schemas.ToolResult import ToolResult
 
 class CheckSystemSecurityFeaturesProdReadinessTool:
     def __init__(self):
@@ -161,5 +162,9 @@ class CheckSystemSecurityFeaturesProdReadinessTool:
             }
         }
     
-    def execute(self, resources: List[Dict[str, Any]]) -> Dict[str, Any]:
-        return self.evaluator.evaluate(resources)
+    def execute(self, resources: List[Dict[str, Any]], tool_id: str) -> ToolResult:
+        return {
+            "type": "tool_result",
+            "tool_use_id": tool_id,
+            "content": self.evaluator.evaluate(resources)
+        }

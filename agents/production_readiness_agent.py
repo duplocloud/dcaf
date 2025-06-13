@@ -9,6 +9,7 @@ from agents.tools.CheckS3BucketProdReadinessTool import CheckS3BucketProdReadine
 from agents.tools.CheckSystemSecurityFeaturesProdReadinessTool import CheckSystemSecurityFeaturesProdReadinessTool
 from agents.tools.CheckSystemSettingsProdReadinessTool import CheckSystemSettingsProdReadinessTool
 from agents.tools.CheckTenantSettingsProdReadinessTool import CheckTenantSettingsProdReadinessTool
+from agents.tools.GenerateProdReadinessSummaryTool import GenerateProdReadinessSummaryTool
 from agents.tools.GetElastiCacheInstancesTool import GetElastiCacheInstancesTool
 from agents.tools.GetK8sDeploymentsTools import GetK8sDeploymentsTool
 from agents.tools.GetRdsInstancesTool import GetRdsInstancesTool
@@ -18,7 +19,6 @@ from agents.tools.GetSystemSettingsTool import GetSystemSettingsTool
 from agents.tools.GetTenantSettingsTool import GetTenantSettingsTool
 from schemas.messages import AgentMessage
 from services.llm import BedrockAnthropicLLM
-from services.duplo_client import DuploClient
 import os
 
 logger = logging.getLogger(__name__)
@@ -214,6 +214,9 @@ class ProductionReadinessAgent(AgentProtocol):
                 # DuploCloud System settings
                 GetSystemSettingsTool(platform_context),
                 CheckSystemSettingsProdReadinessTool(),
+
+                # reporting
+                GenerateProdReadinessSummaryTool(platform_context),
             ]
             
             # Process messages to prepare for LLM
@@ -270,140 +273,3 @@ class ProductionReadinessAgent(AgentProtocol):
             })
         
         return processed_messages
-    
-    def check_production_readiness(self) -> Dict[str, Any]:
-        """
-        Check resources for production readiness.
-        
-        Returns:
-            Dictionary with readiness assessment results
-        """
-        logger.setLevel(logging.INFO)
-        logger.info("Starting production readiness check")
-        
-        if not self.duplo_client:
-            logger.error("DuploClient not initialized")
-            return {"error": "DuploClient not initialized"}
-        
-        try:
-            tenant = self.duplo_client.tenant_name
-            logger.info(f"Checking production readiness for tenant: {tenant}")
-            
-            results = {
-                "tenant": tenant,
-                "timestamp": self._get_current_timestamp(),
-                "resources": {},
-                "summary": {
-                    "total_resources": 0,
-                    "passing_resources": 0,
-                    "critical_issues": 0,
-                    "warnings": 0,
-                    "overall_score": 0
-                }
-            }
-            
-            # Calculate summary statistics
-            logger.info("Calculating summary statistics...")
-            self._calculate_summary(results)
-            
-            return results
-            
-        except Exception as e:
-            logger.error(f"Error checking production readiness: {str(e)}", exc_info=True)
-            return {"error": f"Error checking production readiness: {str(e)}"}
-    
-    def _get_current_timestamp(self) -> str:
-        """Get current timestamp in ISO format."""
-        from datetime import datetime
-        return datetime.now().isoformat()
-
-    def _calculate_summary(self, results: Dict[str, Any]) -> None:
-        """
-        Calculate summary statistics for assessment results.
-        
-        Args:
-            results: Assessment results dictionary to update with summary
-        """
-        total_resources = 0
-        passing_resources = 0
-        critical_issues = 0
-        warnings = 0
-        
-        # Process each resource type
-        for _, resources in results.get("resources", {}).items():
-            # Skip empty resources
-            if not resources:
-                continue
-                
-            # Handle list format (most resource types)
-            if isinstance(resources, list):
-                for resource in resources:
-                    if not isinstance(resource, dict):
-                        continue
-                        
-                    total_resources += 1
-                    
-                    # Count issues by severity
-                    critical_failures = 0
-                    warning_count = 0
-                    
-                    for check in resource.get("checks", []):
-                        if not check.get("passed", True):
-                            if check.get("severity") == "critical":
-                                critical_failures += 1
-                            elif check.get("severity") == "warning":
-                                warning_count += 1
-                    
-                    # Store counts in the resource for future reference
-                    resource["critical_failures"] = critical_failures
-                    resource["warnings"] = warning_count
-                    
-                    # A resource is considered passing if it has no critical failures
-                    if critical_failures == 0:
-                        passing_resources += 1
-                    
-                    critical_issues += critical_failures
-                    warnings += warning_count
-            
-            # Handle dict format (aws_security and system_settings)
-            elif isinstance(resources, dict) and "checks" in resources:
-                total_resources += 1
-                critical_failures = 0
-                warning_count = 0
-                
-                for check in resources.get("checks", []):
-                    if not check.get("passed", True):
-                        if check.get("severity") == "critical":
-                            critical_failures += 1
-                        elif check.get("severity") == "warning":
-                            warning_count += 1
-                
-                # Store counts in the resource for future reference
-                resources["critical_failures"] = critical_failures
-                resources["warnings"] = warning_count
-                
-                # A resource is considered passing if it has no critical failures
-                if critical_failures == 0:
-                    passing_resources += 1
-                
-                critical_issues += critical_failures
-                warnings += warning_count
-        
-        # Initialize summary if it doesn't exist
-        if "summary" not in results:
-            results["summary"] = {}
-            
-        # Update summary
-        results["summary"]["total_resources"] = total_resources
-        results["summary"]["passing_resources"] = passing_resources
-        results["summary"]["critical_issues"] = critical_issues
-        results["summary"]["warnings"] = warnings
-        
-        # Calculate overall score (0-100)
-        if total_resources > 0:
-            # Weight critical issues more heavily than warnings
-            results["summary"]["overall_score"] = max(0, min(100, 
-                100 - (critical_issues * 15 + warnings * 5) / total_resources
-            ))
-        else:
-            results["summary"]["overall_score"] = 0

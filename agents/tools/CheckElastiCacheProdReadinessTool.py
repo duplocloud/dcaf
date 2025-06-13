@@ -1,5 +1,6 @@
 from typing import Any, Dict, List
 from agents.tools.ProdReadinessChecksEvaluator import ProdReadinessChecksEvaluator
+from schemas.ToolResult import ToolResult
 
 class CheckElastiCacheProdReadinessTool:
     def __init__(self):
@@ -47,27 +48,35 @@ class CheckElastiCacheProdReadinessTool:
             "name": "check_elasticache_prod_readiness",
             "description": "Checks input elasticache clusters for prod readiness",
             "input_schema": {
-                "type": "object",
-                "properties": {
-                     "EnableEncryptionAtRest": {
-                          "type": "boolean",
-                          "description": "Whether ElastiCache Cluster has been configured with encryption at rest"
-                     },
-                     "EnableEncryptionAtTransit": {
-                          "type": "boolean",
-                          "description": "Whether ElastiCache Cluster has been configured with encryption in transit"
-                     },
-                     "MultiAZEnabled": {
-                          "type": "boolean",
-                          "description": "Whether ElastiCache Cluster has been configured with multi availability zone"
-                     },
-                     "AutomaticFailoverEnabled": {
-                          "type": "boolean",
-                          "description": "Whether ElastiCache Cluster has multi failover enabled or not"
-                     }
+                "type": "array",
+                "description": "List of ElastiCache clusters needing prod readiness assessment",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "EnableEncryptionAtRest": {
+                            "type": "boolean",
+                            "description": "Whether ElastiCache Cluster has been configured with encryption at rest"
+                        },
+                        "EnableEncryptionAtTransit": {
+                            "type": "boolean",
+                            "description": "Whether ElastiCache Cluster has been configured with encryption in transit"
+                        },
+                        "MultiAZEnabled": {
+                            "type": "boolean",
+                            "description": "Whether ElastiCache Cluster has been configured with multi availability zone"
+                        },
+                        "AutomaticFailoverEnabled": {
+                            "type": "boolean",
+                            "description": "Whether ElastiCache Cluster has multi failover enabled or not"
+                        }
+                    }
                 }
             }
         }
     
-    def execute(self, resources: List[Dict[str, Any]]) -> Dict[str, Any]:
-        return self.evaluator.evaluate(resources)
+    def execute(self, resources: List[Dict[str, Any]], tool_id: str) -> ToolResult:
+        return {
+            "type": "tool_result",
+            "tool_use_id": tool_id,
+            "content": self.evaluator.evaluate(resources)
+        }
