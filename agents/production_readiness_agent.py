@@ -228,35 +228,60 @@ class ProductionReadinessAgent(AgentProtocol):
         Use the following action types:
         
         1. enable_aws_security_feature - To enable AWS security features
-           Example: enable_aws_security_feature:guardduty
-           Supported features: vpc_flow_logs, security_hub, guardduty, cloudtrail, s3_public_access_block, inspector
+            Examples: 
+            - enable_aws_security_feature:guardduty:true
+            - enable_aws_security_feature:vpc_flow_logs:true
+            - enable_aws_security_feature:security_hub:true
+            - enable_aws_security_feature:cloudtrail:true
+            - enable_aws_security_feature:s3_public_access_block:true
+            - enable_aws_security_feature:inspector:true
+            - enable_aws_security_feature:password_policy:true
+            - enable_aws_security_feature:delete_default_vpcs:true
+            - enable_aws_security_feature:revoke_default_sg_rules:true
+            - enable_aws_security_feature:delete_default_nacl_rules:true
+            Supported features: vpc_flow_logs, security_hub, guardduty, cloudtrail, s3_public_access_block, inspector, password_policy, delete_default_vpcs, revoke_default_sg_rules, delete_default_nacl_rules
         
         2. update_duplo_system_setting - To update DuploCloud system settings
-           Example: update_duplo_system_setting:token_expiration_notification_email=alerts@example.com
-           Supported settings: user_token_expiration, token_expiration_notification_email
+            Examples: 
+            - update_duplo_system_setting:token_expiration_notification_email=alerts@example.com
+            - update_duplo_system_setting:user_token_expiration=30
+            - update_duplo_system_setting:token_expiration_notification_email=security@company.com
+            - update_duplo_system_setting:user_token_expiration=90
+            Supported settings: user_token_expiration, token_expiration_notification_email
         
         3. enable_duplo_monitoring - To enable monitoring for a tenant
-           Example: enable_duplo_monitoring:true
+            Examples: 
+            - enable_duplo_monitoring:true
         
         4. enable_duplo_logging - To enable logging for a tenant
-           Example: enable_duplo_logging:true
+            Examples: 
+            - enable_duplo_logging:true
         
         5. enable_duplo_alerting - To configure alerting for a tenant
-           Example: enable_duplo_alerting:pagerduty=YOUR_PD_SERVICE_KEY
-           Supported channels: pagerduty, sentry, newrelic, opsgenie
-
+            Examples: 
+            - enable_duplo_alerting:true
+        
         6. enable_fault_notification_channel - To configure fault notification channel for a tenant
-           Example: enable_fault_notification_channel:pagerduty=YOUR_PD_SERVICE_KEY
-           Supported channels: pagerduty, sentry, newrelic, opsgenie
-
+            Examples: 
+            - enable_fault_notification_channel:pagerduty=YOUR_PD_SERVICE_KEY
+            - enable_fault_notification_channel:sentry=YOUR_DSN
+            - enable_fault_notification_channel:newrelic=YOUR_NR_API_KEY
+            - enable_fault_notification_channel:opsgenie=YOUR_OPSGENIE_API_KEY
+            Supported channels: pagerduty, sentry, newrelic, opsgenie
+        
         7. update_duplo_service - To update a DuploCloud Service configuration
-           Example: update_duplo_service:my-api-service:replicas=3
-           Supported settings: replicas, cpu, memory, health_check
+            Examples: 
+            - update_duplo_service:my-api-service:replicas=3
+            - update_duplo_service:my-worker-service:cpu=1
+            - update_duplo_service:my-web-service:memory=2048
+            - update_duplo_service:my-backend-service:health_check=true
+            - update_duplo_service:my-frontend-service:replicas=2:cpu=0.5:memory=1024
+            Supported settings: replicas, cpu, memory, health_check
         
         The user must explicitly type "APPROVE" to execute any of these remediation actions. Always explain what each action will do before suggesting it.
         ```        
         Always use tables for showing check results with columns for Check Name, Status (✅/❌), Severity, and Recommendation
-
+        
         Remember that your assessment directly impacts production deployment decisions, so be thorough, accurate, and provide practical, implementable recommendations."""
     
     def _validate_platform_context(self, platform_context: Optional[Dict[str, Any]]) -> bool:
