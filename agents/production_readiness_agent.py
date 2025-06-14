@@ -654,18 +654,18 @@ class ProductionReadinessAgent(AgentProtocol):
         
         try:
             # Get current AWS security settings
-            current_settings = self.duplo_client.get("/v3/admin/systemSettings/awsAccountSecurityFeatures")
+            current_settings = self.duplo_client.get("/v3/admin/systemSettings/awsAccountSecurity")
             if not current_settings:
                 current_settings = {}
-            
+            features = current_settings.get("Features", {})
             # Update the specific feature
-            current_settings[api_param] = enable
+            features[api_param] = enable
             
             # Call the API to update AWS account security features
             logger.info(f"Updating AWS security feature {feature_name} to {enable}")
-            logger.debug(f"Request body: {current_settings}")
+            logger.debug(f"Request body: {features}")
             
-            result = self.duplo_client.post("/v3/admin/systemSettings/awsAccountSecurityFeatures", current_settings)
+            self.duplo_client.post("/v3/admin/systemSettings/awsAccountSecurityFeatures", features)
             logger.info(f"Successfully {'enabled' if enable else 'disabled'} {feature_name}")
             
             return f"Successfully {'enabled' if enable else 'disabled'} {feature_name}"
