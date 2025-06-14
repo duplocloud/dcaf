@@ -7,8 +7,7 @@ from services.llm import BedrockAnthropicLLM
 from services.duplo_client import DuploClient
 import os
 import json
-import time
-import re
+import requests
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
@@ -386,19 +385,20 @@ class ProductionReadinessAgent(AgentProtocol):
                 "type": "tool",
                 "name": "return_assessment"
             }
-
+            initial_response = None
             # First LLM call to determine if production readiness check is needed
-            logger.info("Making initial LLM call to determine if production readiness check is needed")
-            initial_response = self.llm.invoke(
-                messages=processed_messages, 
-                model_id=self.model_id, 
-                system_prompt=self.system_prompt,
-                max_tokens=20000, 
-                tools=[self.response_schema],
-                tool_choice=tool_choice
-            )
-            logger.info("#### initial_response:")
-            logger.info(initial_response)
+            if not is_remediation_only:
+                logger.info("Making initial LLM call to determine if production readiness check is needed")
+                initial_response = self.llm.invoke(
+                    messages=processed_messages, 
+                    model_id=self.model_id, 
+                    system_prompt=self.system_prompt,
+                    max_tokens=20000, 
+                    tools=[self.response_schema],
+                    tool_choice=tool_choice
+                )
+                logger.info("#### initial_response:")
+                logger.info(initial_response)
             
             # Check if production readiness assessment is requested
             should_check_readiness = False
@@ -598,8 +598,8 @@ class ProductionReadinessAgent(AgentProtocol):
                 return self._enable_duplo_logging(action_params)
             elif action_type == "enable_fault_notification_channel":
                 return self._enable_fault_notification_channel(action_params)
-            elif action_type == "enable_tenant_notifications":
-                return self._enable_tenant_alerting(action_params)    
+            elif action_type == "enable_duplo_alerting":
+                return self._enable_duplo_alerting(action_params)    
             elif action_type == "update_duplo_service":
                 return self._update_duplo_service(action_params)
             else:
@@ -766,7 +766,7 @@ class ProductionReadinessAgent(AgentProtocol):
         except Exception as e:
             return f"Failed to enable logging: {str(e)}"
 
-    def _enable_tenant_alerting(self, params: str) -> str:
+    def _enable_duplo_alerting(self, params: str) -> str:
         """
         Enable alerting for a tenant.
         
@@ -776,37 +776,37 @@ class ProductionReadinessAgent(AgentProtocol):
         Returns:
             Result of the action
         """
-        # Parse parameters (format: "channel_type=endpoint")
-        try:
-            channel_type, endpoint = params.split("=", 1)
-            channel_type = channel_type.strip().lower()
-            endpoint = endpoint.strip()
-        except ValueError:
-            return f"Invalid alerting format: {params}"
+        # Check if this is the special case to enable all alerts using the base template
+        if params.strip().lower() == "true":
+            try:
+                # Step 1: Get the alerts base template
+                logger.info("Fetching alerts base template")
+                alerts_template = self.duplo_client.get("admin/GetAlertsBaseTemplate")
+                
+                if not alerts_template:
+                    return "Failed to fetch alerts base template: Empty response"
+                    
+                logger.info(f"Successfully fetched alerts base template with {len(alerts_template)} alerts")
+                
+                # Step 2: Update the tenant with the base template
+                logger.info(f"Updating alerts template for tenant {self.duplo_client.tenant_id}")
+                
+                # Post the exact template to the update endpoint and handle the response directly
+                # without trying to parse it as JSON
+                url = self.duplo_client._build_url(f"admin/UpdateAlertsTemplateForTenant/{self.duplo_client.tenant_id}")
+                headers = self.duplo_client._get_headers()
+                
+                logger.info(f"Making POST request to {url}")
+                response = requests.post(url, headers=headers, json=alerts_template)
+                response.raise_for_status()  # This will raise an exception for HTTP errors
+                
+                # Successfully updated the alerts template
+                logger.info(f"Successfully updated alerts template for tenant {self.duplo_client.tenant_id}")
+                return f"Successfully enabled alerting for tenant {self.duplo_client.tenant_id} using base template"
+            except Exception as e:
+                logger.error(f"Failed to enable alerting: {str(e)}", exc_info=True)
+                return f"Failed to enable alerting: {str(e)}"
         
-        # Map channel types to API parameters
-        channel_map = {
-            "pagerduty": "PagerDutyServiceKey",
-            "sentry": "SentryDSN",
-            "newrelic": "NewRelicKey",
-            "opsgenie": "OpsGenieKey"
-        }
-        
-        # Check if channel type is supported
-        if channel_type not in channel_map:
-            return f"Unsupported alerting channel: {channel_type}"
-        
-        # Prepare request body
-        api_param = channel_map[channel_type]
-        request_body = {api_param: endpoint}
-        
-        # Call the API
-        try:
-            # This is a placeholder - you'll need to implement the actual API calls
-            result = self.duplo_client.post(f"subscriptions/{self.duplo_client.tenant_id}/UpdateTenantMonConfig", request_body)
-            return f"Successfully configured {channel_type} alerting"
-        except Exception as e:
-            return f"Failed to configure alerting: {str(e)}"
 
     def _enable_fault_notification_channel(self, params: str) -> str:
         """
@@ -865,7 +865,7 @@ class ProductionReadinessAgent(AgentProtocol):
         except Exception as e:
             logger.error(f"Failed to configure {channel_type} notification channel: {str(e)}", exc_info=True)
             return f"Failed to configure {channel_type} notification channel: {str(e)}"
-            
+        
     def _update_duplo_service(self, params: str) -> str:
         """
         Update a DuploCloud Service configuration.
