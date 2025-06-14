@@ -789,7 +789,7 @@ class ProductionReadinessAgent(AgentProtocol):
                 logger.info(f"Successfully fetched alerts base template with {len(alerts_template)} alerts")
                 
                 # Step 2: Update the tenant with the base template
-                logger.info(f"Updating alerts template for tenant {self.duplo_client.tenant_id}")
+                logger.info(f"Updating alerts template for tenant {self.duplo_client.tenant_name}")
                 
                 # Post the exact template to the update endpoint and handle the response directly
                 # without trying to parse it as JSON
@@ -801,8 +801,13 @@ class ProductionReadinessAgent(AgentProtocol):
                 response.raise_for_status()  # This will raise an exception for HTTP errors
                 
                 # Successfully updated the alerts template
-                logger.info(f"Successfully updated alerts template for tenant {self.duplo_client.tenant_id}")
-                return f"Successfully enabled alerting for tenant {self.duplo_client.tenant_id} using base template"
+                logger.info(f"Successfully updated alerts template for tenant {self.duplo_client.tenant_name}")
+
+                self.duplo_client.post(f"v3/admin/tenant/{self.duplo_client.tenant_id}/metadata", {
+                    "Key": "enable_alerting",
+                    "Value": "true"
+                })
+                return f"Successfully enabled alerting for tenant {self.duplo_client.tenant_name} using base template"
             except Exception as e:
                 logger.error(f"Failed to enable alerting: {str(e)}", exc_info=True)
                 return f"Failed to enable alerting: {str(e)}"
