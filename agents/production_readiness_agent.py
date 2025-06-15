@@ -277,6 +277,14 @@ class ProductionReadinessAgent(AgentProtocol):
             - update_duplo_service:my-frontend-service:replicas=2:cpu=0.5:memory=1024
             Supported settings: replicas, cpu, memory, health_check
         
+        8. update_s3_bucket - To update S3 bucket configuration
+            Examples: 
+            - update_s3_bucket:my-bucket:versioning=true
+            - update_s3_bucket:my-bucket:logging=true
+            - update_s3_bucket:my-bucket:encryption=true
+            - update_s3_bucket:my-bucket:public_access=false
+            Supported settings: versioning, logging, encryption, public_access
+        
         The user must explicitly type "APPROVE" to execute any of these remediation actions. Always explain what each action will do before suggesting it.
         ```        
         Always use tables for showing check results with columns for Check Name, Status (✅/❌), Severity, and Recommendation
@@ -592,16 +600,18 @@ class ProductionReadinessAgent(AgentProtocol):
                 return self._enable_aws_security_feature(action_params)
             elif action_type == "update_duplo_system_setting":
                 return self._update_duplo_system_setting(action_params)
+            elif action_type == "enable_fault_notification_channel":
+                return self._enable_fault_notification_channel(action_params)
+            elif action_type == "enable_duplo_alerting":
+                return self._enable_duplo_alerting(action_params)       
             elif action_type == "enable_duplo_monitoring":
                 return self._enable_duplo_monitoring(action_params)
             elif action_type == "enable_duplo_logging":
                 return self._enable_duplo_logging(action_params)
-            elif action_type == "enable_fault_notification_channel":
-                return self._enable_fault_notification_channel(action_params)
-            elif action_type == "enable_duplo_alerting":
-                return self._enable_duplo_alerting(action_params)    
             elif action_type == "update_duplo_service":
                 return self._update_duplo_service(action_params)
+            elif action_type == "update_s3_bucket":
+                return self._update_s3_bucket(action_params)
             else:
                 return f"Unknown action type: {action_type}"
         except Exception as e:
@@ -923,6 +933,96 @@ class ProductionReadinessAgent(AgentProtocol):
         except Exception as e:
             return f"Failed to update service: {str(e)}"
 
+    def _update_s3_bucket(self, params: str) -> str:
+        """
+        Update an S3 bucket configuration using jsonpatch.
+        
+        Args:
+            params: Parameters for updating the S3 bucket (format: "bucket_name:setting=value")
+            
+        Returns:
+            Result of the action
+        """
+        try:
+            # Parse parameters (format: "bucket_name:setting=value")
+            parts = params.split(":", 1)
+            if len(parts) != 2:
+                return f"Invalid S3 bucket update parameters: {params}"
+                
+            bucket_name = parts[0].strip()
+            setting_value = parts[1].strip()
+            
+            # Parse setting and value
+            setting_parts = setting_value.split("=", 1)
+            if len(setting_parts) != 2:
+                return f"Invalid setting format: {setting_value}"
+                
+            setting = setting_parts[0].strip().lower()
+            value_str = setting_parts[1].strip().lower()
+            
+            # Convert string value to boolean
+            value = value_str in ["true", "yes", "1"]
+            
+            # Create JSON patch based on the setting
+            patches = []
+            if setting == "versioning":
+                patches.append({
+                    "op": "replace",
+                    "path": "/EnableVersioning",
+                    "value": value
+                })
+            elif setting == "logging":
+                patches.append({
+                    "op": "replace",
+                    "path": "/EnableAccessLogs",
+                    "value": value
+                })
+            elif setting == "encryption":
+                if value:
+                    patches.append({
+                        "op": "replace",
+                        "path": "/DefaultEncryption",
+                        "value": "Sse"
+                    })
+                    patches.append({
+                        "op": "replace",
+                        "path": "/DefaultEncryptionType",
+                        "value": 2
+                    })
+                    patches.append({
+                        "op": "replace",
+                        "path": "/DefaultEncryptionAwsSyntax",
+                        "value": "AES256"
+                    })
+                else:
+                    patches.append({
+                        "op": "replace",
+                        "path": "/DefaultEncryption",
+                        "value": None
+                    })
+            elif setting == "public_access":
+                patches.append({
+                    "op": "replace",
+                    "path": "/AllowPublicAccess",
+                    "value": value
+                })
+            else:
+                return f"Unknown S3 bucket setting: {setting}"
+            
+            # Apply the patch to update the bucket
+            try:
+                self.duplo_client.official_client.load("s3").update(
+                    name=bucket_name,
+                    patches=patches
+                )
+                return f"Successfully updated S3 bucket {bucket_name} with {setting}={value}"
+            except Exception as e:
+                logger.error(f"Error applying jsonpatch to S3 bucket: {str(e)}", exc_info=True)
+                return f"Error applying jsonpatch to S3 bucket: {str(e)}"
+            
+        except Exception as e:
+            logger.error(f"Error updating S3 bucket: {str(e)}", exc_info=True)
+            return f"Error updating S3 bucket: {str(e)}"
     
     def check_production_readiness(self) -> Dict[str, Any]:
         """
