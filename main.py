@@ -11,6 +11,7 @@ from agents.cmd_agent import CommandAgent
 from agents.boilerplate_agent import BoilerplateAgent
 import dotenv
 import uvicorn
+import os
 
 # Load environment variables from .env file and override existing ones
 dotenv.load_dotenv(override=True)
