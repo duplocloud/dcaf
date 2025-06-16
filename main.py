@@ -7,8 +7,7 @@ from agent_server import create_chat_app
 from services.llm import BedrockAnthropicLLM
 from agents.echo_agent import EchoAgent
 from agents.llm_passthrough_agent import LLMPassthroughAgent
-from agents.cost_optimization_agent import CostOptimizationAgent
-from agents.cost_cmd_agent import CostOptimizationCommandAgent
+from agents.cost_optimization_agent import CostOptimizationCommandAgent
 from agents.cmd_agent import CommandAgent
 from agents.boilerplate_agent import BoilerplateAgent
 import dotenv
