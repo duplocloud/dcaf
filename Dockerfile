@@ -31,4 +31,4 @@ ENV LOG_LEVEL=INFO \
     AWS_REGION=us-east-1
 
 # Run the application
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--no-reload"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

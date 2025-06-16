@@ -22,7 +22,7 @@ agent = CommandAgent(BedrockAnthropicLLM())
 # agent = BoilerplateAgent()  # Default to the boilerplate agent
 
 app = create_chat_app(agent)
-
+port = os.getenv("PORT", 8000)
 
 if __name__ == "__main__":
         
@@ -30,7 +30,7 @@ if __name__ == "__main__":
     uvicorn.run(
         "main:app",
         host="0.0.0.0",
-        port=8000,
+        port=port,
         reload=True,     # set True for auto-reload in dev
         log_level="info",
     )
