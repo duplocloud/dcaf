@@ -376,7 +376,9 @@ class CostOptimizationCommandAgent(AgentProtocol):
         If user requests some data which is not sensitive & is readonly then you can assume default grant & run the commands if they are readonly.
         If user request did not mention resource type specifically, then you need to ask to mention it clearly to the user, Should not assume any default resource.
         dont share Recommendation in the same response as Analysis Summary, instead ask user for any preference & then share Recommendation in next response
-        Share Recommendation for resource at a time, instead of sharing it for multiple resources, as it would create confusion & complexity will be increased. Try to share single aws command for recommended action which will be easy for user to understand. 
+        Share Recommendation for resource at a time, instead of sharing it for multiple resources, as it would create confusion & complexity will be increased. 
+        Share aws command for recommended action.
+        Do not combine multiple commands with && operators. 
         """
     
     def _create_response_schema(self) -> Dict[str, Any]:
