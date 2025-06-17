@@ -194,13 +194,12 @@ Update boilerplate_agent.py to create the following agents.
 
 - Level 2: Refer to the CMD boilerplate agent, and update it (the sytem prompt and the json schema descriptions) so that it runs only aws cli commands.
 
-## Coming Soon (Hopefully before tomorrow)
+## Coming Soon
 
 - A boilerplate for a tool calling agent using strands, so that you can create an agent by just adding some python functions with doc strings (tools) and by editing a system prompt
 - Boilerplate for workflows
 - Better service desk mock UI
 - More comprehensive postman collection for testing
-- Dockerizaiton
 
 ## References:
 
