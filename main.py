@@ -4,12 +4,13 @@ Or `uvicorn main:app --port 8000` if you prefer the CLI.
 """
 
 from agent_server import create_chat_app
-from agents.failure_predictive_agent import CICDFailurePredictiveAgent
 from services.llm import BedrockAnthropicLLM
+from agents.simple_log_analyzer import SimpleFailurePredictiveAgent
 from agents.echo_agent import EchoAgent
 from agents.llm_passthrough_agent import LLMPassthroughAgent
 from agents.cmd_agent import CommandAgent
 from agents.boilerplate_agent import BoilerplateAgent
+from agents.cicd_failure_agent import CICDFailureAgent
 import dotenv
 from service_desk_mock_ui import start_UI
 
@@ -17,11 +18,11 @@ from service_desk_mock_ui import start_UI
 dotenv.load_dotenv(override=True)
 
 # Choose which agent to use
-# agent = EchoAgent()
+agent = EchoAgent()
 # agent = LLMPassthroughAgent(BedrockAnthropicLLM())
 # agent = CommandAgent(BedrockAnthropicLLM())
-# agent = BoilerplateAgent()  # Default to the boilerplate agent
-agent = CICDFailurePredictiveAgent(BedrockAnthropicLLM())
+# agent = BoilerplateAgent()  # Default to the boilerplate
+agent = CICDFailureAgent()
 
 app = create_chat_app(agent)
 

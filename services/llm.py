@@ -43,14 +43,56 @@ class BedrockAnthropicLLM:
         else:
             self.bedrock_runtime = boto3.client('bedrock-runtime', region_name=region_name)
 
-    def call_llm(self, prompt: str) -> str:
-        """
-        Dummy implementation of an LLM call.
-        In production, this method should make an API call to AWS Bedrock
-        using the Anthropics model to get the refined explanation.
-        For now, it simply echoes the prompt back with a prefix.
-        """
-        return f"Refined explanation: {prompt}"
+    # def call_llm(self, prompt: str) -> str:
+    #     """
+    #     Call AWS Bedrock using the Anthropic Messages API.
+    #     This method builds a payload with the required keys:
+    #       - "anthropic_version"
+    #       - "max_tokens"
+    #       - "messages" (an array of message objects)
+    #     and sends it to the model.
+    #     """
+    #     # Prepare the messages payload as required by the Messages API.
+    #     messages_payload = [
+    #         {"role": "user", "content": prompt}
+    #     ]
+    #
+    #     # Construct the payload using the required keys.
+    #     # Using "\nHuman:" as a stop sequence ensures that the string is not purely whitespace.
+    #     payload = {
+    #         "anthropic_version": "bedrock-2023-05-31",  # Required version key.
+    #         "max_tokens": 256,  # Maximum tokens to generate.
+    #         "temperature": 0.7,  # Controls randomness.
+    #         "top_p": 0.9,  # Controls diversity via nucleus sampling.
+    #         "stop_sequences": ["\nHuman:"],  # Stop when a new human message starts.
+    #         "messages": messages_payload  # The conversation messages.
+    #     }
+    #
+    #     try:
+    #         # Hardcode the model ID for now; update this to your configured model.
+    #         model_id = "anthropic.claude-3-5-sonnet-20240620-v1:0"
+    #
+    #         response = self.bedrock_runtime.invoke_model(
+    #             modelId=model_id,
+    #             body=json.dumps(payload),
+    #             contentType="application/json",
+    #             accept="application/json"
+    #         )
+    #
+    #         # Read and decode the response body.
+    #         result_str = response['body'].read().decode('utf-8')
+    #         result_json = json.loads(result_str)
+    #
+    #         # Extract the generated text.
+    #         if ("content" in result_json and
+    #                 isinstance(result_json["content"], list) and
+    #                 len(result_json["content"]) > 0):
+    #             return result_json["content"][0]["text"]
+    #         else:
+    #             return "LLM response did not contain any generated text."
+    #     except Exception as e:
+    #         logger.error("Error calling LLM via AWS Bedrock: %s", e)
+    #         return f"Error calling LLM: {e}"
 
     def invoke(
         self,
@@ -103,6 +145,8 @@ class BedrockAnthropicLLM:
             model_id,
             latency,
         )
+        # Add debug logging here to inspect the payload
+        logger.debug("Request body being sent to Bedrock: %s", request_body)
         start_time = time.perf_counter()
         
         # Invoke the model

@@ -1,0 +1,7 @@
+2025-06-01 10:00:01,234 [INFO]  Stage INIT: starting build
+2025-06-01 10:00:15,567 [INFO]  Cloning repo https://github.com/myorg/myapp
+2025-06-01 10:01:05,678 [ERROR] Pulling Docker image timed out
+2025-06-01 10:02:45,123 [INFO]  Running unit tests
+2025-06-01 10:03:10,999 [ERROR] Unit test suite hung after 30s
+2025-06-01 10:04:45,123 [INFO]  Connecting to Docker daemon
+2025-06-01 10:05:10,999 [ERROR] cannot connect to the Docker daemon

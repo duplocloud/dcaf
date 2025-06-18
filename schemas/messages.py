@@ -36,7 +36,6 @@ class Data(BaseModel):
     executed_cmds: List[ExecutedCommand] = Field(default_factory=list)
     url_configs: List[URLConfig] = Field(default_factory=list)
 
-
 class Message(BaseModel):
     role: Literal["user", "assistant"]
     content: str = ""

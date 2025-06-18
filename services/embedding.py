@@ -7,6 +7,18 @@ import dotenv
 
 logger = logging.getLogger(__name__)
 
+MAX_EMBED_LEN = 2048
+
+def chunk_text(text: str, max_length: int = MAX_EMBED_LEN) -> list[str]:
+    """Split long text into ≤max_length pieces."""
+    return [text[i : i+max_length] for i in range(0, len(text), max_length)]
+
+def average_embeddings(embs: list[list[float]]) -> list[float]:
+    """Compute element-wise average of a list of vectors."""
+    if not embs:
+        return []
+    return [sum(col)/len(embs) for col in zip(*embs)]
+
 
 class EmbeddingProvider:
     """Factory class to create embedding models."""

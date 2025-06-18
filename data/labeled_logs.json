@@ -1,0 +1,58 @@
+[
+  {
+    "timestamp": "2025-06-17 19:28:29.744405",
+    "message": "2025-06-01 10:00:01,234 [INFO]  Stage INIT: starting build",
+    "stream": "exported-stream",
+    "log_group": "local-file",
+    "status": "SUCCEEDED",
+    "root_cause": null
+  },
+  {
+    "timestamp": "2025-06-17 19:28:29.744455",
+    "message": "2025-06-01 10:00:15,567 [INFO]  Cloning repo https://github.com/myorg/myapp",
+    "stream": "exported-stream",
+    "log_group": "local-file",
+    "status": "SUCCEEDED",
+    "root_cause": null
+  },
+  {
+    "timestamp": "2025-06-17 19:28:29.744463",
+    "message": "2025-06-01 10:01:05,678 [ERROR] Pulling Docker image timed out",
+    "stream": "exported-stream",
+    "log_group": "local-file",
+    "status": "FAILED",
+    "root_cause": "Network Issue"
+  },
+  {
+    "timestamp": "2025-06-17 19:28:29.744470",
+    "message": "2025-06-01 10:02:45,123 [INFO]  Running unit tests",
+    "stream": "exported-stream",
+    "log_group": "local-file",
+    "status": "SUCCEEDED",
+    "root_cause": null
+  },
+  {
+    "timestamp": "2025-06-17 19:28:29.744475",
+    "message": "2025-06-01 10:03:10,999 [ERROR] Unit test suite hung after 30s",
+    "stream": "exported-stream",
+    "log_group": "local-file",
+    "status": "FAILED",
+    "root_cause": "Unit Test Failure"
+  },
+  {
+    "timestamp": "2025-06-17 19:28:29.744480",
+    "message": "2025-06-01 10:04:45,123 [INFO]  Connecting to Docker daemon",
+    "stream": "exported-stream",
+    "log_group": "local-file",
+    "status": "SUCCEEDED",
+    "root_cause": null
+  },
+  {
+    "timestamp": "2025-06-17 19:28:29.744490",
+    "message": "2025-06-01 10:05:10,999 [ERROR] cannot connect to the Docker daemon",
+    "stream": "exported-stream",
+    "log_group": "local-file",
+    "status": "FAILED",
+    "root_cause": "Docker Daemon is not running"
+  }
+]
