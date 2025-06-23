@@ -41,7 +41,8 @@ def create_chat_app(agent: AgentProtocol) -> FastAPI:
     def send_message(raw_body: Dict[str, Any] = Body(...)) -> AgentMessage:
        
         # log request body
-        logger.info("Request Body:", raw_body)
+        logger.info("Request Body:")
+        logger.info(str(raw_body))
 
         # 1. validate presence of 'messages'
         if "messages" not in raw_body:

@@ -9,6 +9,7 @@ from agents.echo_agent import EchoAgent
 from agents.llm_passthrough_agent import LLMPassthroughAgent
 from agents.cmd_agent import CommandAgent
 from agents.boilerplate_agent import BoilerplateAgent
+from agents.k8s_agent import K8sAgent
 import dotenv
 import uvicorn
 import os
@@ -19,7 +20,8 @@ dotenv.load_dotenv(override=True)
 # Choose which agent to use
 # agent = EchoAgent()
 # agent = LLMPassthroughAgent(BedrockAnthropicLLM())
-agent = CommandAgent(BedrockAnthropicLLM())
+# agent = CommandAgent(BedrockAnthropicLLM())
+agent = K8sAgent(BedrockAnthropicLLM())
 # agent = BoilerplateAgent()  # Default to the boilerplate agent
 
 app = create_chat_app(agent)
