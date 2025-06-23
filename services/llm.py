@@ -5,6 +5,7 @@ import logging
 from typing import Dict, Any, Optional
 import os
 import dotenv
+from botocore.config import Config
 
 dotenv.load_dotenv()
 
@@ -32,6 +33,11 @@ class BedrockAnthropicLLM:
 
         app_env = os.getenv("APP_ENV", "duplo")
         logger.info(f"Initializing Bedrock client for APP_ENV: {app_env}")
+
+        config = Config(
+            read_timeout=1000
+        )
+
         if app_env == "local":
             self.bedrock_runtime = boto3.client(
                 'bedrock-runtime', 
@@ -39,9 +45,10 @@ class BedrockAnthropicLLM:
                 aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
                 aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
                 aws_session_token=os.getenv("AWS_SESSION_TOKEN"),
-                )
+                config=config
+                        )
         else:
-            self.bedrock_runtime = boto3.client('bedrock-runtime', region_name=region_name)
+            self.bedrock_runtime = boto3.client('bedrock-runtime', region_name=region_name, config=config)
     
     def invoke(
         self,
