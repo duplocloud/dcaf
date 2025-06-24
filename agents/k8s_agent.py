@@ -106,6 +106,9 @@ class K8sAgent(AgentProtocol):
             # Base message content #TODO update it to handle the case where assistant message as the last message
             content = msg.get("content", "")
 
+            content = "Current Request Ephemeral Instructions: - If the user asks to convert a docker compose into a helm chart, ask for the name of the helm chart and confirm with the user.\n- Be less wordy and to the point.\n\n" + content
+
+
             data = msg.get("data", {}) if role == "user" else {}
 
             if role == "user":
@@ -142,8 +145,6 @@ class K8sAgent(AgentProtocol):
                 # 3. Execute approved commands only in the latest user message
                 is_latest_user_msg = (idx == len(messages_list) - 1)
                 if is_latest_user_msg:
-                    
-                    content += "Current Request Ephemeral Instructions: - If the user asks to convert a docker compose into a helm chart, ask for the name of the helm chart and confirm with the user.\n- Be less wordy and to the point."
                     # execute approved commands
                     for c in data.get("cmds", []):
                         if c.get("execute", False):
@@ -319,8 +320,8 @@ Whenever a user mentions “<name> service” inside DuploCloud, interpret it as
             "2. Keep answers short and actionable.\n"
             "3. Always use the structured `return_response` tool.\n"
             "4. Respect any commands the user already ran or rejected.\n"
-        "5. When a command needs auxiliary files, list them under a `files` array with `file_path` and `file_content`.\n"
-        "6. For Docker-Compose → Helm tasks: ask for a chart name if not provided, map services to Deployments, volumes to PVCs, expose via Service/Ingress, and output the full chart files in the files array.\n"
+        "5. When a command needs auxiliary files, list them under a `files` array with `file_path` and `file_content`. If approved along with the command, the files will be created temporarily in a tmp dir and the agent will cd into the dir, execute the command, collect the output and the tmp dir will be removed after command execution.\n"
+        "6. For Docker-Compose → Helm tasks: ask for a chart name if not provided, map services to Deployments, volumes to PVCs, expose via Service/Ingress, and output the full chart files in the files array. Remember that users will approve commands before execution, and files for Helm operations will be created temporarily and removed after command execution.\n"
         )
     
     def _create_response_schema(self) -> Dict[str, Any]:
@@ -356,7 +357,7 @@ Whenever a user mentions “<name> service” inside DuploCloud, interpret it as
                                 },
                                 "files": {
                                     "type": "array",
-                                    "description": "Optional files that must exist before running this command.",
+                                    "description": "Optional. All files that must be created before running this command.",
                                     "items": {
                                         "type": "object",
                                         "properties": {

@@ -33,7 +33,7 @@ if __name__ == "__main__":
     uvicorn.run(
         "main:app",
         host="0.0.0.0",
-        port=port,
+        port=int(port),
         reload=True,     # set True for auto-reload in dev
         log_level="info",
     )
