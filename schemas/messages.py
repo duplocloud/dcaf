@@ -4,10 +4,16 @@ from datetime import datetime
 from pydantic import BaseModel, Field, HttpUrl
 
 
+class FileObject(BaseModel):
+    file_path: str
+    file_content: str
+
+
 class Command(BaseModel):
     command: str
     execute: bool = False
     rejection_reason: Optional[str] = None
+    files: Optional[List[FileObject]] = None
 
 
 class ExecutedCommand(BaseModel):

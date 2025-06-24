@@ -7,6 +7,7 @@ import subprocess
 import os
 import base64
 import tempfile
+import shutil
 from typing import List, Dict, Any, Optional
 
 from agent_server import AgentProtocol
@@ -56,7 +57,7 @@ class K8sAgent(AgentProtocol):
         return AgentMessage(
             content=llm_response.get("content", "I'm unable to provide a response at this time."),
             data=Data(
-                cmds=[Command(command=cmd["command"]) for cmd in commands],
+                cmds=[Command(command=cmd["command"], files=cmd.get("files")) for cmd in commands],
                 executed_cmds=[ExecutedCommand(command=cmd["command"], output=cmd["output"]) 
                               for cmd in executed_commands]
             )
@@ -141,13 +142,18 @@ class K8sAgent(AgentProtocol):
                 # 3. Execute approved commands only in the latest user message
                 is_latest_user_msg = (idx == len(messages_list) - 1)
                 if is_latest_user_msg:
+                    
+                    content += "Current Request Ephemeral Instructions: - If the user asks to convert a docker compose into a helm chart, ask for the name of the helm chart and confirm with the user.\n- Be less wordy and to the point."
+                    # execute approved commands
                     for c in data.get("cmds", []):
                         if c.get("execute", False):
                             cmd_str = c.get("command", "")
                             logger.info("Executing approved command: %s", cmd_str)
-                            output = self.execute_cmd(cmd_str, kubeconfig_path)
+                            files = c.get("files")
+                            output = self.execute_cmd(cmd_str, kubeconfig_path, files)
                             executed_cmds_current_turn.append({"command": cmd_str, "output": output})
                             content += f"\n\nExecuted command: {cmd_str}\nOutput:\n{output}"
+                            
 
             processed_messages.append({"role": role, "content": content})
 
@@ -178,7 +184,8 @@ class K8sAgent(AgentProtocol):
             }
             
             # Invoke the LLM with the messages, system prompt, and response schema
-            model_id = os.getenv("BEDROCK_MODEL_ID", "anthropic.claude-3-5-sonnet-20240620-v1:0")
+            # model_id = os.getenv("BEDROCK_MODEL_ID", "anthropic.claude-3-5-sonnet-20240620-v1:0")
+            model_id = os.getenv("BEDROCK_MODEL_ID", "us.anthropic.claude-sonnet-4-20250514-v1:0")
             response = self.llm.invoke(
                 model_id=model_id,
                 messages=self.llm.normalize_message_roles(messages),
@@ -200,7 +207,7 @@ class K8sAgent(AgentProtocol):
             else:
                 raise Exception(f"Error while making LLM API call: {str(e)}")
     
-    def execute_cmd(self, command: str, kubeconfig_path: Optional[str] = None) -> str:
+    def execute_cmd(self, command: str, kubeconfig_path: Optional[str] = None, files: Optional[List[Dict[str, str]]] = None) -> str:
         """
         Execute a terminal command and return its output.
         
@@ -210,8 +217,22 @@ class K8sAgent(AgentProtocol):
         Returns:
             The command output as a string
         """
+        tmp_dir = None
+        output = ""
         try:
-            logger.info(f"Executing command: {command}")
+            logger.info("Executing command: %s", command)
+            # --- create temp dir & files if provided ---
+            if files:
+                tmp_dir = tempfile.mkdtemp(prefix="cmd_files_")
+                for f in files:
+                    try:
+                        path = os.path.join(tmp_dir, f.get("file_path", ""))
+                        os.makedirs(os.path.dirname(path), exist_ok=True)
+                        with open(path, "w") as fh:
+                            fh.write(f.get("file_content", ""))
+                    except Exception as e:
+                        logger.warning("Failed writing temp file %s: %s", f, e)
+
             env = os.environ.copy()
             if kubeconfig_path:
                 env["KUBECONFIG"] = kubeconfig_path
@@ -220,24 +241,21 @@ class K8sAgent(AgentProtocol):
                 shell=True,
                 capture_output=True,
                 text=True,
-                env=env
+                env=env,
+                cwd=tmp_dir if tmp_dir else None
             )
-            
-            # Combine stdout and stderr for the output
-            output = result.stdout
+            output = result.stdout or ""
             if result.stderr:
-                if output:
-                    output += f"\n\nErrors:\n{result.stderr}"
-                else:
-                    output = f"Errors:\n{result.stderr}"
-                    
+                output += ("\n\nErrors:\n" + result.stderr)
             if not output:
                 output = "Command executed successfully with no output."
-                
             return output
         except Exception as e:
-            logger.error(f"Error executing command: {e}")
+            logger.error("Error executing command: %s", e)
             return f"Error executing command: {str(e)}"
+        finally:
+            if tmp_dir:
+                shutil.rmtree(tmp_dir, ignore_errors=True)
     
     def _extract_commands(self, llm_response: Dict[str, Any]) -> List[Dict[str, str]]:
         """
@@ -249,13 +267,14 @@ class K8sAgent(AgentProtocol):
         Returns:
             A list of command dictionaries
         """
-        commands = []
-        
-        # Extract commands if they exist in the response
-        if "terminal_commands" in llm_response:
-            commands = llm_response["terminal_commands"]
-        
-        return commands
+        cmds: List[Dict[str, Any]] = []
+        raw = llm_response.get("terminal_commands", [])
+        for item in raw:
+            if isinstance(item, str):
+                cmds.append({"command": item})
+            elif isinstance(item, dict):
+                cmds.append(item)
+        return cmds
 
     def _duplocloud_context(self) -> str:
         """
@@ -300,6 +319,8 @@ Whenever a user mentions “<name> service” inside DuploCloud, interpret it as
             "2. Keep answers short and actionable.\n"
             "3. Always use the structured `return_response` tool.\n"
             "4. Respect any commands the user already ran or rejected.\n"
+        "5. When a command needs auxiliary files, list them under a `files` array with `file_path` and `file_content`.\n"
+        "6. For Docker-Compose → Helm tasks: ask for a chart name if not provided, map services to Deployments, volumes to PVCs, expose via Service/Ingress, and output the full chart files in the files array.\n"
         )
     
     def _create_response_schema(self) -> Dict[str, Any]:
@@ -332,6 +353,18 @@ Whenever a user mentions “<name> service” inside DuploCloud, interpret it as
                                 "explanation": {
                                     "type": "string",
                                     "description": "A brief explanation of what this command does."
+                                },
+                                "files": {
+                                    "type": "array",
+                                    "description": "Optional files that must exist before running this command.",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "file_path": {"type": "string", "description": "Path relative to CWD"},
+                                            "file_content": {"type": "string", "description": "Full content of the file"}
+                                        },
+                                        "required": ["file_path", "file_content"]
+                                    }
                                 }
                             },
                             "required": ["command"]
