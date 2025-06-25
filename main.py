@@ -17,11 +17,15 @@ import os
 # Load environment variables from .env file and override existing ones
 dotenv.load_dotenv(override=True)
 
+region_name = os.getenv("AWS_REGION", "us-east-1")
+llm = BedrockAnthropicLLM(region_name=region_name)
+
+
+agent = K8sAgent(llm)
 # Choose which agent to use
 # agent = EchoAgent()
 # agent = LLMPassthroughAgent(BedrockAnthropicLLM())
 # agent = CommandAgent(BedrockAnthropicLLM())
-agent = K8sAgent(BedrockAnthropicLLM())
 # agent = BoilerplateAgent()  # Default to the boilerplate agent
 
 app = create_chat_app(agent)
