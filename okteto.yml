@@ -1,0 +1,9 @@
+dev:
+  k8s:
+    name: k8s  # Explicitly set the name
+    container: k8s  # Match the container name from your deployment
+    workdir: /app
+    sync:
+      - .:/app
+    persistentVolume:
+      enabled: false

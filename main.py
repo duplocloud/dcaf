@@ -21,15 +21,19 @@ dotenv.load_dotenv(override=True)
 region_name = os.getenv("AWS_REGION", "us-east-1")
 llm = BedrockAnthropicLLM(region_name=region_name)
 
+agent_type = os.getenv("AGENT_TYPE", "k8s").lower()
 
-# agent = K8sAgent(llm)
-agent = ToolEnabledLLMAgent(llm)
-# Choose which agent to use
-# agent = EchoAgent()
-# agent = LLMPassthroughAgent(BedrockAnthropicLLM())
-# agent = CommandAgent(BedrockAnthropicLLM())
-# agent = BoilerplateAgent()  # Default to the boilerplate agent
+agent_mapping = {
+    "echo": lambda: EchoAgent(),
+    "llm_passthrough": lambda: LLMPassthroughAgent(BedrockAnthropicLLM()),
+    "command": lambda: CommandAgent(BedrockAnthropicLLM()),
+    "boilerplate": lambda: BoilerplateAgent(),
+    "k8s": lambda: K8sAgent(BedrockAnthropicLLM())
+}
 
+agent_constructor = agent_mapping.get(agent_type, agent_mapping["k8s"])
+agent = agent_constructor()
+print(f"Using {agent.__class__.__name__}")
 app = create_chat_app(agent)
 port = os.getenv("PORT", 8000)
 

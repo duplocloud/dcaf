@@ -80,9 +80,16 @@ class K8sAgent(AgentProtocol):
 
         # --- extract kubeconfig (latest in history) and write to temp file --- TODO Just make it last messsage?
         kubeconfig_path: Optional[str] = None
+        # Store the latest platform context for potential duploctl env vars
+        latest_platform_context = None
+        
         for m in reversed(messages.get("messages", [])):
             if m.get("role") == "user":
-                kube_b64 = (m.get("platform_context") or {}).get("kubeconfig")
+                platform_context = m.get("platform_context")
+                if platform_context:
+                    latest_platform_context = platform_context
+                    
+                kube_b64 = (platform_context or {}).get("kubeconfig")
                 if kube_b64:
                     try:
                         tmp = tempfile.NamedTemporaryFile(delete=False)
@@ -123,12 +130,22 @@ class K8sAgent(AgentProtocol):
                     tenant = platform_context.get("tenant_name")
                     if tenant:
                         pc_lines.append(f"DuploCloud tenant: {tenant}")
+                    # DuploCloud plan if specified
+                    duplo_plan = platform_context.get("duplo_plan")
+                    if duplo_plan:
+                        pc_lines.append(f"DuploCloud plan: {duplo_plan}")
+                    # DuploCloud base URL if specified
+                    duplo_base_url = platform_context.get("duplo_base_url")
+                    if duplo_base_url:
+                        pc_lines.append(f"DuploCloud base URL: {duplo_base_url}")
                     # Only indicate kubeconfig/credentials presence to avoid leaking large sensitive blobs
                     if platform_context.get("kubeconfig"):
                         pass
                         # pc_lines.append("kubeconfig provided")
+                    if platform_context.get("duplo_token"):
+                        pc_lines.append("DuploCloud token provided")
                     if pc_lines:
-                        content = "\n\Current Message Context:\n- " + "\n- ".join(pc_lines) + "\n\n" + content
+                        content = "\n\nCurrent Message Context:\n- " + "\n- ".join(pc_lines) + "\n\n" + content
 
                 # 1. Append context for user-executed commands
                 for uc in data.get("executed_cmds", []):
@@ -151,7 +168,7 @@ class K8sAgent(AgentProtocol):
                             cmd_str = c.get("command", "")
                             logger.info("Executing approved command: %s", cmd_str)
                             files = c.get("files")
-                            output = self.execute_cmd(cmd_str, kubeconfig_path, files)
+                            output = self.execute_cmd(cmd_str, kubeconfig_path, files, platform_context)
                             executed_cmds_current_turn.append({"command": cmd_str, "output": output})
 
                             # Add executed command and files to content
@@ -214,12 +231,15 @@ class K8sAgent(AgentProtocol):
             else:
                 raise Exception(f"Error while making LLM API call: {str(e)}")
     
-    def execute_cmd(self, command: str, kubeconfig_path: Optional[str] = None, files: Optional[List[Dict[str, str]]] = None) -> str:
+    def execute_cmd(self, command: str, kubeconfig_path: Optional[str] = None, files: Optional[List[Dict[str, str]]] = None, platform_context: Optional[Dict[str, Any]] = None) -> str:
         """
         Execute a terminal command and return its output.
         
         Args:
             command: The command string to execute
+            kubeconfig_path: Optional path to a kubeconfig file for kubectl commands
+            files: Optional list of files to create before executing the command
+            platform_context: Optional platform context containing environment variables
             
         Returns:
             The command output as a string
@@ -241,8 +261,56 @@ class K8sAgent(AgentProtocol):
                         logger.warning("Failed writing temp file %s: %s", f, e)
 
             env = os.environ.copy()
-            if kubeconfig_path:
+            
+            # Set environment variables for kubectl commands
+            if kubeconfig_path and (command.startswith("kubectl") or "kubectl " in command):
                 env["KUBECONFIG"] = kubeconfig_path
+                
+            # Set environment variables for duploctl commands
+            if command.startswith("duploctl") or "duploctl " in command:
+                logger.info("Executing duploctl command")
+                
+                # Process platform context to get duploctl environment variables if available
+                if platform_context:
+                    duplo_env_vars = self.process_platform_context(platform_context)
+                    env.update(duplo_env_vars)
+                    
+                    # Log the environment variables being used (excluding sensitive ones)
+                    safe_env_vars = {k: "[REDACTED]" if "TOKEN" in k else v 
+                                   for k, v in duplo_env_vars.items()}
+                    logger.info(f"Using DuploCloud environment variables: {safe_env_vars}")
+                
+            # Generate a service.yaml file if needed for duploctl service create --file
+            if "duploctl service create --file" in command and files is None:
+                logger.info("Creating service.yaml file for duploctl service create command")
+                
+                # Extract file name from command
+                file_name = None
+                cmd_parts = command.split()
+                for i, part in enumerate(cmd_parts):
+                    if part == "--file" and i+1 < len(cmd_parts):
+                        file_name = cmd_parts[i+1]
+                        break
+                
+                if file_name:
+                    # Create temp directory and file if not already created
+                    if tmp_dir is None:
+                        tmp_dir = tempfile.mkdtemp(prefix="duploctl_")
+                    
+                    # Create service.yaml with minimal configuration
+                    # This is just a fallback and typically files would be provided
+                    service_file_path = os.path.join(tmp_dir, file_name)
+                    with open(service_file_path, "w") as f:
+                        f.write("Name: service-name\n")
+                        f.write("DockerImage: nginx:latest\n")
+                        f.write("Replicas: 1\n")
+                        f.write("Cloud: 0\n")
+                        f.write("IsLBSyncedDeployment: true\n")
+                        f.write("AgentPlatform: 7\n")
+                        f.write("NetworkId: default\n")
+                        
+                    logger.warning(f"Created default service file at {service_file_path}")
+                                
             result = subprocess.run(
                 command,
                 shell=True,
@@ -308,6 +376,43 @@ Whenever a user mentions “<name> service” inside DuploCloud, interpret it as
 """
 
         return duplocloud_concepts_context
+        
+    def _duploctl_context(self) -> str:
+        """
+        Return the duploctl command context for the LLM.
+        
+        Returns:
+            The duploctl context string
+        """
+        
+        duploctl_context = """
+# 📚 DuploCloud CLI (duploctl) Command Reference
+
+## Common duploctl Commands
+
+### Service Management
+• **List services**: `duploctl service list`
+• **Find a service**: `duploctl service find <name>`
+• **Get service details**: `duploctl service get <name>`
+• **Create a service**: `duploctl service create --name <name> --docker-image <image> [options]`
+• **Update a service**: `duploctl service update <name> [options]`
+• **Delete a service**: `duploctl service delete <name>`
+• **Rollback a service**: `duploctl service rollback <name> --to-revision <revision-number>`
+
+### Service Command Options
+• `--replicas <n>`: Set number of replicas
+• `--docker-image <image>`: Specify Docker image
+• `--cloud <0|1|2>`: Cloud provider (0=AWS, 1=Azure, 2=GCP)
+• `--agent-platform <n>`: Platform type (7=Kubernetes)
+• `--is-lb-synced-deployment`: Sync with load balancer
+• `--network-id <id>`: Network identifier
+
+### Best Practices
+• Use command-line arguments instead of file-based configuration when possible
+• For complex configurations, prepare YAML files and use `--file` option
+"""
+        
+        return duploctl_context
     
     def _default_system_prompt(self) -> str:
         """
@@ -388,13 +493,13 @@ When converting Docker Compose to Helm:
                     },
                     "terminal_commands": {
                         "type": "array",
-                        "description": "Terminal commands that will be displayed to the user for approval before execution. The commands you execute if approved by the user will be run by the agent in a non-interactive terminal using subprocess.run. So do not suggest commands which need to be run in an interactive user attached terminal, like: kubectl edit, exec etc here. Suggest thos types of commands in the regular content field displayed to the user if needed.",
+                        "description": "Terminal commands (kubectl, duploctl, or Helm) that will be displayed to the user for approval before execution. The commands you execute if approved by the user will be run by the agent in a non-interactive terminal using subprocess.run. So do not suggest commands which need to be run in an interactive user attached terminal, like: kubectl edit, exec etc here. Suggest those types of commands in the regular content field displayed to the user if needed.",
                         "items": {
                             "type": "object",
                             "properties": {
                                 "command": {
                                     "type": "string",
-                                    "description": "The complete terminal command string to be executed."
+                                    "description": "The complete terminal command string to be executed. Can be kubectl, helm, or duploctl commands."
                                 },
                                 "explanation": {
                                     "type": "string",
