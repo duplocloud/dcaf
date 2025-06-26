@@ -437,6 +437,8 @@ Terminal Command Capability:
 
 DuploCloud Concepts Context: {self._duplocloud_context()}
 
+DuploCloud CLI (duploctl) Commands: {self._duploctl_context()}
+
 ## Expertise Areas
 - Kubernetes resource management and troubleshooting
 - Helm chart creation and deployment
@@ -447,6 +449,11 @@ DuploCloud Concepts Context: {self._duplocloud_context()}
 - Be specific about namespaces
 - Choose efficient commands to diagnose or solve problems
 - Consider cluster impact and resource constraints
+- Format commands properly with appropriate flags
+- The commands you suggest will be displayed to the user for approval before execution. If approved by the user, the commands will be run by the agent in a non-interactive terminal using subprocess.run. So do not suggest any commands which need to be run in a persistent, interactive user attached terminal, like: kubectl edit, exec etc in the 'terminal_commands' field. Suggest those types of commands in the regular 'content' field displayed to the user if needed and leave the 'terminal_commands' field empty.
+
+## duploctl Command Guidelines
+- Environment variables will automatically set for DUPLO_HOST, DUPLO_TOKEN, DUPLO_TENANT
 - Format commands properly with appropriate flags
 - The commands you suggest will be displayed to the user for approval before execution. If approved by the user, the commands will be run by the agent in a non-interactive terminal using subprocess.run. So do not suggest any commands which need to be run in a persistent, interactive user attached terminal, like: kubectl edit, exec etc in the 'terminal_commands' field. Suggest those types of commands in the regular 'content' field displayed to the user if needed and leave the 'terminal_commands' field empty.
 
