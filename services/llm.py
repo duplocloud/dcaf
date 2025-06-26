@@ -2,7 +2,7 @@ import json
 import boto3
 import time
 import logging
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Union
 import os
 import dotenv
 from botocore.config import Config
@@ -63,8 +63,9 @@ class BedrockAnthropicLLM:
         system_prompt: Optional[str] = None,
         tools: Optional[list] = None,
         additional_params: Optional[Dict[str, Any]] = None,
-        tool_choice: Optional[dict] = None
-    ) -> str:
+        tool_choice: Optional[dict] = None,
+        return_raw_api_response: bool = False
+    ) -> Union[str, Dict[str, Any]]:
         """
         Invoke an AWS Bedrock LLM with the given prompt and parameters.
         
@@ -120,7 +121,11 @@ class BedrockAnthropicLLM:
         response_body = json.loads(response['body'].read().decode('utf-8'))
 
         logger.info("LLM Response body: %s", response_body)
-        return self._extract_response(response_body, model_id, tool_choice)
+
+        if return_raw_api_response:
+            return response_body
+        else:
+            return self._extract_response(response_body, model_id, tool_choice)
     
     def _prepare_request_body(
         self,
