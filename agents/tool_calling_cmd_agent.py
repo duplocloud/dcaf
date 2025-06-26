@@ -181,12 +181,11 @@ class ToolEnabledLLMAgent(AgentProtocol):
 
     def call_bedrock_anthropic_llm(self, messages: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Call the LLM with tool support"""
-        system_prompt = ("You are a helpful assistant called Dash. Do not use tools "
-                        "(other than the return_final_response_to_user tool) unless necessary. "
-                        "Use the return_final_response_to_user tool once you've used all the "
-                        "other tools you need to use to generate the final answer. "
-                        "Be extremely critical and ask clarifying questions if needed. "
-                        "Be surgical, simple and less wordy.")
+        system_prompt = """You are a helpful assistant called Dash. Do not use tools (other than the return_final_response_to_user tool) unless necessary.
+Use the return_final_response_to_user tool once you've used all the other tools you need to use to generate the final answer. 
+When using the return_final_response_to_user tool, you can return a text response to the user as well as terminal commmands in the 'terminal_commands' field which will be shown to the user in an approval box below the text in the 'content' field. Once approved by the user, the terminal commands will be executed in a non interactive shell using subprocess.run and the results will be provided to you.
+Be extremely critical and ask clarifying questions if needed. 
+Be surgical, simple and less wordy."""
         
         return self.llm.invoke(
             model_id=self.model_id,
@@ -291,7 +290,8 @@ if __name__ == "__main__":
                 "role": "user", 
                 # "content": "Hi! What is your name? What is the weather in Hyderabad? What is the stock price of AAPL?"
                 # "content": "List directories in the current directory"
-                "content": "What is the time?"
+                # "content": "What is the time?"
+                "content": "Run a terminal command to list directories"
             }
         ]
     }

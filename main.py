@@ -9,6 +9,7 @@ from agents.echo_agent import EchoAgent
 from agents.llm_passthrough_agent import LLMPassthroughAgent
 from agents.cmd_agent import CommandAgent
 from agents.boilerplate_agent import BoilerplateAgent
+from agents.tool_calling_cmd_agent import ToolEnabledLLMAgent
 from agents.k8s_agent import K8sAgent
 import dotenv
 import uvicorn
@@ -21,7 +22,8 @@ region_name = os.getenv("AWS_REGION", "us-east-1")
 llm = BedrockAnthropicLLM(region_name=region_name)
 
 
-agent = K8sAgent(llm)
+# agent = K8sAgent(llm)
+agent = ToolEnabledLLMAgent(llm)
 # Choose which agent to use
 # agent = EchoAgent()
 # agent = LLMPassthroughAgent(BedrockAnthropicLLM())
