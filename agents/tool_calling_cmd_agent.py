@@ -10,6 +10,7 @@ from services.llm import BedrockAnthropicLLM
 import os
 import json
 import logging
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -30,12 +31,18 @@ class ToolEnabledLLMAgent(AgentProtocol):
     def get_stock_price(self, ticker: str) -> str:
         """Dummy stock price function that returns static price"""
         return f"The current stock price of {ticker} is $100"
+
+    def get_current_time(self) -> str:
+        """Get the current timestamp"""
+        # return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        return "The time is 00:00:00 and the date is 01-01-2025"
     
     def _get_tools(self) -> Dict[str, callable]:
         """Map tool names to their corresponding functions"""
         return {
             "get_weather": self.get_weather,
             "get_stock_price": self.get_stock_price,
+            "get_current_time": self.get_current_time,
         }
     
     def _get_tool_schemas(self) -> List[Dict[str, Any]]:
@@ -74,6 +81,17 @@ class ToolEnabledLLMAgent(AgentProtocol):
                     "required": ["ticker"]
                 }
             },
+
+            {
+                "name": "get_current_time",
+                "description": "Get the current date and time",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {},  # Empty - no inputs needed
+                    "required": []     # No required fields
+                }
+            },
+
             {
                 "name": "return_final_response_to_user",
                 "description": "Use this tool to return the final response that will be shown to the user once you are ready",
@@ -271,7 +289,9 @@ if __name__ == "__main__":
         "messages": [
             {
                 "role": "user", 
-                "content": "Hi! What is your name? What is the weather in Hyderabad? What is the stock price of AAPL?"
+                # "content": "Hi! What is your name? What is the weather in Hyderabad? What is the stock price of AAPL?"
+                # "content": "List directories in the current directory"
+                "content": "What is the time?"
             }
         ]
     }
