@@ -1,18 +1,19 @@
 import json
-
 import logging
 import traceback
-
 import subprocess
 import os
 import base64
 import tempfile
 import shutil
+import asyncio
 from typing import List, Dict, Any, Optional
+from datetime import datetime
 
 from agent_server import AgentProtocol
 from schemas.messages import AgentMessage, Command, ExecutedCommand, Data
 from services.llm import BedrockAnthropicLLM
+from services.prompt_manager import PromptManager
 
 logger = logging.getLogger(__name__)
 
@@ -28,10 +29,21 @@ class K8sAgent(AgentProtocol):
         
         Args:
             llm: An instance of BedrockAnthropicLLM for generating responses
-            system_prompt: Optional custom system prompt to override the default
+            system_prompt: Optional custom system prompt to override the dynamic prompts
         """
         self.llm = llm
-        self.system_prompt = system_prompt or self._default_system_prompt()
+        
+        # Store the override system prompt if provided
+        self.system_prompt_override = system_prompt
+        
+        # Initialize the prompt manager
+        self.prompt_manager = PromptManager()
+        
+        # Start initial prompt refresh and background refresh task
+        asyncio.create_task(self.prompt_manager.refresh_prompts())
+        self.prompt_manager.start_background_refresh()
+        
+        # Schema for LLM responses
         self.response_schema = self._create_response_schema()
     
     def invoke(self, messages: Dict[str, List[Dict[str, Any]]]) -> AgentMessage:
@@ -206,6 +218,38 @@ class K8sAgent(AgentProtocol):
                 "name": "return_response"
             }
             
+            # Extract platform context from messages if available
+            platform_context = None
+            for m in messages:
+                if m.get("role") == "user" and m.get("platform_context"):
+                    platform_context = m.get("platform_context")
+                    break
+            
+            # Get the dynamic system prompt or use override
+            system_prompt = self.system_prompt_override
+            if not system_prompt:
+                logger.info("Using dynamic system prompt")
+                # Prepare variables for prompt substitution
+                variables = {
+                    "agent_name": self.__class__.__name__,
+                    "current_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                }
+                
+                # Add all platform context variables if available
+                if platform_context:
+                    # Iterate through all keys in platform_context
+                    for key, value in platform_context.items():
+                        if value:  # Only add non-empty values
+                            variables[key] = value
+                            
+                            # Also add namespace as an alias for k8s_namespace for backward compatibility
+                            if key == "k8s_namespace":
+                                variables["namespace"] = value
+                
+                system_prompt = self.prompt_manager.get_combined_prompt(variables)
+            
+            logger.info(f"System prompt: {system_prompt}")
+            
             # Invoke the LLM with the messages, system prompt, and response schema
             model_id = os.getenv("BEDROCK_MODEL_ID", "anthropic.claude-3-5-sonnet-20240620-v1:0")
             # model_id = os.getenv("BEDROCK_MODEL_ID", "us.anthropic.claude-3-7-sonnet-20250219-v1:0")
@@ -214,7 +258,7 @@ class K8sAgent(AgentProtocol):
                 model_id=model_id,
                 messages=self.llm.normalize_message_roles(messages),
                 max_tokens=4000,
-                system_prompt=self.system_prompt,
+                system_prompt=system_prompt,
                 tools=[self.response_schema],
                 tool_choice=tool_choice
             )
@@ -273,43 +317,8 @@ class K8sAgent(AgentProtocol):
                 # Process platform context to get duploctl environment variables if available
                 if platform_context:
                     duplo_env_vars = self.process_platform_context(platform_context)
+                    logger.info(f"Using DuploCloud environment variables: {duplo_env_vars}")
                     env.update(duplo_env_vars)
-                    
-                    # Log the environment variables being used (excluding sensitive ones)
-                    safe_env_vars = {k: "[REDACTED]" if "TOKEN" in k else v 
-                                   for k, v in duplo_env_vars.items()}
-                    logger.info(f"Using DuploCloud environment variables: {safe_env_vars}")
-                
-            # Generate a service.yaml file if needed for duploctl service create --file
-            if "duploctl service create --file" in command and files is None:
-                logger.info("Creating service.yaml file for duploctl service create command")
-                
-                # Extract file name from command
-                file_name = None
-                cmd_parts = command.split()
-                for i, part in enumerate(cmd_parts):
-                    if part == "--file" and i+1 < len(cmd_parts):
-                        file_name = cmd_parts[i+1]
-                        break
-                
-                if file_name:
-                    # Create temp directory and file if not already created
-                    if tmp_dir is None:
-                        tmp_dir = tempfile.mkdtemp(prefix="duploctl_")
-                    
-                    # Create service.yaml with minimal configuration
-                    # This is just a fallback and typically files would be provided
-                    service_file_path = os.path.join(tmp_dir, file_name)
-                    with open(service_file_path, "w") as f:
-                        f.write("Name: service-name\n")
-                        f.write("DockerImage: nginx:latest\n")
-                        f.write("Replicas: 1\n")
-                        f.write("Cloud: 0\n")
-                        f.write("IsLBSyncedDeployment: true\n")
-                        f.write("AgentPlatform: 7\n")
-                        f.write("NetworkId: default\n")
-                        
-                    logger.warning(f"Created default service file at {service_file_path}")
                                 
             result = subprocess.run(
                 command,
@@ -351,135 +360,35 @@ class K8sAgent(AgentProtocol):
                 cmds.append(item)
         return cmds
 
-    def _duplocloud_context(self) -> str:
+    def process_platform_context(self, platform_context: Dict[str, Any]) -> Dict[str, str]:
         """
-        Return the DuploCloud context for the LLM.
+        Process platform context to extract DuploCloud environment variables.
         
+        Args:
+            platform_context: Dictionary containing platform context information
+            
         Returns:
-            The DuploCloud context string
+            A dictionary of environment variables for DuploCloud
         """
-
-        duplocloud_concepts_context = """
-# 📚 DuploCloud Concepts Cheat-Sheet
-
-## What “service” means here
-• **DuploCloud Service** = one micro-service you declared in the DuploCloud UI.  
-  ↳ DuploCloud materialises it as **one Kubernetes Deployment (or StatefulSet)** plus its Pods, HPA, ConfigMaps, etc.  
-  ↳ The Deployment/Pods carry the label **app=<service-name>**.
-
-• **It is *not* a Kubernetes `Service` object.**  
-  – A K8s `Service` is just the ClusterIP/LoadBalancer front-end DuploCloud creates for traffic.  
-  – When a user says “cart service”, they almost always mean the *workload* (Deployment & Pods) called **cart**, not that K8s `Service` resource.
-
-### Key takeaway
-Whenever a user mentions “<name> service” inside DuploCloud, interpret it as **the Deployment/StatefulSet and its Pods labeled `app=<name>`**, *not* the Kubernetes `Service` resource.
-"""
-
-        return duplocloud_concepts_context
+        env_vars = {}
         
-    def _duploctl_context(self) -> str:
-        """
-        Return the duploctl command context for the LLM.
+        # Extract DuploCloud token if available
+        if platform_context.get("duplo_token"):
+            env_vars["DUPLO_TOKEN"] = platform_context.get("duplo_token")
         
-        Returns:
-            The duploctl context string
-        """
+        # Extract DuploCloud tenant if available
+        if platform_context.get("tenant_name"):
+            env_vars["DUPLO_TENANT"] = platform_context.get("tenant_name")
         
-        duploctl_context = """
-# 📚 DuploCloud CLI (duploctl) Command Reference
-
-## Common duploctl Commands
-
-### Service Management
-• **List services**: `duploctl service list`
-• **Find a service**: `duploctl service find <name>`
-• **Get service details**: `duploctl service get <name>`
-• **Create a service**: `duploctl service create --name <name> --docker-image <image> [options]`
-• **Update a service**: `duploctl service update <name> [options]`
-• **Delete a service**: `duploctl service delete <name>`
-• **Rollback a service**: `duploctl service rollback <name> --to-revision <revision-number>`
-
-### Service Command Options
-• `--replicas <n>`: Set number of replicas
-• `--docker-image <image>`: Specify Docker image
-• `--cloud <0|1|2>`: Cloud provider (0=AWS, 1=Azure, 2=GCP)
-• `--agent-platform <n>`: Platform type (7=Kubernetes)
-• `--is-lb-synced-deployment`: Sync with load balancer
-• `--network-id <id>`: Network identifier
-
-### Best Practices
-• Use command-line arguments instead of file-based configuration when possible
-• For complex configurations, prepare YAML files and use `--file` option
-"""
-        
-        return duploctl_context
-    
-    def _default_system_prompt(self) -> str:
-        """
-        Return the default system prompt for the LLM.
-        
-        Returns:
-            The system prompt string
-        """
-        # Primary prompt plus DuploCloud context in a dedicated helper for easy maintenance
-        return f"""You are a seasoned Kubernetes and Helm expert agent for DuploCloud. 
-Your role is to help users manage, troubleshoot, and deploy applications using kubectl commands and Helm in a less wordy manner.
-Be throrough and perform in-depth analysis and run all the necessary terminal commands needed to collect the necessary information when investigating an issue (by suggesting them in the 'terminal_commands' field).
-Always be extremely critical and ask clarifying questions when needed.
-
-Terminal Command Capability:
-- You can suggest terminal commands to the user using the 'terminal_commands' field. 
-- Always specify the namespace when running kubectl commands.
-- These will be shown in an approval box to the user below the text in the 'content' field, and if approved by the user they will be executed in a non-interactive terminal using subprocess.run.
-- The commands will be executed using subprocess.run exactly as suggested, so do not suggest terminal commands with palceholders in them. If you need to know the values of placeholders, ask the user to provide them first and then suggest the correct exact commands using the 'terminal_commands' field.
-- If you can run a terminal command always suggest it in the 'terminal_commands' field. Suggest commands in the 'content' field only if it is a terminal command that needs to be run in a user attached interactive terminal.
-
-
-DuploCloud Concepts Context: {self._duplocloud_context()}
-
-DuploCloud CLI (duploctl) Commands: {self._duploctl_context()}
-
-## Expertise Areas
-- Kubernetes resource management and troubleshooting
-- Helm chart creation and deployment
-- Docker Compose to Helm chart conversion
-- DuploCloud-specific Kubernetes configurations
-
-## Kubectl Command Guidelines
-- Be specific about namespaces
-- Choose efficient commands to diagnose or solve problems
-- Consider cluster impact and resource constraints
-- Format commands properly with appropriate flags
-- The commands you suggest will be displayed to the user for approval before execution. If approved by the user, the commands will be run by the agent in a non-interactive terminal using subprocess.run. So do not suggest any commands which need to be run in a persistent, interactive user attached terminal, like: kubectl edit, exec etc in the 'terminal_commands' field. Suggest those types of commands in the regular 'content' field displayed to the user if needed and leave the 'terminal_commands' field empty.
-
-## duploctl Command Guidelines
-- Environment variables will automatically set for DUPLO_HOST, DUPLO_TOKEN, DUPLO_TENANT
-- Format commands properly with appropriate flags
-- The commands you suggest will be displayed to the user for approval before execution. If approved by the user, the commands will be run by the agent in a non-interactive terminal using subprocess.run. So do not suggest any commands which need to be run in a persistent, interactive user attached terminal, like: kubectl edit, exec etc in the 'terminal_commands' field. Suggest those types of commands in the regular 'content' field displayed to the user if needed and leave the 'terminal_commands' field empty.
-
-## Helm Operation Guidelines
-- If a user asks to convert a Docker Compose file to a Helm chart, ask the user for the name to use for the helm chart
-- Follow Helm best practices for chart structure
-- Use values.yaml for configurable elements
-- Include proper labels and annotations
-- Create reusable and maintainable templates
-
-## Docker Compose Conversion Guidelines
-When converting Docker Compose to Helm:
-1. Map services to appropriate Kubernetes resources
-2. Convert volumes to PersistentVolumeClaims
-3. Handle networking through Services and Ingresses
-4. Create a complete chart structure with all necessary files
-5. Remember that users will approve commands before execution, and files for Helm operations will be created temporarily and removed after command execution.
-
-## Conversation Approach
-- Be concise and to the point
-- Maintain context from previous interactions
-- Reference command outputs shared by the user
-- Explain the reasoning behind your suggestions
-- Do not execute the same command again and again for no reason
-- Ask clarifying questions when needed
-"""
+        # Extract DuploCloud base URL if available
+        if platform_context.get("duplo_base_url"):
+            env_vars["DUPLO_HOST"] = f"https://{platform_context.get('duplo_base_url')}"
+            
+        # Extract DuploCloud plan if available
+        if platform_context.get("duplo_plan"):
+            env_vars["DUPLO_PLAN"] = platform_context.get("duplo_plan")
+            
+        return env_vars
     
     def _create_response_schema(self) -> Dict[str, Any]:
         """

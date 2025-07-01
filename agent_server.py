@@ -35,6 +35,20 @@ def create_chat_app(agent: AgentProtocol) -> FastAPI:
     @app.get("/health", tags=["system"])
     def health() -> Dict[str, str]:
         return {"status": "ok"}
+        
+    # ----- prompt refresh endpoint -------------------------------------------
+    @app.post("/api/refresh_prompts", tags=["system"])
+    async def refresh_prompts() -> Dict[str, str]:
+        """Endpoint to refresh prompts from S3 on demand"""
+        try:
+            if hasattr(agent, 'prompt_manager'):
+                await agent.prompt_manager.refresh_prompts()
+                return {"status": "Prompts refreshed successfully"}
+            else:
+                return {"status": "Agent does not have a prompt manager"}
+        except Exception as e:
+            logger.error(f"Error refreshing prompts: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Error refreshing prompts: {str(e)}")
 
     # ----- chat endpoint -----------------------------------------------------
     @app.post("/api/sendMessage", response_model=AgentMessage, tags=["chat"])

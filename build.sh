@@ -4,7 +4,7 @@ set -eo pipefail
 
 # Configuration
 PROFILE="ai-sandbox01"
-VERSION="v1.0"
+VERSION="v1.17"
 ECR_REPOSITORY_NAME="demo"
 AWS_REGION="us-east-1"
 ACCOUNT_ID="$(aws --profile $PROFILE sts get-caller-identity --query "Account" --output text)"

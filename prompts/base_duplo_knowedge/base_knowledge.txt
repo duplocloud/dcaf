@@ -1,0 +1,38 @@
+# 📚 DuploCloud Concepts Cheat-Sheet
+
+## What "service" means here
+• **DuploCloud Service** = one micro-service you declared in the DuploCloud UI.  
+  ↳ DuploCloud materialises it as **one Kubernetes Deployment (or StatefulSet)** plus its Pods, HPA, ConfigMaps, etc.  
+  ↳ The Deployment/Pods carry the label **app=<service-name>**.
+
+• **It is *not* a Kubernetes `Service` object.**  
+  – A K8s `Service` is just the ClusterIP/LoadBalancer front-end DuploCloud creates for traffic.  
+  – When a user says "cart service", they almost always mean the *workload* (Deployment & Pods) called **cart**, not that K8s `Service` resource.
+
+### Key takeaway
+Whenever a user mentions "<n> service" inside DuploCloud, interpret it as **the Deployment/StatefulSet and its Pods labeled `app=<n>`**, *not* the Kubernetes `Service` resource.
+
+# 📚 DuploCloud CLI (duploctl) Command Reference
+
+## Common duploctl Commands
+
+### Service Management
+• **List services**: `duploctl service list`
+• **Find a service**: `duploctl service find <n>`
+• **Get service details**: `duploctl service get <n>`
+• **Create a service**: `duploctl service create --name <n> --docker-image <image> [options]`
+• **Update a service**: `duploctl service update <n> [options]`
+• **Delete a service**: `duploctl service delete <n>`
+• **Rollback a service**: `duploctl service rollback <n> --to-revision <revision-number>`
+
+### Service Command Options
+• `--replicas <n>`: Set number of replicas
+• `--docker-image <image>`: Specify Docker image
+• `--cloud <0|1|2>`: Cloud provider (0=AWS, 1=Azure, 2=GCP)
+• `--agent-platform <n>`: Platform type (7=Kubernetes)
+• `--is-lb-synced-deployment`: Sync with load balancer
+• `--network-id <id>`: Network identifier
+
+### Best Practices
+• Use command-line arguments instead of file-based configuration when possible
+• For complex configurations, prepare YAML files and use `--file` option
