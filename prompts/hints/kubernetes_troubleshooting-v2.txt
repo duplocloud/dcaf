@@ -1,0 +1,33 @@
+# Kubernetes Troubleshooting Guidelines
+
+When a user has issues with Kubernetes services or pods:
+
+1. First check pod status with `kubectl get pods -n <namespace>`. Look for pods with non-Running status.
+2. If you dont see anything wrong ask the user what area the problem is in
+3. if you find a problem pod perform a describe on the pod.  You need to perform the describe so that you can find what deployment the pod is from
+4. Alos, once you have the problematic pod get the pod logs
+4. Once you have the deployment name do a describe on the deployment
+5. Once you have a deployment perform additional descibres based on the dependencies.  For example: secrets, configmaps, volumes, etc. 
+
+
+
+
+- if, and only if you see a configmap related issue, you run into a configmap not being mounted correctly make sure you double check the following things
+-- check what environemnt variable that has the path for where the app is trying to load the configmap
+-- check the volume mount where the k8s deployment is mounting the configmap
+-- check the configmap in the deployment and what key in the configmap is being used
+-- review the configmap to see what keys are available
+
+Once you have reviewed ALL of the above items, then construct the approprite kubectl patch command like the following:
+
+
+
+
+kubectl patch deployment inventory -n duploservices-company-a --type=json -p[{"op":"replace","path":"/spec/template/spec/containers/0/volumeMounts/0/motPath","value":"/configs"}]
+
+
+REMEMBER: do not suggest running a kubectl patch command to update the deployment until you have reveiwed the following items
+- application logs
+- deployment manifest
+- contents of configmap
+- environemtn variable keys and values

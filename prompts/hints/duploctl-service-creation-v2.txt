@@ -1,0 +1,149 @@
+duploctl is DuploCloud's Python cli.  You have access to this CLI.  
+
+A DuploCloud Service, and the duploctl service command, are for creating Kubernetes Deployments.
+
+The command to create a new DuploCloud Service is the following:
+
+```
+duploctl service create --file service.yaml
+```
+
+This command requires a YAML file that contains the configuration for the new service.
+
+The YAML file should have the following structure:
+
+```yaml
+Name: your-service-name
+DockerImage: your-image:tag
+Replicas: 1
+Cloud: 0
+IsLBSyncedDeployment: true
+AgentPlatform: 7
+ReplicasMatchingAsgName: null
+HPASpecs: null
+IsDaemonset: false
+OtherDockerHostConfig: ''
+OtherDockerConfig: '{"Env": [{"Name": "KEY1", "Value": "value1"}, {"Name": "KEY2", "Value": "value2"}]}'
+NetworkId: default
+```
+
+When you create a new DuploCloud Service, you MUST use the `--wait` flag to wait for the service to be created before returning. ALWAYS ALWAYS ALWAYS use the `--wait` flag.
+
+Example:
+
+duploctl service create --file service.yaml --wait
+```
+
+
+
+Notes
+
+- For duploctl service creation give the required command and the files in a single command object. 
+- Remember the files in a command object are not persisted for the next command's execution. 
+- Do not suggest any other duploctl commands that need to use the previous files again.
+
+
+
+
+###  DuploCloud Service Creation With 
+
+When creating a DuploCloud Service Environment Variables get passed into the OtherDockerconfig section of the YAML file.  Here is an example with Environment variable with key and value:
+
+
+
+{
+    "Env":
+    [
+    	{
+            "Name": "KEY1",
+            "Value": "value1"
+        },
+        {
+            "Name": "KEY2",
+            "Value": "value2"
+        }
+    ]
+}
+
+
+When creating an environment variable from secret you have to use this notation:
+
+{
+    "Env":
+    [
+        {
+            "Name": "DATABASE_USERNAME",
+            "valueFrom":
+            {
+                "secretKeyRef":
+                {
+                    "name": "NAME OF THE SECRET",
+                    "key": "NAME OF THE KEY IN THE SECRET"
+                }
+            }
+        },
+        {
+            "Name": "DATABASE_PASSWORD",
+            "valueFrom":
+            {
+                "secretKeyRef":
+                {
+                    "name": "NAME OF THE SECRET",
+                    "key": "NAME OF THE KEY IN THE SECRET"
+                }
+            }
+        },
+        {
+            "Name": "KEY2",
+            "Value": "value2"
+        }
+    ]
+}
+
+```yaml
+Name: your-service-name
+DockerImage: your-image:tag
+Replicas: 1
+Cloud: 0
+IsLBSyncedDeployment: true
+AgentPlatform: 7
+ReplicasMatchingAsgName: null
+HPASpecs: null
+IsDaemonset: false
+OtherDockerHostConfig: ''
+OtherDockerConfig: '{"Env":[{"Name":"DATABASE_USERNAME","valueFrom":{"secretKeyRef":{"name":"NAME OF THE SECRET","key":"NAME OF THE KEY IN THE SECRET"}}},{"Name":"DATABASE_PASSWORD","valueFrom":{"secretKeyRef":{"name":"NAME OF THE SECRET","key":"NAME OF THE KEY IN THE SECRET"}}},{"Name":"KEY2","Value":"value2"}]}'
+NetworkId: default
+```
+
+
+When the creating a environment variable from secret the following are required:
+
+- Name of the environment variable
+- Name of the secret
+- Key in the secret
+
+If the user does not provide all of these required fields you need to do one of two things:
+
+- if possible suggest running kubectl commands to gather more information
+- if you dont have enough information to suggest kubectl commands ask the user for the missing information.
+
+
+
+### Creating a new Duplo Service
+
+When a user requests help creating a new Duplo Service you need to do the following:
+
+- ask the user for the name of the service
+- ask the user for the docker image
+- ask the user for the number of replicas
+- ask the user what environment variables need to be set
+- ask the user what secrets need to be set
+- ask the user if a configmap is required
+- ask the user if they want this service exposed with a LB
+  - if yes, ask what type of LB (ALB, NLB, k8s cluster IP)
+  - if yes, ask if they want it to be internal or external
+  - if yes, ask what port the LB should be exposed on
+  - if yes, ask what port the service is listening on
+
+Make sure you collect all of these details before trying to create the Duplo Service.  Ask these questions in order and ask them one by one (NEVER IN A GROUP) for confirmation after each question.
+

@@ -1,0 +1,28 @@
+# Helm Chart Best Practices
+
+When creating or modifying Helm charts:
+
+1. Chart Structure Best Practices:
+   - Follow the standard Helm chart structure (templates/, values.yaml, Chart.yaml, etc.)
+   - Use appropriate annotations and labels for all resources
+   - Group related resources in the same chart
+
+2. Values.yaml:
+   - Add descriptive comments for all configurable values
+   - Use reasonable defaults that work out-of-the-box
+   - Organize values logically with grouping and nesting
+   - Provide documentation for custom values
+
+3. Templates:
+   - Use Helm's built-in functions to provide flexibility
+   - Implement proper error handling with required values
+   - Consider using helper templates for common patterns
+   - Validate templates with `helm lint` before deploying
+   - Use _helpers.tpl for defining reusable template fragments
+
+4. Docker Compose to Helm Conversion:
+   - Map Docker Compose services to Deployments or StatefulSets
+   - Convert Docker networks to Kubernetes Service objects
+   - Map Docker volumes to Persistent Volume Claims (PVCs)
+   - Handle environment variables with ConfigMaps or Secrets
+   - Convert Docker labels to appropriate Kubernetes annotations

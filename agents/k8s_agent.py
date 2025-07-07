@@ -33,15 +33,33 @@ class K8sAgent(AgentProtocol):
         """
         self.llm = llm
         
-        # Store the override system prompt if provided
-        self.system_prompt_override = system_prompt
+        # Check if there's a local static prompt file
+        local_prompt_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'prompt.txt')
+        self.using_static_prompt = False
         
-        # Initialize the prompt manager
-        self.prompt_manager = PromptManager()
+        if os.path.isfile(local_prompt_path):
+            # Use the static prompt file instead of dynamic prompts
+            try:
+                with open(local_prompt_path, 'r') as f:
+                    self.system_prompt_override = f.read()
+                logger.info(f"Using local static prompt from {local_prompt_path}")
+                self.using_static_prompt = True
+            except Exception as e:
+                logger.warning(f"Failed to read local prompt file {local_prompt_path}: {str(e)}")
+                self.system_prompt_override = system_prompt
+        else:
+            # Store the override system prompt if provided
+            self.system_prompt_override = system_prompt
         
-        # Start initial prompt refresh and background refresh task
-        asyncio.create_task(self.prompt_manager.refresh_prompts())
-        self.prompt_manager.start_background_refresh()
+        # Only initialize dynamic prompts if not using static prompt
+        if not self.using_static_prompt:
+            # Initialize the prompt manager
+            self.prompt_manager = PromptManager()
+            
+            # Start the background refresh task (which will also do the initial refresh)
+            self.prompt_manager.start_background_refresh()
+        else:
+            self.prompt_manager = None
         
         # Schema for LLM responses
         self.response_schema = self._create_response_schema()
@@ -225,9 +243,9 @@ class K8sAgent(AgentProtocol):
                     platform_context = m.get("platform_context")
                     break
             
-            # Get the dynamic system prompt or use override
+            # Use static prompt override or get the dynamic system prompt
             system_prompt = self.system_prompt_override
-            if not system_prompt:
+            if not system_prompt and not self.using_static_prompt:
                 logger.info("Using dynamic system prompt")
                 # Prepare variables for prompt substitution
                 variables = {
@@ -247,6 +265,8 @@ class K8sAgent(AgentProtocol):
                                 variables["namespace"] = value
                 
                 system_prompt = self.prompt_manager.get_combined_prompt(variables)
+            elif self.using_static_prompt:
+                logger.info("Using static prompt from prompt.txt file")
             
             logger.info(f"System prompt: {system_prompt}")
             
