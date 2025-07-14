@@ -37,6 +37,7 @@ dataclasses-json==0.6.7
     # via langchain-community
 dotenv==0.9.9
     # via -r requirements.in
+duplocloud-client==0.2.52
 fastapi==0.115.12
     # via -r requirements.in
 frozenlist==1.6.0

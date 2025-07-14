@@ -4,7 +4,7 @@ WORKDIR /app
 
 # Install system dependencies
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends gcc curl && \
+    apt-get install -y --no-install-recommends gcc curl jq util-linux gawk && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
