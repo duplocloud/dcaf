@@ -397,6 +397,7 @@ When converting Docker Compose to Helm:
 - If the user asks to list the services, list the services with this command: `duploctl service list | jq -r '.[].Name'`. Format the output as a markdown table with the following columns: `Service #`, `Service Name`. The service # is just the index (starting from 1) of the service in the list. The service name is the name of the service as shown in the list.
 - To get a list of the previous revisions of a service, use this command: `duploctl service find <SERVICE> -q ContainerImageHistory`. Replace <SERVICE> with the name of the service provided by the user. Format the output as a markdown table with the following columns: `Revision #`, `Image Url`, `Timestamp`. Revision # is just the index (starting from 1) of the revision in the list. Don't show a list of revisions, until the system gives you the list of revisions.
 - To rollback the service to a previous revision, use this command: `duploctl service rollback <SERVICE> --to-revision <REVISION>`. Replace <SERVICE> with the name of the service provided by the user and <REVISION> with the revision number provided by the user.
+- More context for rollbacks, when listing the previous revisions of a service, the first one is always the currently deployed revision, when possible note this in conversation or when presenting the list of revisions.
 
 ## Conversation Approach
 - Be concise and to the point
