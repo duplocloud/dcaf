@@ -4,7 +4,7 @@ WORKDIR /app
 
 # Install system dependencies
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends gcc curl && \
+    apt-get install -y --no-install-recommends gcc curl sshpass openssh-client && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
@@ -29,10 +29,10 @@ COPY agents/ ./agents/
 COPY services/ ./services/
 COPY *.py ./
 
-# Create a non-root user and switch to it
-RUN useradd -m appuser && \
-    chown -R appuser:appuser /app
-USER appuser
+# # Create a non-root user and switch to it
+# RUN useradd -m appuser && \
+#     chown -R appuser:appuser /app
+# USER appuser
 
 # Expose the port the app runs on
 EXPOSE 8000

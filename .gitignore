@@ -6,6 +6,10 @@ __pycache__/
 # C extensions
 *.so
 
+#rough demo
+rough.py
+rough2.py
+backup_tool_calling_cmd_agent.py
 
 # AWS credentials
 update_env_aws_creds.sh

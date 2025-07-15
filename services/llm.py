@@ -45,7 +45,8 @@ class BedrockAnthropicLLM:
                 aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
                 aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
                 aws_session_token=os.getenv("AWS_SESSION_TOKEN"),
-                config=config
+                config=config,
+                verify=True   
                         )
         else:
             self.bedrock_runtime = boto3.client('bedrock-runtime', region_name=region_name, config=config)
