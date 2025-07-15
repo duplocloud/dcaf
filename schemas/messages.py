@@ -28,6 +28,8 @@ class URLConfig(BaseModel):
 
 class PlatformContext(BaseModel):
     k8s_namespace: Optional[str] = None
+    duplo_base_url: Optional[str] = None
+    duplo_token: Optional[str] = None
     tenant_name: Optional[str] = None
     aws_credentials: Optional[Dict[str, Any]] = None
     kubeconfig: Optional[str] = None

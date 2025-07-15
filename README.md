@@ -206,5 +206,8 @@ Update boilerplate_agent.py to create the following agents.
 - Service Desk Request Response Structure:
 https://docs.duplocloud.com/docs/ai-suite/ai-studio/developers
 
+- Anthropic Tool Use:
+https://docs.anthropic.com/en/docs/agents-and-tools/tool-use/implement-tool-use
+
 ## License
 See the [LICENSE](LICENSE) file for details.
