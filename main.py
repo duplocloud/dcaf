@@ -22,8 +22,8 @@ region_name = os.getenv("AWS_REGION", "us-east-1")
 llm = BedrockAnthropicLLM(region_name=region_name)
 
 
-# agent = K8sAgent(llm)
-agent = ToolEnabledLLMAgent(llm)
+agent = K8sAgent(llm)
+# agent = ToolEnabledLLMAgent(llm)
 # Choose which agent to use
 # agent = EchoAgent()
 # agent = LLMPassthroughAgent(BedrockAnthropicLLM())
