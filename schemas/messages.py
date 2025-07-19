@@ -21,6 +21,23 @@ class ExecutedCommand(BaseModel):
     output: str
 
 
+class ToolCall(BaseModel):
+    id: str
+    name: str
+    input: Dict[str, Any]
+    execute: bool = False
+    tool_description: str
+    input_description: Dict[str, Any]
+    rejection_reason: Optional[str] = None
+
+
+class ExecutedToolCall(BaseModel):
+    id: str
+    name: str
+    input: Dict[str, Any]
+    output: str
+
+
 class URLConfig(BaseModel):
     url: HttpUrl
     description: str
@@ -42,6 +59,8 @@ class AmbientContext(BaseModel):
 class Data(BaseModel):
     cmds: List[Command] = Field(default_factory=list)
     executed_cmds: List[ExecutedCommand] = Field(default_factory=list)
+    tool_calls: List[ToolCall] = Field(default_factory=list)
+    executed_tool_calls: List[ExecutedToolCall] = Field(default_factory=list)
     url_configs: List[URLConfig] = Field(default_factory=list)
 
 

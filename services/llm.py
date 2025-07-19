@@ -104,6 +104,8 @@ class BedrockAnthropicLLM:
             latency,
         )
         start_time = time.perf_counter()
+
+        logger.info("Messages in LLM API Call: %s", messages)
         
         # Invoke the model
         #TODO: Update to use the converse bedrock API, so it's easier to switch models.
