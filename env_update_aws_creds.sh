@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # Default values
-TENANT="agents"
-HOST="https://duplo.hackathon.duploworkshop.com/"
+TENANT="andy"
+HOST="https://test10.duplocloud.net"
 
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
