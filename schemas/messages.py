@@ -28,6 +28,7 @@ class ToolCall(BaseModel):
     execute: bool = False
     tool_description: str
     input_description: Dict[str, Any]
+    intent: Optional[str] = None
     rejection_reason: Optional[str] = None
 
 

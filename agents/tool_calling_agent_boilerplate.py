@@ -27,10 +27,12 @@ class ToolCallingBoilerplateAgent(AgentProtocol):
     def __init__(self, llm: BedrockAnthropicLLM):
         self.llm = llm
         # self.model_id = "us.anthropic.claude-opus-4-20250514-v1:0"
-        self.model_id = "us.anthropic.claude-3-sonnet-20240229-v1:0"
+        # self.model_id = "us.anthropic.claude-3-sonnet-20240229-v1:0"
+        self.model_id = "us.anthropic.claude-3-5-sonnet-20240620-v1:0"
         self.tools = self._get_tools()
         self.tool_schemas = self._get_tool_schemas()
         self.approval_required_tools = self._get_approval_required_tools()
+        self.max_iterations = 5
         
     # Tool functions - these could be moved to a separate module if needed
     def get_weather(self, location: str, unit: str = "celsius") -> str:
@@ -52,9 +54,9 @@ class ToolCallingBoilerplateAgent(AgentProtocol):
         return f"Tenant '{tenant_name}' has been deleted successfully"
     
     @requires_approval
-    def update_s3_bucket(self, bucket_name: str, policy: str) -> str:
-        """Update S3 bucket policy"""
-        return f"S3 bucket '{bucket_name}' policy updated successfully"
+    def create_tenant(self, tenant_name: str) -> str:
+        """Create a tenant in the system"""
+        return f"Tenant '{tenant_name}' has been created successfully"
     
     def _get_tools(self) -> Dict[str, callable]:
         """Map tool names to their corresponding functions"""
@@ -63,7 +65,7 @@ class ToolCallingBoilerplateAgent(AgentProtocol):
             "get_stock_price": self.get_stock_price,
             "get_current_time": self.get_current_time,
             "delete_tenant": self.delete_tenant,
-            "update_s3_bucket": self.update_s3_bucket,
+            "create_tenant": self.create_tenant,
         }
     
     def _get_approval_required_tools(self) -> set:
@@ -135,21 +137,17 @@ class ToolCallingBoilerplateAgent(AgentProtocol):
                 }
             },
             {
-                "name": "update_s3_bucket",
-                "description": "Update S3 bucket policy",
+                "name": "create_tenant",
+                "description": "Create a tenant in the system",
                 "input_schema": {
                     "type": "object",
                     "properties": {
-                        "bucket_name": {
+                        "tenant_name": {
                             "type": "string",
-                            "description": "The name of the S3 bucket to update"
-                        },
-                        "policy": {
-                            "type": "string",
-                            "description": "The new bucket policy in JSON format"
+                            "description": "The name of the tenant to create"
                         }
                     },
-                    "required": ["bucket_name", "policy"]
+                    "required": ["tenant_name"]
                 }
             },
 
@@ -204,7 +202,7 @@ class ToolCallingBoilerplateAgent(AgentProtocol):
         if tool_name not in self.tools:
             return f"Error: Tool '{tool_name}' not found"
 
-        logger.info("-" * 50)
+        logger.info("-" * 40)
         logger.info(f"Executing tool '{tool_name}' with input: {tool_input}")
         
         try:
@@ -213,7 +211,7 @@ class ToolCallingBoilerplateAgent(AgentProtocol):
 
             tool_output = str(result)
             logger.info(f"Tool '{tool_name}' output: {tool_output}")
-            logger.info("-" * 50)
+            logger.info("-" * 40)
             return tool_output
         except Exception as e:
             return f"Error executing tool '{tool_name}': {str(e)}"
@@ -283,7 +281,7 @@ class ToolCallingBoilerplateAgent(AgentProtocol):
     
     def process_tool_calls(self, response_content: List[Dict[str, Any]]) -> tuple[List[Dict[str, Any]], List[ToolCall]]:
         """Process tool calls from LLM response - execute non-approval tools, return approval tools"""
-        tool_results = []
+        executed_tool_calls = []
         approval_required_tools = []
         
         for content_block in response_content:
@@ -301,13 +299,16 @@ class ToolCallingBoilerplateAgent(AgentProtocol):
                     result = self.execute_tool(tool_name, tool_input)
                     
                     # Format tool result for next LLM call
-                    tool_results.append({
-                        "type": "tool_result",
-                        "tool_use_id": tool_use_id,
-                        "content": result
-                    })
+                    executed_tool_calls.append(
+                        ExecutedToolCall(
+                            id=tool_use_id,
+                            name=tool_name,
+                            input=tool_input,
+                            output=result
+                        )
+                    )
         
-        return tool_results, approval_required_tools
+        return executed_tool_calls, approval_required_tools
 
     def call_bedrock_anthropic_llm(self, messages: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Call the LLM with tool support"""
@@ -319,7 +320,7 @@ Be surgical, simple and less wordy."""
         
         return self.llm.invoke(
             model_id=self.model_id,
-            messages=self.llm.normalize_message_roles(messages),
+            messages=messages,
             max_tokens=4000,
             system_prompt=system_prompt,
             return_raw_api_response=True,
@@ -361,17 +362,19 @@ Be surgical, simple and less wordy."""
                     "content": tool_execution_result_content
                 })
         
+        logger.info("Entering agent execution loop..")
+        num_iterations = 0
         while True:
+            num_iterations += 1
+            if num_iterations > self.max_iterations:
+                logger.error("Max iterations reached. Stopping execution.")
+                break
+
+            logger.info("Iteration %s", num_iterations)
+            
             # Call LLM
             response = self.call_bedrock_anthropic_llm(conversation_messages)
             response_content = response.get("content", [])
-            
-            # Check if response contains tool calls
-            has_tool_calls = any(block.get("type") == "tool_use" for block in response_content)
-            
-            if not has_tool_calls:
-                # No tools called, return response
-                return AgentMessage(content=response)
             
             # Check if final response tool is called
             final_response_call = None
@@ -397,7 +400,7 @@ Be surgical, simple and less wordy."""
                 if final_input.get("terminal_commands"):
                     for cmd in final_input.get("terminal_commands", []):
                         agent_message.data.cmds.append(Command(
-                            command=cmd,
+                            command=cmd.get("command"),
                             execute=False
                         ))
                 
@@ -408,11 +411,11 @@ Be surgical, simple and less wordy."""
                 # Add assistant message with tool calls
                 conversation_messages.append({
                     "role": "assistant",
-                    "content": response_content
+                    "content": "Processing Tool Calls"
                 })
                 
                 # Process tools - execute non-approval ones, collect approval-required ones
-                tool_results, approval_required_tools = self.process_tool_calls(response_content)
+                executed_tool_calls, approval_required_tools = self.process_tool_calls(response_content)
                 
                 # If there are approval-required tools, return them for user approval
                 if approval_required_tools:
@@ -422,16 +425,20 @@ Be surgical, simple and less wordy."""
                     
                     # Add tool calls to data for approval
                     for tool_call in approval_required_tools:
+                        if tool_call.name == "delete_tenant":
+                            tool_call.intent = "Sample Intent: Delete a tenant"
                         agent_message.data.tool_calls.append(tool_call)
                     
                     return agent_message
                 
                 # If only non-approval tools were called, add results and continue
-                if tool_results:
-                    conversation_messages.append({
-                        "role": "user",
-                        "content": tool_results
-                    })
+                if executed_tool_calls:
+                    for executed_tool_call in executed_tool_calls:
+                        executed_tool_call_content = f"Tool result for {executed_tool_call.name} with input {executed_tool_call.input}: {executed_tool_call.output}"
+                        conversation_messages.append({
+                            "role": "assistant",
+                            "content": executed_tool_call_content
+                        })
                 
                 # Continue the loop to get next LLM response
                 continue

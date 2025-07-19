@@ -88,6 +88,8 @@ class BedrockAnthropicLLM:
         if "anthropic" not in model_id.lower():
             raise ValueError(f"Unsupported model: {model_id}. Currently only Anthropic/Claude models are supported.")
 
+        logger.info("Messages in LLM API Call: %s", messages)
+
         messages = self.normalize_message_roles(messages)
         # Prepare request body based on model provider
         request_body = self._prepare_request_body(
@@ -105,7 +107,6 @@ class BedrockAnthropicLLM:
         )
         start_time = time.perf_counter()
 
-        logger.info("Messages in LLM API Call: %s", messages)
         
         # Invoke the model
         #TODO: Update to use the converse bedrock API, so it's easier to switch models.
@@ -196,12 +197,17 @@ class BedrockAnthropicLLM:
         Bedrock requires that roles strictly alternate between 'user' and 'assistant'.
         If two or more adjacent messages have the same role (either 'user' or 'assistant'),
         we merge their content fields into one message and remove the extras.
+
+        Bedrock does not accept empty messages, so remove empty messages for now..
         
         This function processes the entire message list recursively until no more
         merges are possible, ensuring the final list has proper role alternation.
         """
         if not messages:
             return messages
+
+        # Remove empty messages
+        messages = [msg for msg in messages if msg.get("content", "").strip()]
             
         # Base case: single message or already normalized list
         if len(messages) == 1:
