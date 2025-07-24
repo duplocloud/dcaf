@@ -17,7 +17,6 @@ logger = logging.getLogger(__name__)
 class AgentProtocol(Protocol):
     """Any agent that can respond to a chat."""
     def invoke(self, messages: Dict[str, List[Dict[str, Any]]]) -> AgentMessage: ...
-    # (If you add more required methods later, this check auto-updates.)
 
 
 def create_chat_app(agent: AgentProtocol) -> FastAPI:

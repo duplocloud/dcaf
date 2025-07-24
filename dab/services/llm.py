@@ -85,8 +85,9 @@ class BedrockAnthropicLLM:
             The text response from the LLM
         """
 
-        if "anthropic" not in model_id.lower():
-            raise ValueError(f"Unsupported model: {model_id}. Currently only Anthropic/Claude models are supported.")
+        #TODO create a more robust check. 
+        # if "anthropic" not in model_id.lower():
+            # raise ValueError(f"Unsupported model: {model_id}. Currently only Anthropic/Claude models are supported.")
 
         logger.info("Messages in LLM API Call: %s", messages)
 
