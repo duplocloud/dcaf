@@ -1,0 +1,52 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dab"
+version = "0.1.0"
+description = "DuploCloud Agent Builder (DAB) - A framework for building LLM powered AI agents and workflows that integrate with the DuploCloud Help Desk."
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+authors = [
+    {name = "DuploCloud", email = "support@duplocloud.com"}
+]
+keywords = ["ai", "agents", "duplocloud", "chatbot", "llm"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+dependencies = [
+    "fastapi",
+    "pydantic",
+    "uvicorn",
+    "boto3",
+    "python-dotenv",
+    "tk",
+    "requests",
+    "langchain_community",
+    "duplocloud-client"
+]
+
+[project.urls]
+Homepage = "https://github.com/duplocloud/dab"
+Repository = "https://github.com/duplocloud/dab"
+Issues = "https://github.com/duplocloud/dab/issues"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["dab*"]
+
+[tool.setuptools.package-data]
+dab = ["*.py"]
