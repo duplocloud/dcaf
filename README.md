@@ -1,31 +1,74 @@
-# Service Desk Agents
+# DAB (DuploCloud Agent Builder)
 
-A flexible, protocol-based service desk agent framework built with FastAPI that enables various agent implementations to respond to user chat messages.
+A flexible, protocol-based framework for building LLM-powered AI agents and workflows that integrate with the DuploCloud Help Desk. DAB provides a standardized way to create, deploy, and manage intelligent agents with tool-calling capabilities.
 
-## Overview
+## Installation
 
-This project provides a modular framework for creating, testing and deploying agents that can integrate with DuploCloud Service Desk and can:
+```bash
+pip install git+https://github.com/duplocloud/dab.git
+```
 
-- Process chat messages from users
-- Integrate with AWS Bedrock for LLM capabilities (especially Anthropic Claude models)
-- Provide a standardized message schema for communication
-- Include a mock UI for testing interactions
+## Quick Start
 
-## Project Structure
+```python
+from dab import create_chat_app, BedrockAnthropicLLM, ToolCallingCmdAgent
+import uvicorn
+
+# Initialize LLM and agent
+llm = BedrockAnthropicLLM(region_name="us-east-1")
+agent = ToolCallingCmdAgent(llm)
+
+# Create FastAPI app
+app = create_chat_app(agent)
+
+# Run the server
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=8000)
+```
+
+## Features
+
+- **Protocol-based Architecture**: Standardized `AgentProtocol` for consistent agent interfaces
+- **LLM Integration**: Built-in support for AWS Bedrock Anthropic Claude models
+- **Tool Calling**: Advanced tool calling capabilities with approval workflows
+- **FastAPI Server**: Production-ready web server with automatic API documentation
+- **Extensible**: Easy to create custom agents by extending base classes
+
+## Creating Custom Agents
+
+Extend the `ToolCallingCmdAgent` or implement the `AgentProtocol` directly:
+
+```python
+from dab import AgentProtocol, AgentMessage, BedrockAnthropicLLM
+from typing import Dict, Any, List
+
+class MyCustomAgent(AgentProtocol):
+    def __init__(self, llm: BedrockAnthropicLLM):
+        self.llm = llm
+    
+    def invoke(self, messages: Dict[str, List[Dict[str, Any]]]) -> AgentMessage:
+        # Your custom agent logic here
+        return AgentMessage(
+            role="assistant",
+            content="Hello from my custom agent!"
+        )
+```
+
+## Package Structure
 
 ```
-├── agent_server.py         # FastAPI server and agent protocol definition
-├── agents/                 # Agent implementations
-│   ├── boilerplate_agent.py # Minimal starter boilerplate agent
-│   ├── cmd_agent.py        # Command-execution agent implementation
-│   ├── echo_agent.py       # Simple echo agent implementation
-│   └── llm_passthrough_agent.py # Agent that passes through to LLM
-├── main.py                 # Application entry point
-├── schemas/                # Pydantic data models
+dab/
+├── __init__.py             # Main package exports
+├── agent_server.py         # FastAPI server and agent protocol
+├── schemas/
 │   └── messages.py         # Message schema definitions
-├── services/               # Service implementations
+├── services/
 │   └── llm.py              # AWS Bedrock LLM integration
-└── service_desk_mock_ui.py # Mock UI for testing
+└── agents/
+    ├── tool_calling_cmd_agent.py  # Main agent implementation
+    ├── echo_agent.py              # Simple echo agent
+    ├── boilerplate_agent.py       # Minimal starter agent
+    └── llm_passthrough_agent.py   # LLM passthrough agent
 ```
 
 ## Getting Started

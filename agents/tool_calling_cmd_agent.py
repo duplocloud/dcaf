@@ -15,7 +15,7 @@ from datetime import datetime
 logger = logging.getLogger(__name__)
 
 
-class ToolEnabledLLMAgent(AgentProtocol):
+class ToolCallingCmdAgent(AgentProtocol):
     def __init__(self, llm: BedrockAnthropicLLM):
         self.llm = llm
         # self.model_id = "us.anthropic.claude-opus-4-20250514-v1:0"
