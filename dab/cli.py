@@ -90,53 +90,86 @@ def env_update_aws_creds(tenant=None, host=None):
         return 1
 
 
-def docker_build_push(tag, repo, dockerfile='Dockerfile'):
-    """Build and push Docker image to ECR."""
-    print(f"Building Docker image with tag: {tag}")
-    print(f"Repository: {repo}")
-    print(f"Dockerfile: {dockerfile}")
-    
-    # TODO: Implement actual logic to fetch aws ecr creds etc
-
-    # Check if Docker is installed
-    if not shutil.which('docker'):
-        print("Error: Docker is not installed or not in PATH")
-        return 1
-    
-    # Check if Dockerfile exists
-    if not Path(dockerfile).exists():
-        print(f"Error: Dockerfile not found at {dockerfile}")
-        return 1
-    
-    try:
-        # Build image
-        print(f"Building image...")
-        subprocess.run(
-            ['docker', 'build', '-t', tag, '-f', dockerfile, '.'],
-            check=True
-        )
-        
-        # Tag for ECR
-        ecr_tag = f"{repo}:{tag}"
-        print(f"Tagging image as {ecr_tag}")
-        subprocess.run(
-            ['docker', 'tag', tag, ecr_tag],
-            check=True
-        )
-        
-        # Push to ECR
-        print(f"Pushing to ECR...")
-        subprocess.run(
-            ['docker', 'push', ecr_tag],
-            check=True
-        )
-        
-        print(f"✅ Successfully pushed {ecr_tag}")
-        return 0
-        
-    except subprocess.CalledProcessError as e:
-        print(f"Error during docker operation: {e}")
-        return 1
+def docker_build_push_ecr(tag, repo_name=None, registry=None, aws_profile=None, region=None, dockerfile='Dockerfile'):
+   """Build and push Docker image to ECR."""
+   # Use env vars as defaults (following AWS conventions)
+   repo_name = repo_name or os.environ.get('ECR_REPOSITORY_NAME')
+   registry = registry or os.environ.get('ECR_REGISTRY')
+   region = region or os.environ.get('AWS_DEFAULT_REGION', 'us-east-1')
+   
+   # Validate required inputs
+   if not repo_name:
+       print("Error: Repository name not specified. Set ECR_REPOSITORY_NAME env var or use --repo-name flag")
+       return 1
+       
+   if not registry:
+       print("Error: ECR registry not specified. Set ECR_REGISTRY env var or use --registry flag")
+       return 1
+   
+   # Check prerequisites
+   if not shutil.which('docker'):
+       print("Error: Docker is not installed or not in PATH")
+       return 1
+   
+   if not shutil.which('aws'):
+       print("Error: AWS CLI is not installed or not in PATH")
+       return 1
+   
+   # Check if Dockerfile exists
+   dockerfile_path = Path(dockerfile)
+   if not dockerfile_path.exists():
+       print(f"Error: Dockerfile not found at {dockerfile_path.absolute()}")
+       return 1
+   
+   # Build profile option
+   profile_opt = f"--profile {aws_profile}" if aws_profile else ""
+   
+   try:
+       # Step 1: Authenticate Docker to ECR
+       print(f"\n[1/4] Authenticating Docker to ECR registry...")
+       auth_cmd = f"aws ecr get-login-password --region {region} {profile_opt} | docker login --username AWS --password-stdin {registry}"
+       print(f"Running: {auth_cmd}")
+       
+       # Run auth command through shell to handle pipe
+       result = subprocess.run(auth_cmd, shell=True, capture_output=True, text=True)
+       if result.returncode != 0:
+           print(f"Error authenticating to ECR: {result.stderr}")
+           return 1
+       print("✓ Successfully authenticated to ECR")
+       
+       # Step 2: Build image
+       print(f"\n[2/4] Building Docker image...")
+       build_cmd = ['docker', 'build', '-t', f"{repo_name}:{tag}", '-f', dockerfile, '.']
+       print(f"Running: {' '.join(build_cmd)}")
+       
+       subprocess.run(build_cmd, check=True)
+       print(f"✓ Successfully built {repo_name}:{tag}")
+       
+       # Step 3: Tag for ECR
+       ecr_image = f"{registry}/{repo_name}:{tag}"
+       print(f"\n[3/4] Tagging image for ECR...")
+       tag_cmd = ['docker', 'tag', f"{repo_name}:{tag}", ecr_image]
+       print(f"Running: {' '.join(tag_cmd)}")
+       
+       subprocess.run(tag_cmd, check=True)
+       print(f"✓ Tagged as {ecr_image}")
+       
+       # Step 4: Push to ECR
+       print(f"\n[4/4] Pushing to ECR...")
+       push_cmd = ['docker', 'push', ecr_image]
+       print(f"Running: {' '.join(push_cmd)}")
+       
+       subprocess.run(push_cmd, check=True)
+       
+       print(f"\n✅ Successfully pushed {ecr_image}")
+       return 0
+       
+   except subprocess.CalledProcessError as e:
+       print(f"\nError: Command failed with exit code {e.returncode}")
+       return 1
+   except Exception as e:
+       print(f"\nUnexpected error: {e}")
+       return 1
 
 
 def deploy_agent(agent_name, token=None):
@@ -169,20 +202,21 @@ def main():
     )
     env_parser.add_argument('--tenant', help='DuploCloud tenant name (or set DUPLO_TENANT)')
     env_parser.add_argument('--host', help='DuploCloud host URL (or set DUPLO_HOST)')
-    
-    # docker-build-push command
+
+
+    # docker-build-push-ecr command
     docker_parser = subparsers.add_parser(
-        'docker-build-push',
-        help='Build and push Docker image to ECR'
+        'docker-build-push-ecr',
+        help='Build and push Docker image to Amazon ECR'
     )
-    docker_parser.add_argument('tag', help='Docker image tag')
-    docker_parser.add_argument('repo', help='ECR repository URL')
-    docker_parser.add_argument(
-        '--dockerfile', 
-        default='Dockerfile',
-        help='Path to Dockerfile (default: Dockerfile)'
-    )
-    
+    docker_parser.add_argument('tag', help='Image tag (e.g., latest, v1.0.0)')
+    docker_parser.add_argument('--repo-name', help='ECR repository name (or set ECR_REPOSITORY_NAME)')
+    docker_parser.add_argument('--registry', help='ECR registry URI (or set ECR_REGISTRY)')
+    docker_parser.add_argument('--aws-profile', help='AWS profile to use')
+    docker_parser.add_argument('--region', help='AWS region (or set AWS_DEFAULT_REGION)')
+    docker_parser.add_argument('--dockerfile', default='Dockerfile', help='Path to Dockerfile (default: Dockerfile)')    
+
+
     # deploy-agent command
     deploy_parser = subparsers.add_parser(
         'deploy-agent',
@@ -203,8 +237,16 @@ def main():
     exit_code = 1
     if args.command == 'env-update-aws-creds':
         exit_code = env_update_aws_creds(args.tenant, args.host)
-    elif args.command == 'docker-build-push':
-        exit_code = docker_build_push(args.tag, args.repo, args.dockerfile)
+        
+    elif args.command == 'docker-build-push-ecr':
+        exit_code = docker_build_push_ecr(
+            args.tag,
+            args.repo_name,
+            args.registry,
+            args.aws_profile,
+            args.region,
+            args.dockerfile)
+
     elif args.command == 'deploy-agent':
         exit_code = deploy_agent(args.agent_name, args.token)
     
