@@ -5,7 +5,7 @@ import logging
 from datetime import datetime
 
 from ..agent_server import AgentProtocol
-from ..schemas.messages import AgentMessage
+from ..schemas.messages import AgentMessage, ExecutedToolCall
 from ..services.llm import BedrockAnthropicLLM
 
 logger = logging.getLogger(__name__)
@@ -153,9 +153,9 @@ class ToolCallingCmdAgent(AgentProtocol):
         except Exception as e:
             return f"Error executing tool '{tool_name}': {str(e)}"
 
-    def process_tool_calls(self, response_content: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def process_tool_calls(self, response_content: List[Dict[str, Any]]) -> List[ExecutedToolCall]:
         """Process tool calls from LLM response and return tool results"""
-        tool_results = []
+        executed_tool_calls = []
         
         for content_block in response_content:
             if content_block.get("type") == "tool_use":
@@ -167,13 +167,16 @@ class ToolCallingCmdAgent(AgentProtocol):
                 result = self.execute_tool(tool_name, tool_input)
                 
                 # Format tool result for next LLM call
-                tool_results.append({
-                    "type": "tool_result",
-                    "tool_use_id": tool_use_id,
-                    "content": result
-                })
+                executed_tool_calls.append(
+                    ExecutedToolCall(
+                        id=tool_use_id,
+                        name=tool_name,
+                        input=tool_input,
+                        output=result
+                    )
+                )
         
-        return tool_results
+        return executed_tool_calls
 
     def call_bedrock_anthropic_llm(self, messages: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Call the LLM with tool support"""
@@ -250,17 +253,22 @@ Be surgical, simple and less wordy."""
             # Process other tool calls
             if other_tool_calls:
                 # Add assistant message with tool calls
+                tool_calls_message = 'Making Tool Calls.'
                 conversation_messages.append({
                     "role": "assistant",
-                    "content": response_content
+                    "content": tool_calls_message
                 })
                 
                 # Execute tools and add results
-                tool_results = self.process_tool_calls(response_content)
-                conversation_messages.append({
-                    "role": "user",
-                    "content": tool_results
-                })
+                executed_tool_calls = self.process_tool_calls(response_content)
+                # If only non-approval tools were called, add results and continue
+                if executed_tool_calls:
+                    for executed_tool_call in executed_tool_calls:
+                        executed_tool_call_content = f"Tool result for {executed_tool_call.name} with input {executed_tool_call.input}: {executed_tool_call.output}"
+                        conversation_messages.append({
+                            "role": "user",
+                            "content": executed_tool_call_content
+                        })
                 
                 # Continue the loop to get next LLM response
                 continue

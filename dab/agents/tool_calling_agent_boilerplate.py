@@ -436,7 +436,7 @@ Be surgical, simple and less wordy."""
                     for executed_tool_call in executed_tool_calls:
                         executed_tool_call_content = f"Tool result for {executed_tool_call.name} with input {executed_tool_call.input}: {executed_tool_call.output}"
                         conversation_messages.append({
-                            "role": "assistant",
+                            "role": "user",
                             "content": executed_tool_call_content
                         })
                 

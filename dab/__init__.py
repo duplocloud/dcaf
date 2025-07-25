@@ -5,7 +5,7 @@ DAB (DuploCloud Agent Builder) - A framework for building AI agents with tool ca
 from .agent_server import create_chat_app, AgentProtocol
 from .services.llm import BedrockAnthropicLLM
 from .agents.tool_calling_cmd_agent import ToolCallingCmdAgent
-from .schemas.messages import AgentMessage, Messages
+from .schemas.messages import *
 
 __version__ = "0.1.0"
 __all__ = [
@@ -14,5 +14,6 @@ __all__ = [
     "BedrockAnthropicLLM",
     "ToolCallingCmdAgent",
     "AgentMessage",
-    "Messages"
+    "Messages",
+    "ExecutedToolCall",
 ]
