@@ -40,9 +40,12 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/duplocloud/dab"
-Repository = "https://github.com/duplocloud/dab"
-Issues = "https://github.com/duplocloud/dab/issues"
+Homepage = "https://github.com/duplocloud/service-desk-agents/tree/pip-package"
+#Repository = "https://github.com/duplocloud/dab"
+#Issues = "https://github.com/duplocloud/dab/issues"
+
+[project.scripts]
+dab = "dab.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
