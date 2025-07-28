@@ -3,11 +3,11 @@
 ---
 
 ## 1. Logging
-- [ ] Centralised logging bootstrap helper (e.g. `core/utils/logger.py`) imported by every entry-point.
-- [ ] Replace all `print()` calls with module-level loggers (`logging.getLogger(__name__)`).
-- [ ] Support env-driven format switch: pretty console (dev) vs JSON/structured (prod/CI) via `LOG_FORMAT`.
-- [ ] Propagate request/user IDs via FastAPI middleware; attach same handler to third-party loggers.
-- [ ] Ensure graceful shutdown (`logging.shutdown()`) and clear handlers in tests.
+- [x] Centralised logging bootstrap helper (e.g. `src/utils/logger.py`) imported by every entry-point.
+- [x] Replace all `print()` calls (or proxy them) with module-level loggers (`logger = get_logger(__name__)`).
+- [x] Support env-driven format switch: pretty console (dev) vs JSON/structured (prod/CI) via `LOG_FORMAT`.
+- [x] Propagate request/user IDs via FastAPI middleware; attach same handler to third-party loggers.
+- [x] Ensure graceful shutdown (`logging.shutdown()`) and provide helper to clear handlers in tests.
 
 ## 2. Testing & CI
 - [ ] Create `tests/` directory with pytest; require ≥ 80 % coverage.
@@ -15,7 +15,7 @@
 - [ ] Differentiate unit vs integration tests; mock external services.
 - [ ] Add CI pipeline steps: `ruff check → ruff format → pytest --cov → mypy`.
 - [ ] Increase dependency injection (wrap subprocess/AWS calls) for easier mocking.
-- [ ] Configure Ruff in `pyproject.toml` (`[tool.ruff]`) and fix existing lint offences.
+- [x] Configure Ruff in `pyproject.toml` (`[tool.ruff]`) — still need to fix existing lint offences.
 
 ## 3. Metrics & Observability
 - [ ] Implement thin wrapper (`core/metrics.py`) around Prometheus/StatsD helpers (`increment`, `time`).
@@ -40,4 +40,4 @@
 
 ## 8. CLI Improvements
 - [ ] Replace `print()` statements in CLI with proper logging.
-- [ ] Add retries/back-off logic and enriched error messages around subprocess calls. 
+- [ ] Add retries/back-off logic and enriched error messages around subprocess calls.

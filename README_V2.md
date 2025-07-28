@@ -96,6 +96,60 @@ The helper is designed to be extended for:
 
 Contributions welcome – see `docs/engineering-initiatives.md`.
 
+## 7  Code Style & Linting (Ruff)
+
+Ruff provides linting, import ordering, and formatting in a **single fast tool**.
+
+### 7.1  Installation (dev-only extras)
+
+```bash
+pip install -e '.[dev]'
+```
+
+This installs Ruff and any other developer-only helpers defined in the `dev` extras group of `pyproject.toml`.
+
+### 7.2  Checking the codebase
+
+```bash
+ruff check .
+```
+
+Runs all enabled rule sets (E, F, I, B) and exits with a non-zero status if violations are found.
+
+### 7.3  Auto-formatting
+
+```bash
+ruff format .
+```
+
+Rewrites files in-place, unifying what Black and isort used to handle.
+
+### 7.4  Configuration snippets
+
+Ruff is configured in `pyproject.toml`.
+
+```toml
+[tool.ruff]
+line-length = 120
+preview = true
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B"]
+```
+
+Adjust these if the team agrees on different conventions.
+
+### 7.5  CI pipeline hook
+
+Add the following to your CI steps _before_ running tests:
+
+```bash
+ruff check .            # fail fast on lint
+ruff format --check .   # ensure files are already formatted
+```
+
+This keeps `main` free of style regressions.
+
 ---
 
 Made with ☕ by the Service-Desk Agents team. 

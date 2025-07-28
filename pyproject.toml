@@ -47,9 +47,31 @@ Homepage = "https://github.com/duplocloud/service-desk-agents/tree/pip-package"
 [project.scripts]
 dab = "dab.cli:main"
 
+[project.optional-dependencies]
+# Development-only dependencies
+dev = [
+    "ruff>=0.4.5"
+]
+
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["dab*"]
 
 [tool.setuptools.package-data]
 dab = ["*.py"]
+
+[tool.ruff]
+# Enable preview features and set global defaults
+preview = true
+line-length = 120
+# Match the minimum Python version supported by the project
+target-version = "py39"
+
+[tool.ruff.lint]
+# Enable common rule sets: 
+# E (pycodestyle), F (flake8), I (isort), B (bugbear)
+select = ["E", "F", "I", "B"]
+ignore = []
+
+[tool.ruff.format]
+quote-style = "preserve"

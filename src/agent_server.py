@@ -2,6 +2,8 @@ from typing import Protocol, runtime_checkable, Dict, Any, List
 from fastapi import FastAPI, HTTPException, Body
 from pydantic import ValidationError
 from .schemas.messages import AgentMessage, Messages
+from src.middleware.request_id import RequestIdMiddleware
+from src.middleware.user_context import UserContextMiddleware
 import logging
 import os
 import traceback
@@ -27,6 +29,10 @@ def create_chat_app(agent: AgentProtocol) -> FastAPI:
         )
 
     app = FastAPI(title="DuploCloud Chat Service", version="0.1.0")
+
+    # Middleware to attach correlation IDs
+    app.add_middleware(RequestIdMiddleware)
+    app.add_middleware(UserContextMiddleware)
 
     # ----- health check ------------------------------------------------------
     @app.get("/health", tags=["system"])
