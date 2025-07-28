@@ -56,4 +56,31 @@ The `src/` layout moves all first-party Python packages under a dedicated top-le
 | Update tests and CI configurations to use new layout. |  | ☐ |
 | Amend developer docs / README with new layout instructions. |  | ☐ |
 
+---
+
+## 3. Centralised Logging Framework
+
+### What is Centralised Logging?
+A unified logging setup that funnels **all** application logs through the standard `logging` library, with a single bootstrap module (`src/utils/logger.py`). The helper supports human-friendly console output for development and structured JSON for production and CI, switchable via the `LOG_FORMAT` env var.
+
+### Why are we adding it?
+1. **Observability** – consistent, parseable logs accelerate debugging and monitoring.
+2. **Best practices** – promotes idiomatic logging and removes ad-hoc `print()` calls.
+3. **Flexibility** – format and verbosity can be tuned without code changes.
+4. **Foundation for tracing** – central hook point for future correlation IDs and trace context.
+
+### Expected Benefits
+* Cleaner source code with idiomatic `logger.info(...)` etc.
+* Ability to ingest logs into ELK/CloudWatch with minimal processing.
+* Easy toggling between pretty console logs and machine-readable JSON.
+
+### Scope of Work (MVP)
+| Task | Owner | Status |
+|------|-------|--------|
+| Create `src/utils/logger.py` and configure root logger (console vs JSON). |  | ✅ |
+| Import the helper in every entry-point (`main.py`, `src/cli.py`, agent scripts). |  | ✅ |
+| Replace all `print()` calls with logger calls or redirect them to the logger. |  | ☐ |
+| Expose `LOG_LEVEL` and `LOG_FORMAT` env vars; document defaults in README. |  | ☐ |
+| Add guidance in docs on how to view JSON logs locally (`jq`, etc.). |  | ☐ |
+
 *Add future initiatives below using the same structure.* 

@@ -6,12 +6,11 @@ import logging
 import os
 import traceback
 
-logging.basicConfig(
-    level=os.getenv("LOG_LEVEL", "INFO"),
-    format="%(asctime)s | %(name)s | %(message)s",
-)
+# Centralised logging
+from src.utils.logger import get_logger
 
-logger = logging.getLogger(__name__)
+# Ensure root logger configured once
+logger = get_logger(__name__)
 
 @runtime_checkable            
 class AgentProtocol(Protocol):

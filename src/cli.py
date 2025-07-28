@@ -11,6 +11,21 @@ import shutil
 from pathlib import Path
 import dotenv
 
+# Centralised logging
+from src.utils.logger import get_logger
+
+logger = get_logger(__name__)
+
+
+def _log_print(*args, **kwargs):
+    """Proxy built-in print to the module logger for consistency."""
+    logger.info(" ".join(str(a) for a in args))
+
+
+# Override built-in print used throughout this script.
+print = _log_print  # type: ignore[misc]
+
+
 def env_update_aws_creds(tenant=None, host=None):
     """Update .env file with AWS credentials from DuploCloud."""
     # Use env vars as defaults

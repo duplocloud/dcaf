@@ -14,6 +14,10 @@ from src.agents.k8s_agent import K8sAgent
 import dotenv
 import uvicorn
 import os
+# Initialise centralised logging as early as possible
+from src.utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 # Load environment variables from .env file and override existing ones
 dotenv.load_dotenv(override=True)
@@ -41,5 +45,5 @@ if __name__ == "__main__":
         host="0.0.0.0",
         port=int(port),
         reload=True,     # set True for auto-reload in dev
-        log_level="info",
+        log_level=os.getenv("UVICORN_LOG_LEVEL", "info"),
     )

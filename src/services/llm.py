@@ -7,14 +7,12 @@ import os
 import dotenv
 from botocore.config import Config
 
+# Centralised logging
+from src.utils.logger import get_logger
+
 dotenv.load_dotenv()
 
-logger = logging.getLogger(__name__)
-
-logging.basicConfig(
-    level=os.getenv("LOG_LEVEL", "INFO"),
-    format="%(asctime)s | %(name)s | %(message)s",
-)
+logger = get_logger(__name__)
 
 
 class BedrockAnthropicLLM:

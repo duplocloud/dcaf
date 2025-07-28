@@ -10,7 +10,17 @@ import json
 import logging
 from datetime import datetime
 
-logger = logging.getLogger(__name__)
+# Centralised logging
+from src.utils.logger import get_logger
+
+logger = get_logger(__name__)
+
+
+def _log_print(*args, **kwargs):
+    logger.info(" ".join(str(a) for a in args))
+
+
+print = _log_print  # type: ignore[misc]
 
 
 def requires_approval(func):
@@ -467,10 +477,9 @@ if __name__ == "__main__":
     }
     
     result = agent.invoke(test_messages)
-    print("Result:", result.content)
+    logger.info("Result: %s", result.content)
     if hasattr(result, 'terminal_commands') and result.terminal_commands:
-        print("Terminal commands:", result.terminal_commands)
+        logger.info("Terminal commands: %s", result.terminal_commands)
 
-    print()
-    print("-" * 50)
-    print(result)
+    logger.info("-" * 50)
+    logger.info("%s", result)
