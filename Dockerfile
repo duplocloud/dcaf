@@ -23,11 +23,9 @@ RUN curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/s
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy only necessary files (exclude .env, .git, etc.)
-COPY schemas/ ./schemas/
-COPY agents/ ./agents/
-COPY services/ ./services/
-COPY *.py ./
+# Copy application code (src/ layout) and entrypoints
+COPY src/ ./src/
+COPY main.py ./
 
 # # Create a non-root user and switch to it
 # RUN useradd -m appuser && \

@@ -1,15 +1,11 @@
 from typing import Dict, Any, List, Optional
-import sys
 import os
 import uuid
 import functools
 
-# Add parent directory to path to import from root directory
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from agent_server import AgentProtocol
-from schemas.messages import AgentMessage, ToolCall, ExecutedToolCall, Command
-from services.llm import BedrockAnthropicLLM
-import os
+from ..agent_server import AgentProtocol
+from ..schemas.messages import AgentMessage, ToolCall, ExecutedToolCall, Command
+from ..services.llm import BedrockAnthropicLLM
 import json
 import logging
 from datetime import datetime
@@ -449,13 +445,13 @@ Be surgical, simple and less wordy."""
 
 # Usage example:
 if __name__ == "__main__":
-    from services.llm import BedrockAnthropicLLM
+    from ..services.llm import BedrockAnthropicLLM
     import dotenv
     
     dotenv.load_dotenv(override=True)
     
     llm = BedrockAnthropicLLM()
-    agent = ToolEnabledLLMAgent(llm)
+    agent = ToolCallingBoilerplateAgent(llm)
     
     # Test with mixed tool calls (approval and non-approval)
     test_messages = {

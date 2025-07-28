@@ -3,14 +3,14 @@ Run with:   python main.py
 Or `uvicorn main:app --port 8000` if you prefer the CLI.
 """
 
-from agent_server import create_chat_app
-from services.llm import BedrockAnthropicLLM
-from agents.echo_agent import EchoAgent
-from agents.llm_passthrough_agent import LLMPassthroughAgent
-from agents.cmd_agent import CommandAgent
-from agents.boilerplate_agent import BoilerplateAgent
-from agents.tool_calling_agent_boilerplate import ToolCallingBoilerplateAgent
-from agents.k8s_agent import K8sAgent
+from src.agent_server import create_chat_app
+from src.services.llm import BedrockAnthropicLLM
+from src.agents.echo_agent import EchoAgent
+from src.agents.llm_passthrough_agent import LLMPassthroughAgent
+from src.agents.cmd_agent import CommandAgent
+from src.agents.boilerplate_agent import BoilerplateAgent
+from src.agents.tool_calling_agent_boilerplate import ToolCallingBoilerplateAgent
+from src.agents.k8s_agent import K8sAgent
 import dotenv
 import uvicorn
 import os

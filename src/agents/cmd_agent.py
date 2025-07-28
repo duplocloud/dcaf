@@ -7,9 +7,9 @@ import subprocess
 import os
 from typing import List, Dict, Any, Optional
 
-from agent_server import AgentProtocol
-from schemas.messages import AgentMessage, Command, ExecutedCommand, Data
-from services.llm import BedrockAnthropicLLM
+from ..agent_server import AgentProtocol
+from ..schemas.messages import AgentMessage, Command, ExecutedCommand, Data
+from ..services.llm import BedrockAnthropicLLM
 
 logger = logging.getLogger(__name__)
 
