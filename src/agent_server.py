@@ -7,6 +7,9 @@ from src.middleware.user_context import UserContextMiddleware
 import logging
 import os
 import traceback
+from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
+from starlette.responses import Response  # FastAPI re-exports Response but Starlette import avoids circular typing
+from src.middleware.metrics import MetricsMiddleware
 
 # Centralised logging
 from src.utils.logger import get_logger
@@ -33,11 +36,20 @@ def create_chat_app(agent: AgentProtocol) -> FastAPI:
     # Middleware to attach correlation IDs
     app.add_middleware(RequestIdMiddleware)
     app.add_middleware(UserContextMiddleware)
+    # Metrics
+    app.add_middleware(MetricsMiddleware)
 
     # ----- health check ------------------------------------------------------
     @app.get("/health", tags=["system"])
     def health() -> Dict[str, str]:
         return {"status": "ok"}
+
+    # ----- metrics endpoint ---------------------------------------------------
+    @app.get("/metrics", tags=["system"], include_in_schema=False)
+    def metrics() -> Response:
+        """Prometheus scrape endpoint."""
+        data = generate_latest()
+        return Response(content=data, media_type=CONTENT_TYPE_LATEST)
 
     # ----- chat endpoint -----------------------------------------------------
     @app.post("/api/sendMessage", response_model=AgentMessage, tags=["chat"])

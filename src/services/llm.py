@@ -4,15 +4,19 @@ import time
 import logging
 from typing import Dict, Any, Optional, Union
 import os
-import dotenv
-from botocore.config import Config
+
+# Centralised configuration
+from src.config import get_settings
+
+settings = get_settings()
 
 # Centralised logging
 from src.utils.logger import get_logger
 
-dotenv.load_dotenv()
-
 logger = get_logger(__name__)
+
+from botocore.config import Config
+from src.core.metrics import observe_llm_latency
 
 
 class BedrockAnthropicLLM:
@@ -29,7 +33,7 @@ class BedrockAnthropicLLM:
             region_name: AWS region name (optional, uses 'us-east-1' by default)
         """
 
-        app_env = os.getenv("APP_ENV", "duplo")
+        app_env = settings.app_env
         logger.info(f"Initializing Bedrock client for APP_ENV: {app_env}")
 
         config = Config(
@@ -40,9 +44,9 @@ class BedrockAnthropicLLM:
             self.bedrock_runtime = boto3.client(
                 'bedrock-runtime', 
                 region_name=region_name,
-                aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
-                aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
-                aws_session_token=os.getenv("AWS_SESSION_TOKEN"),
+                aws_access_key_id=settings.aws_access_key_id,
+                aws_secret_access_key=settings.aws_secret_access_key,
+                aws_session_token=settings.aws_session_token,
                 config=config,
                 verify=True   
                         )
@@ -119,6 +123,11 @@ class BedrockAnthropicLLM:
         
         elapsed = time.perf_counter() - start_time
         logger.info("Model %s call completed in %.2f seconds", model_id, elapsed)
+        # Record latency metric
+        try:
+            observe_llm_latency(model_id, elapsed)
+        except Exception as metric_exc:  # Metrics must never break business logic
+            logger.warning("Failed to record LLM latency metric: %s", metric_exc)
         
         # Parse and return the response
         response_body = json.loads(response['body'].read().decode('utf-8'))

@@ -7,3 +7,4 @@ tk
 requests
 langchain_community
 duplocloud-client
+prometheus_client

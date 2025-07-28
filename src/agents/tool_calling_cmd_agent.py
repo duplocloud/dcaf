@@ -290,10 +290,7 @@ Be surgical, simple and less wordy."""
 # Usage example:
 if __name__ == "__main__":
     from services.llm import BedrockAnthropicLLM
-    import dotenv
-    
-    dotenv.load_dotenv(override=True)
-    
+
     llm = BedrockAnthropicLLM()
     agent = ToolCallingCmdAgent(llm)
     

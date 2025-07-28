@@ -10,6 +10,10 @@ import tempfile
 import shutil
 from typing import List, Dict, Any, Optional
 
+from src.config import get_settings
+
+settings = get_settings()
+
 from ..agent_server import AgentProtocol
 from ..schemas.messages import AgentMessage, Command, ExecutedCommand, Data
 from ..services.llm import BedrockAnthropicLLM
@@ -202,9 +206,10 @@ class K8sAgent(AgentProtocol):
             }
             
             # Invoke the LLM with the messages, system prompt, and response schema
-            model_id = os.getenv("BEDROCK_MODEL_ID", "anthropic.claude-3-5-sonnet-20240620-v1:0")
-            # model_id = os.getenv("BEDROCK_MODEL_ID", "us.anthropic.claude-3-7-sonnet-20250219-v1:0")
-            # model_id = os.getenv("BEDROCK_MODEL_ID", "us.anthropic.claude-sonnet-4-20250514-v1:0")
+            model_id = settings.bedrock_model_id
+            # Alternative model IDs examples:
+            #   "us.anthropic.claude-3-7-sonnet-20250219-v1:0"
+            #   "us.anthropic.claude-sonnet-4-20250514-v1:0"
             response = self.llm.invoke(
                 model_id=model_id,
                 messages=self.llm.normalize_message_roles(messages),

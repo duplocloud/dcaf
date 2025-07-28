@@ -93,7 +93,6 @@ The helper is designed to be extended for:
 * Request/trace correlation IDs via log-context
 * Distributed tracing exporters (OpenTelemetry)
 * Metrics side-effects (e.g., increment error counters)
-
 Contributions welcome – see `docs/engineering-initiatives.md`.
 
 ## 7  Code Style & Linting (Ruff)
@@ -149,6 +148,97 @@ ruff format --check .   # ensure files are already formatted
 ```
 
 This keeps `main` free of style regressions.
+
+## 8  Testing & Coverage (Pytest)
+
+Pytest is now included in the `dev` extras group along with `pytest-cov` for code-coverage reporting.
+
+### 8.1  Installation
+
+```bash
+pip install -e '.[dev]'
+```
+
+*(If you already installed the dev extras for Ruff, you’re covered – no additional steps needed.)*
+
+### 8.2  Running the test suite
+
+Simply execute:
+
+```bash
+pytest
+```
+
+By default pytest will look for tests under the `tests/` directory and output a short progress report.
+
+### 8.3  Generating coverage reports
+
+To measure statement coverage while running the suite:
+
+```bash
+pytest --cov=src
+```
+
+This will produce a coverage summary in the terminal. To generate an HTML report you can append `--cov-report=html` and open `htmlcov/index.html` in your browser.
+
+## 9  Static Type Checking (MyPy)
+
+MyPy performs **static analysis** of your type annotations, detecting bugs *before* runtime.
+
+### 9.1  Installation
+
+If you installed the dev extras earlier you already have MyPy:
+
+```bash
+pip install -e '.[dev]'   # includes mypy>=1.10
+```
+
+### 9.2  Running MyPy
+
+```bash
+mypy .
+```
+
+By default MyPy will respect the configuration found in `pyproject.toml` under `[tool.mypy]`.
+
+• Want maximum rigour? Use strict mode:
+
+```bash
+mypy --strict .
+```
+
+• First-time run? Install missing stub packages automatically:
+
+```bash
+mypy --install-types --non-interactive .
+```
+
+### 9.3  Configuration snippets
+
+```toml
+[tool.mypy]
+python_version = "3.9"
+ignore_missing_imports = true
+show_error_codes = true
+warn_unused_configs = true
+pretty = true
+```
+
+Adjust these settings as the codebase matures—e.g., disable `ignore_missing_imports` once third-party stubs are in place.
+
+### 9.4  Common ignore patterns
+
+Use `# type: ignore[<code>]` to silence a *specific* error at a particular line, or add modules to `mypy-exclude` in the config for coarse-grained ignores. Keep ignores to a minimum and document them in code reviews.
+
+### 9.5  CI pipeline hook (optional)
+
+Add MyPy after linting and before tests:
+
+```bash
+mypy --strict .
+```
+
+Fail the build on any reported errors to keep `main` type-safe.
 
 ---
 

@@ -11,18 +11,20 @@ from src.agents.cmd_agent import CommandAgent
 from src.agents.boilerplate_agent import BoilerplateAgent
 from src.agents.tool_calling_agent_boilerplate import ToolCallingBoilerplateAgent
 from src.agents.k8s_agent import K8sAgent
-import dotenv
 import uvicorn
-import os
+
+# Initialise config (loads .env automatically via Pydantic)
+from src.config import get_settings
+
+# Instantiate once and keep globally
+settings = get_settings()
+
 # Initialise centralised logging as early as possible
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-# Load environment variables from .env file and override existing ones
-dotenv.load_dotenv(override=True)
-
-region_name = os.getenv("AWS_REGION", "us-east-1")
+region_name = settings.aws_region
 llm = BedrockAnthropicLLM(region_name=region_name)
 
 
@@ -35,7 +37,7 @@ agent = ToolCallingBoilerplateAgent(llm)
 # agent = BoilerplateAgent()  # Default to the boilerplate agent
 
 app = create_chat_app(agent)
-port = os.getenv("PORT", 8000)
+port = settings.port
 
 if __name__ == "__main__":
         
@@ -45,5 +47,5 @@ if __name__ == "__main__":
         host="0.0.0.0",
         port=int(port),
         reload=True,     # set True for auto-reload in dev
-        log_level=os.getenv("UVICORN_LOG_LEVEL", "info"),
+        log_level=settings.uvicorn_log_level,
     )

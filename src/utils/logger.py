@@ -24,6 +24,7 @@ import atexit
 
 # Context variables for correlation IDs
 from src.utils.request_context import current_request_id, current_user_id
+from src.config import get_settings
 
 
 _configured: bool = False
@@ -59,9 +60,10 @@ def _configure_root_logger() -> None:
     if _configured:
         return
 
-    # Determine runtime config from environment variables.
-    log_level = os.getenv("LOG_LEVEL", "INFO").upper()
-    log_format = os.getenv("LOG_FORMAT", "console").lower()
+    # Determine runtime config from centralised settings
+    settings = get_settings()
+    log_level = settings.log_level.upper()
+    log_format = settings.log_format.lower()
 
     handler: logging.Handler = logging.StreamHandler(sys.stdout)
     
@@ -93,7 +95,7 @@ def _configure_root_logger() -> None:
 
     # Reduce noise from common noisy libraries unless explicitly overridden.
     access_logger = logging.getLogger("uvicorn.access")
-    access_logger.setLevel(os.getenv("UVICORN_LOG_LEVEL", "WARNING"))
+    access_logger.setLevel(settings.uvicorn_log_level.upper())
     access_logger.addFilter(context_filter)
 
     _configured = True

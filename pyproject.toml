@@ -36,7 +36,8 @@ dependencies = [
     "tk",
     "requests",
     "langchain_community",
-    "duplocloud-client"
+    "duplocloud-client",
+    "prometheus_client"
 ]
 
 [project.urls]
@@ -50,7 +51,10 @@ dab = "dab.cli:main"
 [project.optional-dependencies]
 # Development-only dependencies
 dev = [
-    "ruff>=0.4.5"
+    "ruff>=0.4.5",
+    "mypy>=1.10",
+    "pytest>=8.2",
+    "pytest-cov>=5.0",
 ]
 
 [tool.setuptools.packages.find]
@@ -75,3 +79,21 @@ ignore = []
 
 [tool.ruff.format]
 quote-style = "preserve"
+
+# --------------------------------------------------------------------------------------
+# MyPy (static type checker) configuration
+# --------------------------------------------------------------------------------------
+[tool.mypy]
+python_version = "3.9"
+# Treat imports that cannot be resolved (e.g., C extensions) as typed but skip errors
+ignore_missing_imports = true
+# Display error codes alongside messages (useful when searching them)
+show_error_codes = true
+# Warn if there are unused section names or unknown config options
+warn_unused_configs = true
+# Enable ANSI-colored output for easier readability
+pretty = true
+
+[tool.pytest.ini_options]
+addopts = "-ra"
+testpaths = ["tests"]

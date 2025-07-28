@@ -32,7 +32,7 @@
 - [ ] Add `mypy` configuration and fix current type issues.
 
 ## 6. Configuration & Secrets
-- [ ] Create Pydantic `Settings` class to centralise & validate env vars.
+- [x] Create Pydantic `Settings` class to centralise & validate env vars.
 - [ ] Ensure secrets do not leak: keep `.env` in `.gitignore`, integrate AWS Secrets Manager or SOPS.
 
 ## 7. API Error Handling

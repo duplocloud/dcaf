@@ -7,6 +7,10 @@ import subprocess
 import os
 from typing import List, Dict, Any, Optional
 
+from src.config import get_settings
+
+settings = get_settings()
+
 from ..agent_server import AgentProtocol
 from ..schemas.messages import AgentMessage, Command, ExecutedCommand, Data
 from ..services.llm import BedrockAnthropicLLM
@@ -134,7 +138,7 @@ class AWSAgent(AgentProtocol):
             }
             
             # Invoke the LLM with the messages, system prompt, and response schema
-            model_id = os.getenv("BEDROCK_MODEL_ID", "anthropic.claude-3-5-sonnet-20240620-v1:0")
+            model_id = settings.bedrock_model_id
             response = self.llm.invoke(
                 model_id=model_id,
                 messages=self.llm.normalize_message_roles(messages),
