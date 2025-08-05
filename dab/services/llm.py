@@ -208,11 +208,7 @@ class BedrockAnthropicLLM:
             return messages
 
         # Remove empty messages
-        messages = [
-            msg for msg in messages 
-            if isinstance(msg.get("content", ""), str) and msg.get("content", "").strip()
-        ]
-
+        # messages = [msg for msg in messages if msg.get("content", "").strip()]
 
         # Base case: single message or already normalized list
         if len(messages) == 1:
