@@ -44,7 +44,10 @@ def create_chat_app(agent: AgentProtocol, router: ChannelResponseRouter = None) 
         logger.info("Request Body:")
         logger.info(str(raw_body))
 
-        if raw_body.get("source") == "slack":
+        source = raw_body.get("source", "No Source Provided. Defaulting to 'help-desk'")
+        logger.info("Request Source: %s", source)
+
+        if source == "slack":
             if router:
                 should_respond = router.should_agent_respond(
                     raw_body["messages"]
