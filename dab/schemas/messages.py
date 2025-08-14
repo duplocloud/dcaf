@@ -78,8 +78,8 @@ class Message(BaseModel):
     content: str = ""
     data: Data = Field(default_factory=Data)
     timestamp: Optional[datetime] = None
-    user: User = None
-    agent: Agent = None
+    user: Optional[User] = None
+    agent: Optional[Agent] = None
 
 
 class UserMessage(Message):
