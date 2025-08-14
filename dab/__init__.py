@@ -6,8 +6,9 @@ from .agent_server import create_chat_app, AgentProtocol
 from .services.llm import BedrockAnthropicLLM
 from .agents.tool_calling_cmd_agent import ToolCallingCmdAgent
 from .schemas.messages import *
+from .channel_routing import SlackResponseRouter
 
-__version__ = "0.1.0"
+__version__ = "0.0.1"
 __all__ = [
     "create_chat_app",
     "AgentProtocol", 
@@ -16,4 +17,5 @@ __all__ = [
     "AgentMessage",
     "Messages",
     "ExecutedToolCall",
+    "SlackResponseRouter"
 ]
