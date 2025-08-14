@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "dab"
-version = "0.1.0"
+version = "0.0.1"
 description = "DuploCloud Agent Builder (DAB) - A framework for building LLM powered AI agents and workflows that integrate with the DuploCloud Help Desk."
 readme = "README.md"
 requires-python = ">=3.9"
