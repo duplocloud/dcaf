@@ -124,8 +124,7 @@ Focus primarily on the LATEST message, but use thread context to understand if t
         return formatted_conversation
     
     def should_agent_respond(self,
-        slack_thread: str,
-        agent_description: str,
+        slack_thread: str
     ) -> dict:
 
 
@@ -134,8 +133,6 @@ Focus primarily on the LATEST message, but use thread context to understand if t
         
         Args:
             slack_thread: Complete Slack thread conversation as string
-            agent_description: Agent name, capabilities, and description
-            llm_client: Initialized BedrockAnthropicLLM client
     
         Returns:
             dict: {"should_respond": bool, "reasoning": str}
