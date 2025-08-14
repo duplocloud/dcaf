@@ -200,6 +200,8 @@ Focus primarily on the LATEST message, but use thread context to understand if t
                 latency="optimized"
                 # latency="standard"
             )
+
+            logger.info("Slack Channel Router LLM Response: %s", response)
             
             if type(response) == str:
                 if response == "1":
