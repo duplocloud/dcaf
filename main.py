@@ -26,7 +26,7 @@ llm = BedrockAnthropicLLM(region_name=region_name)
 agent = ToolCallingBoilerplateAgent(llm)
 # Choose which agent to use
 # agent = EchoAgent()
-# agent = LLMPassthroughAgent(BedrockAnthropicLLM())
+agent = LLMPassthroughAgent(BedrockAnthropicLLM())
 # agent = CommandAgent(BedrockAnthropicLLM())
 # agent = BoilerplateAgent()  # Default to the boilerplate agent
 
