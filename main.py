@@ -4,13 +4,8 @@ Or `uvicorn main:app --port 8000` if you prefer the CLI.
 """
 
 from agent_server import create_chat_app
-from llm import BedrockLLM
-from agents.echo_agent import EchoAgent
+from dcaf.llm import BedrockLLM
 from agents.llm_passthrough_agent import LLMPassthroughAgent
-from agents.cmd_agent import CommandAgent
-from agents.boilerplate_agent import BoilerplateAgent
-from agents.tool_calling_agent_boilerplate import ToolCallingBoilerplateAgent
-from agents.k8s_agent import K8sAgent
 import dotenv
 import uvicorn
 import os
@@ -21,10 +16,8 @@ dotenv.load_dotenv(override=True)
 region_name = os.getenv("AWS_REGION", "us-east-1")
 llm = BedrockLLM(region_name=region_name)
 
-
-# agent = K8sAgent(llm)
-agent = ToolCallingBoilerplateAgent(llm)
 # Choose which agent to use
+agent = LLMPassthroughAgent(llm)
 # agent = EchoAgent()
 # agent = LLMPassthroughAgent(BedrockLLM())
 # agent = CommandAgent(BedrockLLM())
