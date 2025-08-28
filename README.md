@@ -5,17 +5,17 @@ A flexible, protocol-based framework for building LLM-powered AI agents and work
 ## Installation
 
 ```bash
-pip install git+https://github.com/duplocloud/dab.git
+pip install git+https://github.com/duplocloud/dcaf.git
 ```
 
 ## Quick Start
 
 ```python
-from dab import create_chat_app, BedrockAnthropicLLM, ToolCallingCmdAgent
+from dcaf import create_chat_app, BedrockLLM, ToolCallingCmdAgent
 import uvicorn
 
 # Initialize LLM and agent
-llm = BedrockAnthropicLLM(region_name="us-east-1")
+llm = BedrockLLM(region_name="us-east-1")
 agent = ToolCallingCmdAgent(llm)
 
 # Create FastAPI app
@@ -39,11 +39,11 @@ if __name__ == "__main__":
 Extend the `ToolCallingCmdAgent` or implement the `AgentProtocol` directly:
 
 ```python
-from dab import AgentProtocol, AgentMessage, BedrockAnthropicLLM
+from dcaf import AgentProtocol, AgentMessage, BedrockLLM
 from typing import Dict, Any, List
 
 class MyCustomAgent(AgentProtocol):
-    def __init__(self, llm: BedrockAnthropicLLM):
+    def __init__(self, llm: BedrockLLM):
         self.llm = llm
     
     def invoke(self, messages: Dict[str, List[Dict[str, Any]]]) -> AgentMessage:
@@ -57,7 +57,7 @@ class MyCustomAgent(AgentProtocol):
 ## Package Structure
 
 ```
-dab/
+dcaf/
 ├── __init__.py             # Main package exports
 ├── agent_server.py         # FastAPI server and agent protocol
 ├── schemas/
@@ -110,7 +110,7 @@ Edit the `.env` file with your AWS credentials and other configuration values.
 
 ### AWS Credentials Setup
 
-Use [`env_update_aws_creds.sh`](./env_update_aws_creds.sh) to fetch temporary AWS credentials via `duplo-jit`. It creates `.env` if not present, adds missing variables, and updates credentials. Uses default host (`https://duplo.hackathon.duploworkshop.com/`) and tenant (`agents`), overridable with `--host` and `--tenant` arguments.
+Use [`env_update_aws_creds.sh`](./env_update_aws_creds.sh) to fetch temporary AWS credentials via `duplo-jit`. It creates `.env` if not present, adds missing variables, and updates credentials. Uses default host (`https://duplo.hackathon.duploworkshop.com/`) and tenant (`agents`), overridcafle with `--host` and `--tenant` arguments.
 
 Make executable and run:
 ```bash

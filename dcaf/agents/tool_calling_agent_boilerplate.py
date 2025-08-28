@@ -8,7 +8,7 @@ import functools
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from agent_server import AgentProtocol
 from schemas.messages import AgentMessage, ToolCall, ExecutedToolCall, Command
-from services.llm import BedrockAnthropicLLM
+from llm import BedrockLLM
 import os
 import json
 import logging
@@ -24,7 +24,7 @@ def requires_approval(func):
 
 
 class ToolCallingBoilerplateAgent(AgentProtocol):
-    def __init__(self, llm: BedrockAnthropicLLM):
+    def __init__(self, llm: BedrockLLM):
         self.llm = llm
         # self.model_id = "us.anthropic.claude-opus-4-20250514-v1:0"
         # self.model_id = "us.anthropic.claude-3-sonnet-20240229-v1:0"
@@ -449,12 +449,12 @@ Be surgical, simple and less wordy."""
 
 # Usage example:
 if __name__ == "__main__":
-    from services.llm import BedrockAnthropicLLM
+    from llm import BedrockLLM
     import dotenv
     
     dotenv.load_dotenv(override=True)
     
-    llm = BedrockAnthropicLLM()
+    llm = BedrockLLM()
     agent = ToolEnabledLLMAgent(llm)
     
     # Test with mixed tool calls (approval and non-approval)

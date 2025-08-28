@@ -1,3 +1,8 @@
+from dcaf.llm import BedrockLLM
+import dotenv
+
+dotenv.load_dotenv(override=True)
+
 import json
 import boto3
 import time
@@ -85,11 +90,8 @@ class BedrockAnthropicLLM:
             The text response from the LLM
         """
 
-        #TODO create a more robust check. 
-        # if "anthropic" not in model_id.lower():
-            # raise ValueError(f"Unsupported model: {model_id}. Currently only Anthropic/Claude models are supported.")
-
-        logger.info("Messages in LLM API Call: %s", messages)
+        if "anthropic" not in model_id.lower():
+            raise ValueError(f"Unsupported model: {model_id}. Currently only Anthropic/Claude models are supported.")
 
         messages = self.normalize_message_roles(messages)
         # Prepare request body based on model provider
@@ -107,7 +109,6 @@ class BedrockAnthropicLLM:
             latency,
         )
         start_time = time.perf_counter()
-
         
         # Invoke the model
         #TODO: Update to use the converse bedrock API, so it's easier to switch models.
@@ -198,17 +199,12 @@ class BedrockAnthropicLLM:
         Bedrock requires that roles strictly alternate between 'user' and 'assistant'.
         If two or more adjacent messages have the same role (either 'user' or 'assistant'),
         we merge their content fields into one message and remove the extras.
-
-        Bedrock does not accept empty messages, so remove empty messages for now..
         
         This function processes the entire message list recursively until no more
         merges are possible, ensuring the final list has proper role alternation.
         """
         if not messages:
             return messages
-
-        # Remove empty messages
-        messages = [msg for msg in messages if msg.get("content", "").strip()]
             
         # Base case: single message or already normalized list
         if len(messages) == 1:
@@ -278,3 +274,66 @@ class BedrockAnthropicLLM:
             return output
         else:
             return response_body["content"][0]["text"]
+
+# Example Usage
+if __name__ == "__main__":
+    print("Example Usage - Bedrock Converse API")
+    
+    # Initialize the client
+    llm = BedrockLLM(region_name="us-west-2")
+    
+    # Simple text conversation
+    response = llm.invoke(
+        messages=[{"role": "user", "content": "Hello, how are you?"}],
+        # model_id="anthropic.claude-3-5-sonnet-20240620-v1:0",
+        model_id="openai.gpt-oss-120b-1:0",
+        max_tokens=500,
+        temperature=0.7
+    )
+
+    # print('\n'*5)
+    # print("Response:", response)
+    # print('\n'*5)
+
+    # Example with tools
+    tools = [{
+        "name": "get_weather",
+        "description": "Get the weather for a location",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "location": {
+                    "type": "string",
+                    "description": "The city and state, e.g. San Francisco, CA"
+                }
+            },
+            "required": ["location"]
+        }
+    }]
+    
+    response_with_tools = llm.invoke(
+        messages=[{"role": "user", "content": "What's the weather in New York?"}],
+        model_id="anthropic.claude-3-5-sonnet-20240620-v1:0",
+        system_prompt="You are a helpful assistant that can check the weather.",
+        tools=tools,
+        tool_choice="any"
+        # tool_choice={"name": "get_weather"}
+    )
+    
+    print('\n'*5)
+    print("Response with tools:", response_with_tools)
+    print('\n'*5)
+
+    response_with_tools = llm.invoke(
+        messages=[{"role": "user", "content": "What's the weather in New York?"}],
+        # model_id="anthropic.claude-3-5-sonnet-20240620-v1:0", 
+        model_id="openai.gpt-oss-120b-1:0",
+        system_prompt="You are a helpful assistant that can check the weather.",
+        tools=tools,
+        tool_choice="any"
+        # tool_choice={"name": "get_weather"}
+    )
+    
+    print('\n'*5)
+    print("Response with tools:", response_with_tools)
+    print('\n'*5)

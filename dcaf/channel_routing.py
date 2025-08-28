@@ -6,7 +6,7 @@ or remain silent. It uses an LLM to analyze the conversation context and make
 intelligent decisions about when the bot should engage.
 """
 
-from .services.llm import BedrockAnthropicLLM
+from .llm import BedrockLLM
 from typing import Dict, List, Any
 import logging
 import traceback
@@ -31,7 +31,7 @@ class SlackResponseRouter(ChannelResponseRouter):
     the bot should engage or remain silent based on the conversation flow.
     """
     
-    def __init__(self, llm_client: BedrockAnthropicLLM, agent_name: str = "Assistant", agent_description: str = ""):
+    def __init__(self, llm_client: BedrockLLM, agent_name: str = "Assistant", agent_description: str = ""):
         """
         Initialize the Slack Response Router.
         

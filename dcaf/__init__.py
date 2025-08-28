@@ -3,7 +3,7 @@ DAB (DuploCloud Agent Builder) - A framework for building AI agents with tool ca
 """
 
 from .agent_server import create_chat_app, AgentProtocol
-from .services.llm import BedrockAnthropicLLM
+from .llm import BedrockLLM
 from .agents.tool_calling_cmd_agent import ToolCallingCmdAgent
 from .schemas.messages import *
 from .channel_routing import SlackResponseRouter
@@ -12,7 +12,7 @@ __version__ = "0.0.1"
 __all__ = [
     "create_chat_app",
     "AgentProtocol", 
-    "BedrockAnthropicLLM",
+    "BedrockLLM",
     "ToolCallingCmdAgent",
     "AgentMessage",
     "Messages",

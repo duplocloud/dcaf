@@ -3,7 +3,7 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "dab"
+name = "dcaf"
 version = "0.0.1"
 description = "DuploCloud Agent Builder (DAB) - A framework for building LLM powered AI agents and workflows that integrate with the DuploCloud Help Desk."
 readme = "README.md"
@@ -41,15 +41,15 @@ dependencies = [
 
 [project.urls]
 Homepage = "https://github.com/duplocloud/service-desk-agents/tree/pip-package"
-#Repository = "https://github.com/duplocloud/dab"
-#Issues = "https://github.com/duplocloud/dab/issues"
+#Repository = "https://github.com/duplocloud/dcaf"
+#Issues = "https://github.com/duplocloud/dcaf/issues"
 
 [project.scripts]
-dab = "dab.cli:main"
+dcaf = "dcaf.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["dab*"]
+include = ["dcaf*"]
 
 [tool.setuptools.package-data]
-dab = ["*.py"]
+dcaf = ["*.py"]

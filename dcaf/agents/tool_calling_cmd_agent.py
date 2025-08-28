@@ -6,13 +6,13 @@ from datetime import datetime
 
 from ..agent_server import AgentProtocol
 from ..schemas.messages import AgentMessage, ExecutedToolCall
-from ..services.llm import BedrockAnthropicLLM
+from ..llm import BedrockLLM
 
 logger = logging.getLogger(__name__)
 
 
 class ToolCallingCmdAgent(AgentProtocol):
-    def __init__(self, llm: BedrockAnthropicLLM):
+    def __init__(self, llm: BedrockLLM):
         self.llm = llm
         # self.model_id = "us.anthropic.claude-opus-4-20250514-v1:0"
         self.model_id = "us.anthropic.claude-3-sonnet-20240229-v1:0"
@@ -279,12 +279,12 @@ Be surgical, simple and less wordy."""
 
 # Usage example:
 if __name__ == "__main__":
-    from services.llm import BedrockAnthropicLLM
+    from llm import BedrockLLM
     import dotenv
     
     dotenv.load_dotenv(override=True)
     
-    llm = BedrockAnthropicLLM()
+    llm = BedrockLLM()
     agent = ToolEnabledLLMAgent(llm)
     
     # Test with weather and stock request

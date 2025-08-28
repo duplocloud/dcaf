@@ -189,7 +189,7 @@ def main():
     dotenv.load_dotenv(override=True)
     
     parser = argparse.ArgumentParser(
-        prog='dab',
+        prog='dcaf',
         description='DuploCloud Agent Builder CLI'
     )
     
