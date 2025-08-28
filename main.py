@@ -4,7 +4,7 @@ Or `uvicorn main:app --port 8000` if you prefer the CLI.
 """
 
 from agent_server import create_chat_app
-from dcaf.llm import BedrockLLM
+from dcaf import BedrockLLM
 from agents.llm_passthrough_agent import LLMPassthroughAgent
 import dotenv
 import uvicorn
