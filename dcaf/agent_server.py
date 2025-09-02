@@ -5,6 +5,7 @@ from .schemas.messages import AgentMessage, Messages
 import logging
 import os
 import traceback
+from .channel_routing import ChannelResponseRouter, SlackResponseRouter
 
 logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO"),
@@ -19,10 +20,10 @@ class AgentProtocol(Protocol):
     def invoke(self, messages: Dict[str, List[Dict[str, Any]]]) -> AgentMessage: ...
 
 
-def create_chat_app(agent: AgentProtocol) -> FastAPI:
+def create_chat_app(agent: AgentProtocol, router: ChannelResponseRouter = None) -> FastAPI:
     # ONE-LINER guardrail — fails fast if agent doesn’t meet the protocol
     if not isinstance(agent, AgentProtocol):
-        raise TypeError(
+        raise TypeError(    
             "Agent must satisfy AgentProtocol "
             "(missing .invoke(messages: Messages) -> Message, perhaps?)"
         )
@@ -37,10 +38,25 @@ def create_chat_app(agent: AgentProtocol) -> FastAPI:
     # ----- chat endpoint -----------------------------------------------------
     @app.post("/api/sendMessage", response_model=AgentMessage, tags=["chat"])
     def send_message(raw_body: Dict[str, Any] = Body(...)) -> AgentMessage:
+
        
         # log request body
         logger.info("Request Body:")
         logger.info(str(raw_body))
+
+        source = raw_body.get("source", "No Source Provided. Defaulting to 'help-desk'")
+        logger.info("Request Source: %s", source)
+
+        if source == "slack":
+            if router:
+                should_respond = router.should_agent_respond(
+                    raw_body["messages"]
+                )
+                if not should_respond["should_respond"]:
+                    return AgentMessage(
+                        role="assistant",
+                        content=""
+                    )
 
         # 1. validate presence of 'messages'
         if "messages" not in raw_body:

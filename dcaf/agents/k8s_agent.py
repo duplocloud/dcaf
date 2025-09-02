@@ -12,7 +12,7 @@ from typing import List, Dict, Any, Optional
 
 from agent_server import AgentProtocol
 from schemas.messages import AgentMessage, Command, ExecutedCommand, Data
-from services.llm import BedrockAnthropicLLM
+from llm import BedrockLLM
 
 logger = logging.getLogger(__name__)
 
@@ -22,12 +22,12 @@ class K8sAgent(AgentProtocol):
     and uses an LLM to generate responses and suggest commands.
     """
     
-    def __init__(self, llm: BedrockAnthropicLLM, system_prompt: Optional[str] = None):
+    def __init__(self, llm: BedrockLLM, system_prompt: Optional[str] = None):
         """
         Initialize the CommandAgent with an LLM instance and optional custom system prompt.
         
         Args:
-            llm: An instance of BedrockAnthropicLLM for generating responses
+            llm: An instance of BedrockLLM for generating responses
             system_prompt: Optional custom system prompt to override the default
         """
         self.llm = llm

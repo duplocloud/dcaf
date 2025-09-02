@@ -65,13 +65,21 @@ class Data(BaseModel):
     url_configs: List[URLConfig] = Field(default_factory=list)
 
 
+class User(BaseModel):
+    name: str
+    id: str
+
+class Agent(BaseModel):
+    name: str
+    id: str
+
 class Message(BaseModel):
     role: Literal["user", "assistant"]
     content: str = ""
     data: Data = Field(default_factory=Data)
     timestamp: Optional[datetime] = None
-    user: Optional[Union[str, Dict[str, Any]]] = None
-    agent: Optional[Union[str, Dict[str, Any]]] = None
+    user: Optional[User] = None
+    agent: Optional[Agent] = None
 
 
 class UserMessage(Message):

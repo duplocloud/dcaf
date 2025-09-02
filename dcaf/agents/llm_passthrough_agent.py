@@ -1,11 +1,11 @@
 from typing import Dict, Any, List
 from ..agent_server import AgentProtocol
 from ..schemas.messages import AgentMessage
-from ..services.llm import BedrockAnthropicLLM
+from ..llm import BedrockLLM
 import os
 
 class LLMPassthroughAgent(AgentProtocol):
-    def __init__(self, llm: BedrockAnthropicLLM):
+    def __init__(self, llm: BedrockLLM):
         self.llm = llm
         # self.model_id = "us.anthropic.claude-3-5-sonnet-20240620-v1:0"
         # self.model_id = "us.anthropic.claude-sonnet-4-20250514-v1:0"
