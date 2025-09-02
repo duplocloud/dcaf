@@ -73,7 +73,8 @@ class BedrockLLM(LLM):
             **kwargs: Additional parameters for compatibility
             
         Returns:
-            The raw response from the Converse API
+            The response from the Converse API
+            https://docs.aws.amazon.com/bedrock/latest/APIReference/API_runtime_Converse.html#API_runtime_Converse_ResponseSyntax
         """
         
         logger.info(f"Invoking model {model_id} with Converse API")
