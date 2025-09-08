@@ -69,9 +69,11 @@ class User(BaseModel):
     name: str
     id: str
 
+
 class Agent(BaseModel):
     name: str
     id: str
+
 
 class Message(BaseModel):
     role: Literal["user", "assistant"]

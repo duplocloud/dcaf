@@ -22,7 +22,7 @@ class ToolCallingAgent:
         tools: List[Tool],
         system_prompt: str = "You are a helpful assistant.",
         model_id: str = "us.anthropic.claude-3-5-sonnet-20240620-v1:0",
-        max_iterations: int = 5,
+        max_iterations: int = 10,
         enable_terminal_cmds: bool = True
     ):
         """
@@ -106,7 +106,7 @@ class ToolCallingAgent:
         schemas.append(final_response_schema)
         return schemas
     
-    async def execute_tool(
+    def execute_tool(
         self, 
         tool_name: str, 
         tool_input: Dict[str, Any],
@@ -120,7 +120,7 @@ class ToolCallingAgent:
         
         try:
             tool = self.tools[tool_name]
-            result = await tool.execute(tool_input, platform_context)
+            result = tool.execute(tool_input, platform_context)
             logger.info(f"Tool '{tool_name}' output: {result}")
             return result
         except Exception as e:
@@ -154,7 +154,7 @@ class ToolCallingAgent:
             input_description=input_description
         )
     
-    async def process_approved_tool_calls(
+    def process_approved_tool_calls(
         self,
         messages: Dict[str, List[Dict[str, Any]]],
         platform_context: Dict[str, Any]
@@ -172,7 +172,7 @@ class ToolCallingAgent:
             for tool_call in tool_calls:
                 if tool_call.get("execute", False):
                     # Execute the approved tool
-                    result = await self.execute_tool(
+                    result = self.execute_tool(
                         tool_call["name"],
                         tool_call["input"],
                         platform_context
@@ -190,12 +190,12 @@ class ToolCallingAgent:
                         id=tool_call["id"],
                         name=tool_call["name"],
                         input=tool_call["input"],
-                        output=f"Tool execution rejected: {tool_call['rejection_reason']}"
+                        output=f"Tool execution rejected; Rejection Reason: {tool_call['rejection_reason']}"
                     ))
         
         return executed_tools
     
-    async def process_tool_calls(
+    def process_tool_calls(
         self,
         response_content: List[Dict[str, Any]],
         platform_context: Dict[str, Any]
@@ -221,7 +221,7 @@ class ToolCallingAgent:
                         approval_required_tools.append(tool_call)
                     else:
                         # Execute immediately
-                        result = await self.execute_tool(
+                        result = self.execute_tool(
                             tool_name, tool_input, platform_context
                         )
                         executed_tool_calls.append(ExecutedToolCall(
@@ -250,10 +250,9 @@ class ToolCallingAgent:
         
         return preprocessed
     
-    async def invoke(
+    def invoke(
         self,
         messages: Dict[str, List[Dict[str, Any]]],
-        platform_context: Optional[Dict[str, Any]] = None
     ) -> AgentMessage:
         """
         Main agent invocation.
@@ -265,11 +264,17 @@ class ToolCallingAgent:
         Returns:
             AgentMessage with response and any tool calls needing approval
         """
-        if platform_context is None:
-            platform_context = {}
+
+        #Fetch the platform context for the current turn from the last user message object
+        platform_context = {}
+        #Iterate through the messages in reverse order to find the last user message
+        for message in reversed(messages.get("messages", [])):
+            if message.get("role") == "user":
+                platform_context = message.get("platform_context", {})
+                break
         
         # Process any approved tool calls from incoming message
-        executed_tool_calls = await self.process_approved_tool_calls(
+        executed_tool_calls = self.process_approved_tool_calls(
             messages, platform_context
         )
         
@@ -283,6 +288,8 @@ class ToolCallingAgent:
                 )
                 conversation.append({"role": "user", "content": result_msg})
         
+        #store and return the executed calls in the agent message response object so that they are stored in the persistent thread
+        current_turn_executed_tool_calls = []
         # Main execution loop
         for iteration in range(self.max_iterations):
             logger.info(f"Iteration {iteration + 1}")
@@ -298,27 +305,32 @@ class ToolCallingAgent:
                 return_raw_api_response=True
             )
             
-            response_content = response.get("content", [])
+            response_content = response['output']['message'].get('content', [])
             
             # Check for final response
             final_response_call = None
             other_tool_calls = []
             
             for content_block in response_content:
-                if (content_block.get("type") == "tool_use" and
-                    content_block.get("name") == "return_final_response_to_user"):
-                    final_response_call = content_block
-                elif content_block.get("type") == "tool_use":
-                    other_tool_calls.append(content_block)
-            
+                if 'toolUse' in content_block:
+                    tool_use = content_block['toolUse']
+                    if tool_use['name'] == "return_final_response_to_user":
+                        final_response_call = tool_use
+                    else:
+                        other_tool_calls.append(tool_use)    
+
             # Return final response if found
             if final_response_call:
-                final_input = final_response_call.get("input", {})
+                final_input = final_response_call.get('input', {})
                 agent_message = AgentMessage(
                     content=final_input.get("content", "")
                 )
                 
-                # Add terminal commands if present and enabled
+                #return executed_tool_calls in the agent message response object so that they are stored in the persistent thread
+                if current_turn_executed_tool_calls:
+                    agent_message.data.executed_tool_calls = current_turn_executed_tool_calls
+
+                # Add terminal commands if present
                 if self.enable_terminal_cmds and final_input.get("terminal_commands"):
                     for cmd in final_input["terminal_commands"]:
                         agent_message.data.cmds.append(Command(
@@ -329,27 +341,18 @@ class ToolCallingAgent:
                 return agent_message
             
             # Process other tool calls
-            if other_tool_calls:
+            elif other_tool_calls:
                 conversation.append({
                     "role": "assistant",
                     "content": "Processing tool calls"
                 })
                 
-                # Process tools
-                executed, approval_needed = await self.process_tool_calls(
-                    response_content, platform_context
+                # Update process_tool_calls to expect toolUse format
+                executed, approval_needed = self.process_tool_calls(
+                    other_tool_calls, platform_context
                 )
                 
-                # Return approval-needed tools
-                if approval_needed:
-                    agent_message = AgentMessage(
-                        content="I need your approval to execute the following tools:"
-                    )
-                    for tool_call in approval_needed:
-                        agent_message.data.tool_calls.append(tool_call)
-                    return agent_message
-                
-                # Add executed tool results
+                # Add executed tool results. This needs to be dealt with properly TODO:
                 if executed:
                     for executed_tool in executed:
                         result_msg = (
@@ -357,8 +360,24 @@ class ToolCallingAgent:
                             f"with input {executed_tool.input}: {executed_tool.output}"
                         )
                         conversation.append({"role": "user", "content": result_msg})
-        
+
+                        current_turn_executed_tool_calls.append(executed_tool)
+
+                # Return approval-needed tools
+                if approval_needed:
+                    agent_message = AgentMessage(
+                        content="I need your approval to execute the following tools:"
+                    )
+                    for tool_call in approval_needed:
+                        agent_message.data.tool_calls.append(tool_call)
+
+                    #return executed_tool_calls in the agent message response object so that they are stored in the persistent thread
+                    agent_message.data.executed_tool_calls = current_turn_executed_tool_calls
+
+                    return agent_message
+                
         # Max iterations reached
+        #TODO explore implementing soft limit for max iterations by telling the LLM to return the final response.
         return AgentMessage(
-            content="Maximum iterations reached. Please try rephrasing your request."
+            content=f"Maximum iterations ({self.max_iterations}) reached. Please try a different request or increase the maximum iterations limit."
         )

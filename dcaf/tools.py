@@ -1,7 +1,7 @@
 """
 Tool system for creating LLM-powered agents with approval workflows.
 """
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, ConfigDict
 from typing import Callable, Dict, Any, Optional
 import inspect
 import json
