@@ -28,11 +28,12 @@ class Tool(BaseModel):
     
     def get_schema(self) -> Dict[str, Any]:
         """Get the tool's JSON schema for LLM consumption."""
-        return {
-            "name": self.name,
-            "description": self.description,
-            "input_schema": self.schema
-        }
+        # Check if self.schema is already a full tool specification
+        if isinstance(self.schema, dict) and "input_schema" in self.schema and "name" in self.schema and "description" in self.schema:
+            # Schema is already a full tool spec, return it as-is
+            return self.schema
+        else:
+            raise Exception("The schema does not have all the necessary fields: ['name', 'description', 'input_schema']")
     
     def describe(self):
         """Print detailed description of the tool."""
@@ -65,7 +66,7 @@ class Tool(BaseModel):
 
 def tool(
     schema: Dict[str, Any],
-    requires_approval: bool = False,
+    requires_approval: bool = True,
     name: Optional[str] = None,
     description: Optional[str] = None
 ):

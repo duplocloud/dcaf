@@ -261,14 +261,17 @@ class BedrockLLM(LLM):
         """
         tool_config = {'tools': []}
         
-        for tool in tools:
+        for i, tool in enumerate(tools):
+            # Extract the input schema
+            input_schema = tool.get('input_schema', tool.get('parameters', {}))
+            
             # Format each tool specification
             tool_spec = {
                 'toolSpec': {
                     'name': tool['name'],
                     'description': tool.get('description', ''),
                     'inputSchema': {
-                        'json': tool.get('input_schema', tool.get('parameters', {}))
+                        'json': input_schema
                     }
                 }
             }
