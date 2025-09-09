@@ -125,7 +125,7 @@ class BedrockLLM(LLM):
             
             elapsed = time.perf_counter() - start_time
             logger.info(f"Model {model_id} call completed in {elapsed:.2f} seconds")
-            logger.debug(f"Response: {response}")
+            logger.info(f"Response: {response}")
             
             return response
             

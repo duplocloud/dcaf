@@ -106,7 +106,7 @@ class ToolCallingAgent:
                 }
             }
         
-        schemas.append(final_response_schema)
+        # schemas.append(final_response_schema)
         return schemas
     
     def execute_tool(
@@ -308,7 +308,8 @@ class ToolCallingAgent:
                 max_tokens=4000,
                 system_prompt=self.system_prompt,
                 tools=self.tool_schemas,
-                tool_choice="any",
+                # tool_choice="any",
+                # tool_choice="required",
                 return_raw_api_response=True
             )
             
@@ -321,18 +322,18 @@ class ToolCallingAgent:
             for content_block in response_content:
                 if 'toolUse' in content_block:
                     tool_use = content_block['toolUse']
-                    if tool_use['name'] == "return_final_response_to_user":
-                        final_response_call = tool_use
-                    else:
-                        other_tool_calls.append(tool_use)    
+                    other_tool_calls.append(tool_use)    
+
+                elif "text" in content_block:
+                    final_response_call = content_block
 
             logger.info(f"Tool calls found: {other_tool_calls}")
 
             # Return final response if found
             if final_response_call:
-                final_input = final_response_call.get('input', {})
+                final_response = final_response_call.get('text', "")
                 agent_message = AgentMessage(
-                    content=final_input.get("content", "")
+                    content=final_response
                 )
                 
                 #return executed_tool_calls in the agent message response object so that they are stored in the persistent thread
@@ -384,6 +385,8 @@ class ToolCallingAgent:
                     agent_message.data.executed_tool_calls = current_turn_executed_tool_calls
 
                     return agent_message
+
+            #Edge case when no tool calls are found and no final message is found
                 
         # Max iterations reached
         #TODO explore implementing soft limit for max iterations by telling the LLM to return the final response.
