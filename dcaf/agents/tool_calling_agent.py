@@ -23,7 +23,7 @@ class ToolCallingAgent:
         system_prompt: str = "You are a helpful assistant.",
         model_id: str = "us.anthropic.claude-3-5-sonnet-20240620-v1:0",
         max_iterations: int = 10,
-        enable_terminal_cmds: bool = True
+        enable_terminal_cmds: bool = False
     ):
         """
         Initialize the agent.
@@ -38,6 +38,8 @@ class ToolCallingAgent:
         """
         self.llm = llm
         self.tools = {tool.name: tool for tool in tools}
+        logger.info(f"Loading Agent Tools: {list(self.tools.keys())}")
+
         self.system_prompt = system_prompt
         self.model_id = model_id
         self.max_iterations = max_iterations
@@ -45,6 +47,7 @@ class ToolCallingAgent:
         
         # Build tool schemas for LLM
         self.tool_schemas = self._build_tool_schemas()
+        logger.info(f"Tool schemas: {"\n\n\n".join(str(schema) for schema in self.tool_schemas)}")
         
     def _build_tool_schemas(self) -> List[Dict[str, Any]]:
         """Build tool schemas for the LLM, including the final response tool."""
@@ -204,32 +207,36 @@ class ToolCallingAgent:
         executed_tool_calls = []
         approval_required_tools = []
         
-        for content_block in response_content:
-            if content_block.get("type") == "tool_use":
-                tool_name = content_block.get("name")
-                tool_input = content_block.get("input", {})
-                tool_use_id = content_block.get("id")
+        logger.info(f"Processing {len(response_content)} content blocks")
+        
+        for tool_use_block in response_content:
+            # Handle the actual format returned by Bedrock: {'toolUse': {...}}
+            tool_name = tool_use_block.get("name")
+            tool_input = tool_use_block.get("input", {})
+            tool_use_id = tool_use_block.get("toolUseId")
+            
+            logger.info(f"Found tool call: {tool_name} with ID: {tool_use_id}")
                 
-                if tool_name in self.tools:
-                    tool = self.tools[tool_name]
-                    
-                    if tool.requires_approval:
-                        # Tool requires approval
-                        tool_call = self.create_tool_call_for_approval(
-                            tool_name, tool_input, tool_use_id
-                        )
-                        approval_required_tools.append(tool_call)
-                    else:
-                        # Execute immediately
-                        result = self.execute_tool(
-                            tool_name, tool_input, platform_context
-                        )
-                        executed_tool_calls.append(ExecutedToolCall(
-                            id=tool_use_id,
-                            name=tool_name,
-                            input=tool_input,
-                            output=result
-                        ))
+            if tool_name in self.tools:
+                tool = self.tools[tool_name]
+                
+                if tool.requires_approval:
+                    # Tool requires approval
+                    tool_call = self.create_tool_call_for_approval(
+                        tool_name, tool_input, tool_use_id
+                    )
+                    approval_required_tools.append(tool_call)
+                else:
+                    # Execute immediately
+                    result = self.execute_tool(
+                        tool_name, tool_input, platform_context
+                    )
+                    executed_tool_calls.append(ExecutedToolCall(
+                        id=tool_use_id,
+                        name=tool_name,
+                        input=tool_input,
+                        output=result
+                    ))
         
         return executed_tool_calls, approval_required_tools
     
@@ -301,7 +308,7 @@ class ToolCallingAgent:
                 max_tokens=4000,
                 system_prompt=self.system_prompt,
                 tools=self.tool_schemas,
-                tool_choice={"type": "any"},
+                tool_choice="any",
                 return_raw_api_response=True
             )
             
@@ -318,6 +325,8 @@ class ToolCallingAgent:
                         final_response_call = tool_use
                     else:
                         other_tool_calls.append(tool_use)    
+
+            logger.info(f"Tool calls found: {other_tool_calls}")
 
             # Return final response if found
             if final_response_call:
