@@ -244,16 +244,72 @@ class ToolCallingAgent:
         self,
         messages: Dict[str, List[Dict[str, Any]]]
     ) -> List[Dict[str, Any]]:
-        """Convert input messages to LLM format."""
+        """Convert input messages to LLM format with efficient context injection."""
         preprocessed = []
         messages_list = messages.get("messages", [])
+        # tracked_fields = ["k8s_namespace", "tenant_name"]  # Configurable context fields
+        tracked_fields = ["tenant_name"]  # Configurable context fields
+        
+        # State tracking for context changes across user messages
+        last_context = {}
+        user_message_positions = []  # Track where user messages are in preprocessed array
+        original_user_messages = []  # Keep reference to original user messages
         
         for message in messages_list:
-            if message.get("role") in ["user", "assistant"]:
-                preprocessed.append({
-                    "role": message["role"],
-                    "content": message.get("content", "")
-                })
+            role = message.get("role")
+            if role not in ["user", "assistant"]:
+                continue
+                
+            processed_msg = {
+                "role": role,
+                "content": message.get("content", "")
+            }
+            
+            if role == "user":
+                # Remember this user message's position and original content
+                user_message_positions.append(len(preprocessed))
+                original_user_messages.append(message)  # Keep reference to original
+                
+                # Extract current context from platform_context
+                platform_context = message.get("platform_context", {})
+                current_context = {
+                    field: platform_context.get(field) 
+                    for field in tracked_fields 
+                    if platform_context.get(field)  # Only include non-empty values
+                }
+                
+                # Determine if we need to inject context
+                is_first_user_message = len(user_message_positions) == 1
+                context_has_changed = current_context != last_context
+                
+                # Inject context for first user message OR when context changes
+                if current_context and (is_first_user_message or context_has_changed):
+                    context_lines = [
+                        f"{field.replace('_', ' ').title()}: {value}" 
+                        for field, value in current_context.items()
+                    ]
+                    context_header = "Context Information:\n- " + "\n- ".join(context_lines) + "\n\n"
+                    processed_msg["content"] = context_header + processed_msg["content"]
+                
+                # Update our tracking state
+                last_context = current_context
+            
+            preprocessed.append(processed_msg)
+        
+        # Always inject "Current Message Context" into the very last user message
+        if user_message_positions and last_context:
+            final_user_position = user_message_positions[-1]
+            # Get the original content from the source - much cleaner!
+            original_final_content = original_user_messages[-1].get("content", "")
+            
+            context_lines = [
+                f"{field.replace('_', ' ').title()}: {value}" 
+                for field, value in last_context.items()
+            ]
+            final_context_header = "Current Message Context:\n- " + "\n- ".join(context_lines) + "\n\n"
+            
+            # Always use original content as the base - no parsing needed
+            preprocessed[final_user_position]["content"] = final_context_header + original_final_content
         
         return preprocessed
     
