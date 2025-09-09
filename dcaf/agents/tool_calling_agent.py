@@ -272,6 +272,8 @@ class ToolCallingAgent:
                 
                 # Extract current context from platform_context
                 platform_context = message.get("platform_context", {})
+                if not platform_context:
+                    platform_context = {}
                 current_context = {
                     field: platform_context.get(field) 
                     for field in tracked_fields 
@@ -289,7 +291,7 @@ class ToolCallingAgent:
                         for field, value in current_context.items()
                     ]
                     context_header = "Context Information:\n- " + "\n- ".join(context_lines) + "\n\n"
-                    processed_msg["content"] = context_header + processed_msg["content"]
+                    processed_msg["content"] = context_header + "User Message: " + processed_msg["content"]
                 
                 # Update our tracking state
                 last_context = current_context
@@ -309,8 +311,14 @@ class ToolCallingAgent:
             final_context_header = "Current Message Context:\n- " + "\n- ".join(context_lines) + "\n\n"
             
             # Always use original content as the base - no parsing needed
-            preprocessed[final_user_position]["content"] = final_context_header + original_final_content
+            preprocessed[final_user_position]["content"] = final_context_header + "User Message: " + original_final_content
         
+        logger.debug("#"*10)
+        logger.debug("Preprocessed messages: %s", preprocessed)
+        for msg in preprocessed:
+            logger.debug(msg["content"])
+        logger.debug("#"*10)
+
         return preprocessed
     
     def invoke(
