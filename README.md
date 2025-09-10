@@ -1,4 +1,4 @@
-# DAB (DuploCloud Agent Builder)
+# dcaf (DuploCloud Agent Framework)
 
 A flexible, protocol-based framework for building LLM-powered AI agents and workflows that integrate with the DuploCloud Help Desk. DAB provides a standardized way to create, deploy, and manage intelligent agents with tool-calling capabilities.
 
