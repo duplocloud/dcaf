@@ -23,7 +23,8 @@ class ToolCallingAgent:
         system_prompt: str = "You are a helpful assistant.",
         model_id: str = "us.anthropic.claude-3-5-sonnet-20240620-v1:0",
         max_iterations: int = 10,
-        enable_terminal_cmds: bool = False
+        enable_terminal_cmds: bool = False,
+        llm_visible_context_fields = ["tenant_name"]
     ):
         """
         Initialize the agent.
@@ -248,7 +249,7 @@ class ToolCallingAgent:
         preprocessed = []
         messages_list = messages.get("messages", [])
         # tracked_fields = ["k8s_namespace", "tenant_name"]  # Configurable context fields
-        tracked_fields = ["tenant_name"]  # Configurable context fields
+        tracked_fields = self.llm_visible_context_fields  # Configurable context fields
         
         # State tracking for context changes across user messages
         last_context = {}
