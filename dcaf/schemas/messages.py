@@ -79,6 +79,7 @@ class Message(BaseModel):
     role: Literal["user", "assistant"]
     content: str = ""
     data: Data = Field(default_factory=Data)
+    meta_data: Dict[str, Any] = Field(default_factory=dict)
     timestamp: Optional[datetime] = None
     user: Optional[User] = None
     agent: Optional[Agent] = None
