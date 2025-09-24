@@ -176,6 +176,8 @@ class BedrockLLM(LLM):
         if len(merged) < len(messages):
             return self.normalize_message_roles(merged)
         else:
+            if (m := next((m for m in reversed(merged) if m.get("role") == "assistant"), None)) and isinstance(m.get("content", ""), str):
+                m["content"] = m["content"].rstrip()
             return merged
     
     def _merge_message_content(self, target_msg: Dict[str, Any], source_msg: Dict[str, Any]) -> None:
