@@ -45,6 +45,8 @@ class ToolCallingAgent:
         self.model_id = model_id
         self.max_iterations = max_iterations
         self.enable_terminal_cmds = enable_terminal_cmds
+        self.llm_visible_platform_context_fields = llm_visible_platform_context_fields
+
         
         # Build tool schemas for LLM
         self.tool_schemas = self._build_tool_schemas()
