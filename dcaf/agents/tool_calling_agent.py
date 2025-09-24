@@ -50,7 +50,8 @@ class ToolCallingAgent:
         
         # Build tool schemas for LLM
         self.tool_schemas = self._build_tool_schemas()
-        logger.info(f"Tool schemas: {'\n\n\n'.join(str(schema) for schema in self.tool_schemas)}")
+        separator = '\n\n\n'
+        logger.info(f"Tool schemas: {separator.join(str(schema) for schema in self.tool_schemas)}")
         
     def _build_tool_schemas(self) -> List[Dict[str, Any]]:
         """Build tool schemas for the LLM, including the final response tool."""
