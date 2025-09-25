@@ -7,9 +7,9 @@ import asyncio
 from ..tools import Tool, tool
 from ..schemas.messages import AgentMessage, ToolCall, ExecutedToolCall, Command
 from ..llm import BedrockLLM
+import traceback
 
 logger = logging.getLogger(__name__)
-
 
 class ToolCallingAgent:
     """
@@ -132,7 +132,7 @@ class ToolCallingAgent:
             return result
         except Exception as e:
             error_msg = f"Error executing tool '{tool_name}': {str(e)}"
-            logger.error(error_msg)
+            logger.exception(error_msg)
             return error_msg
     
     def create_tool_call_for_approval(
@@ -395,7 +395,7 @@ class ToolCallingAgent:
                     # Capture text response but do NOT return yet if there are tool calls to process
                     final_response_call = content_block
 
-            logger.info(f"Tool calls found: {other_tool_calls}")
+            logger.info(f"{len(other_tool_calls)} Tool calls found: {other_tool_calls}")
 
             # Always process tool calls first if any are present
             if other_tool_calls:
@@ -459,5 +459,5 @@ class ToolCallingAgent:
         # Max iterations reached
         #TODO explore implementing soft limit for max iterations by telling the LLM to return the final response.
         return AgentMessage(
-            content=f"Maximum iterations ({self.max_iterations}) reached. Please try a different request or increase the maximum iterations limit."
+            content=f"Maximum iterations ({self.max_iterations}) reached. Please try a different request or contact DuploCloud support to increase the maximum iterations limit."
         )
