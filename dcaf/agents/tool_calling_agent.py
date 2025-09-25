@@ -390,36 +390,15 @@ class ToolCallingAgent:
             for content_block in response_content:
                 if 'toolUse' in content_block:
                     tool_use = content_block['toolUse']
-                    other_tool_calls.append(tool_use)    
-
+                    other_tool_calls.append(tool_use)
                 elif "text" in content_block:
+                    # Capture text response but do NOT return yet if there are tool calls to process
                     final_response_call = content_block
 
             logger.info(f"Tool calls found: {other_tool_calls}")
 
-            # Return final response if found
-            if final_response_call:
-                final_response = final_response_call.get('text', "")
-                agent_message = AgentMessage(
-                    content=final_response
-                )
-                
-                #return executed_tool_calls in the agent message response object so that they are stored in the persistent thread
-                if current_turn_executed_tool_calls:
-                    agent_message.data.executed_tool_calls = current_turn_executed_tool_calls
-
-                # Add terminal commands if present
-                if self.enable_terminal_cmds and final_input.get("terminal_commands"):
-                    for cmd in final_input["terminal_commands"]:
-                        agent_message.data.cmds.append(Command(
-                            command=cmd.get("command"),
-                            execute=False
-                        ))
-                
-                return agent_message
-            
-            # Process other tool calls
-            elif other_tool_calls:
+            # Always process tool calls first if any are present
+            if other_tool_calls:
                 conversation.append({
                     "role": "assistant",
                     "content": "Processing tool calls"
@@ -454,6 +433,27 @@ class ToolCallingAgent:
 
                     return agent_message
 
+                # If tools were executed without requiring approval, continue the loop to let the LLM consume results
+                # and eventually produce the final response in a subsequent iteration.
+                continue
+
+            # If there are no tool calls to process, return final response if present
+            if final_response_call:
+                final_response = final_response_call.get('text', "")
+                agent_message = AgentMessage(
+                    content=final_response
+                )
+                
+                #return executed_tool_calls in the agent message response object so that they are stored in the persistent thread
+                if current_turn_executed_tool_calls:
+                    agent_message.data.executed_tool_calls = current_turn_executed_tool_calls
+
+                # Add terminal commands if present (note: final_input was undefined; use parsed content if needed in future)
+                # Currently, we only support plain text final responses here.
+                
+                return agent_message
+
+            
             #Edge case when no tool calls are found and no final message is found
                 
         # Max iterations reached
