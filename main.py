@@ -3,9 +3,10 @@ Run with:   python main.py
 Or `uvicorn main:app --port 8000` if you prefer the CLI.
 """
 
-from agent_server import create_chat_app
-from dcaf import BedrockLLM
-from agents.llm_passthrough_agent import LLMPassthroughAgent
+# from agent_server import create_chat_app
+from dcaf.agents.llm_passthrough_agent import LLMPassthroughAgent
+from dcaf import BedrockLLM, create_chat_app
+# from agents.llm_passthrough_agent import LLMPassthroughAgent
 import dotenv
 import uvicorn
 import os
@@ -17,7 +18,7 @@ region_name = os.getenv("AWS_REGION", "us-east-1")
 llm = BedrockLLM(region_name=region_name)
 
 # Choose which agent to use
-agent = LLMPassthroughAgent(llm)
+agent =  LLMPassthroughAgent(llm)
 # agent = EchoAgent()
 # agent = LLMPassthroughAgent(BedrockLLM())
 # agent = CommandAgent(BedrockLLM())
