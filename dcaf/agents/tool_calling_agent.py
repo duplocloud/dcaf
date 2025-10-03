@@ -143,7 +143,7 @@ class ToolCallingAgent:
     ) -> ToolCall:
         """Create a ToolCall object for user approval."""
         tool = self.tools[tool_name]
-        
+
         # Extract input descriptions from schema
         input_description = {}
         if "properties" in tool.schema:
@@ -400,8 +400,8 @@ class ToolCallingAgent:
             # Always process tool calls first if any are present
             if other_tool_calls:
                 conversation.append({
-                    "role": "assistant",
-                    "content": "Processing tool calls"
+                    "role": "user",
+                    "content": "Processing tool calls..."
                 })
                 
                 # Update process_tool_calls to expect toolUse format
