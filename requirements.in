@@ -6,3 +6,4 @@ dotenv
 requests
 langchain_community
 duplocloud-client
+tiktoken
