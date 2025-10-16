@@ -16,14 +16,20 @@ logging.basicConfig(
 if __name__ == "__main__":
     print("Example Usage - Bedrock Converse API")
     
-    # Initialize the client
+    # Initialize the client with default config
     llm = BedrockLLM(region_name="us-west-2")
+    
+    # Or with custom boto3 config
+    from botocore.config import Config
+    custom_config = Config(read_timeout=60, retries={'max_attempts': 5, 'mode': 'adaptive'})
+    # llm = BedrockLLM(region_name="us-west-2", boto3_config=custom_config)
     
     # Simple text conversation
     response = llm.invoke(
         messages=[{"role": "user", "content": "Hello, how are you?"}],
         # model_id="anthropic.claude-3-5-sonnet-20240620-v1:0",
-        model_id="openai.gpt-oss-120b-1:0",
+        model_id="us.anthropic.claude-3-5-sonnet-20240620-v1:0",
+        # model_id="openai.gpt-oss-120b-1:0",
         max_tokens=500,
         temperature=0.7
     )
@@ -51,7 +57,8 @@ if __name__ == "__main__":
     response_with_tools = llm.invoke(
         messages=[{"role": "user", "content": "What's the weather in New York?"}],
         # messages=[{"role": "user", "content": "What's the weather in New York? and what's the stock price of Apple?"}],
-        model_id="openai.gpt-oss-120b-1:0",
+        # model_id="openai.gpt-oss-120b-1:0",
+        model_id="us.anthropic.claude-3-5-sonnet-20240620-v1:0",
         system_prompt="You are a helpful assistant that can check the weather.",
         tools=tools,
         # tool_choice="any"
@@ -66,7 +73,8 @@ if __name__ == "__main__":
     # Simple text conversation
     response = llm.invoke(
         messages=[{"role": "user", "content": "Hello, how are you?"}],
-        model_id="anthropic.claude-3-5-sonnet-20240620-v1:0",
+        # model_id="anthropic.claude-3-5-sonnet-20240620-v1:0",
+        model_id="us.anthropic.claude-3-5-sonnet-20240620-v1:0",
         # model_id="openai.gpt-oss-120b-1:0",
         max_tokens=500,
         temperature=0.7
@@ -112,7 +120,8 @@ if __name__ == "__main__":
     response_with_tools = llm.invoke(
         # messages=[{"role": "user", "content": "What's the weather in New York?"}],
         messages=[{"role": "user", "content": "What's the weather in New York? and what's the stock price of Apple?"}],
-        model_id="anthropic.claude-3-5-sonnet-20240620-v1:0",
+        # model_id="anthropic.claude-3-5-sonnet-20240620-v1:0",
+        model_id="us.anthropic.claude-3-5-sonnet-20240620-v1:0",
         system_prompt="You are a helpful assistant that can check the weather.",
         tools=tools,
         # tool_choice="any"

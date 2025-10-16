@@ -22,19 +22,29 @@ class BedrockLLM(LLM):
     Provides consistent interface across all Bedrock models.
     """
     
-    def __init__(self, region_name: str = 'us-east-1'):
+    def __init__(self, region_name: str = 'us-east-1', boto3_config: Optional[Config] = None):
         """
         Initialize the BedrockLLM client.
         
         Args:
             region_name: AWS region name (default: 'us-east-1')
+            boto3_config: Optional boto3 Config object to customize client behavior.
+                         If None, uses default config with optimized timeouts and retries.
         """
         app_env = os.getenv("APP_ENV", "duplo")
         logger.info(f"Initializing Bedrock client for APP_ENV: {app_env}")
 
-        config = Config(
-            read_timeout=1000
+        default_boto3_config = Config(
+            read_timeout=20,           # Max time to wait for response data
+            connect_timeout=10,        # Max time to establish connection
+            tcp_keepalive=True,        # Enable TCP keepalive to detect dead connections
+            retries={
+                'max_attempts': 3,
+                'mode': 'standard'     # Standard retry with exponential backoff
+            }
         )
+
+        config = boto3_config or default_boto3_config
 
         self.bedrock_runtime = boto3.client(
             'bedrock-runtime', 

@@ -78,6 +78,21 @@ response = llm.invoke(
     max_tokens=1000,
     tools=[...],  # Optional tool schemas
 )
+
+# Custom boto3 configuration
+from botocore.config import Config
+
+custom_config = Config(
+    read_timeout=60,
+    retries={'max_attempts': 5, 'mode': 'adaptive'}
+)
+llm = BedrockLLM(region_name="us-east-1", boto3_config=custom_config)
+
+# Default configuration (used when boto3_config=None):
+# - read_timeout: 20 seconds
+# - connect_timeout: 10 seconds  
+# - tcp_keepalive: True
+# - retries: 3 attempts with standard exponential backoff
 ```
 
 ### 2. Tools
