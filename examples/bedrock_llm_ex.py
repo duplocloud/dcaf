@@ -16,12 +16,15 @@ logging.basicConfig(
 if __name__ == "__main__":
     print("Example Usage - Bedrock Converse API")
     
-    # Initialize the client with default config
+    # Option 1: Use defaults (read_timeout=20, connect_timeout=10, retries=3)
     llm = BedrockLLM(region_name="us-west-2")
     
-    # Or with custom boto3 config
+    # Option 2: Use environment variables (set BOTO3_READ_TIMEOUT, etc.)
+    # llm = BedrockLLM(region_name="us-west-2")
+    
+    # Option 3: Custom boto3 config (takes precedence over env vars)
     from botocore.config import Config
-    custom_config = Config(read_timeout=60, retries={'max_attempts': 5, 'mode': 'adaptive'})
+    # custom_config = Config(read_timeout=60, retries={'max_attempts': 5, 'mode': 'adaptive'})
     # llm = BedrockLLM(region_name="us-west-2", boto3_config=custom_config)
     
     # Simple text conversation

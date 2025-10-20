@@ -28,28 +28,33 @@ class BedrockLLM(LLM):
         
         Args:
             region_name: AWS region name (default: 'us-east-1')
-            boto3_config: Optional boto3 Config object to customize client behavior.
-                         If None, uses default config with optimized timeouts and retries.
+            boto3_config: Optional boto3 Config object. If provided, takes precedence 
+                         over environment variables. If None, uses env vars or defaults.
+        
+        Environment Variables (used when boto3_config=None):
+            BOTO3_READ_TIMEOUT: Read timeout in seconds (default: 20)
+            BOTO3_CONNECT_TIMEOUT: Connect timeout in seconds (default: 10)
+            BOTO3_MAX_ATTEMPTS: Max retry attempts (default: 3)
+            BOTO3_RETRY_MODE: Retry mode - 'standard', 'adaptive', or 'legacy' (default: 'standard')
         """
         app_env = os.getenv("APP_ENV", "duplo")
         logger.info(f"Initializing Bedrock client for APP_ENV: {app_env}")
 
-        default_boto3_config = Config(
-            read_timeout=20,           # Max time to wait for response data
-            connect_timeout=10,        # Max time to establish connection
-            tcp_keepalive=True,        # Enable TCP keepalive to detect dead connections
-            retries={
-                'max_attempts': 3,
-                'mode': 'standard'     # Standard retry with exponential backoff
-            }
-        )
-
-        config = boto3_config or default_boto3_config
+        if boto3_config is None:
+            boto3_config = Config(
+                read_timeout=int(os.getenv("BOTO3_READ_TIMEOUT", "20")),
+                connect_timeout=int(os.getenv("BOTO3_CONNECT_TIMEOUT", "10")),
+                tcp_keepalive=True,
+                retries={
+                    'max_attempts': int(os.getenv("BOTO3_MAX_ATTEMPTS", "3")),
+                    'mode': os.getenv("BOTO3_RETRY_MODE", "standard")
+                }
+            )
 
         self.bedrock_runtime = boto3.client(
             'bedrock-runtime', 
             region_name=region_name, 
-            config=config
+            config=boto3_config
         )
     
     def invoke(

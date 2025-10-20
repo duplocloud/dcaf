@@ -79,20 +79,24 @@ response = llm.invoke(
     tools=[...],  # Optional tool schemas
 )
 
-# Custom boto3 configuration
+**Configuration Priority:** Explicit `boto3_config` > Environment Variables > Defaults
+
+```python
+# 1. With explicit config (full control, overrides everything)
 from botocore.config import Config
-
-custom_config = Config(
-    read_timeout=60,
-    retries={'max_attempts': 5, 'mode': 'adaptive'}
+llm = BedrockLLM(
+    boto3_config=Config(read_timeout=60, retries={'max_attempts': 5, 'mode': 'adaptive'})
 )
-llm = BedrockLLM(region_name="us-east-1", boto3_config=custom_config)
 
-# Default configuration (used when boto3_config=None):
-# - read_timeout: 20 seconds
-# - connect_timeout: 10 seconds  
-# - tcp_keepalive: True
-# - retries: 3 attempts with standard exponential backoff
+# 2. With environment variables (deployment-time configuration)
+# export BOTO3_READ_TIMEOUT=30
+# export BOTO3_CONNECT_TIMEOUT=15
+# export BOTO3_MAX_ATTEMPTS=5
+# export BOTO3_RETRY_MODE=adaptive
+llm = BedrockLLM()  # Reads from env vars
+
+# 3. Defaults: read_timeout=20s, connect_timeout=10s, max_attempts=3, mode=standard
+llm = BedrockLLM()  # Works out of the box
 ```
 
 ### 2. Tools
