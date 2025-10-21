@@ -165,7 +165,11 @@ class BedrockLLM(LLM):
             return messages
         
         # Remove empty messages
-        messages = [msg for msg in messages if msg.get("content", "").strip()]
+        messages = [
+            m for m in messages
+            if (isinstance(m.get("content"), str) and m["content"].strip())
+            or (isinstance(m.get("content"), list) and m["content"])  # filters out []
+        ]
         
         if len(messages) <= 1:
             return messages.copy()
