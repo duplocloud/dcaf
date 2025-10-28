@@ -37,7 +37,7 @@ def create_chat_app(agent: AgentProtocol, router: ChannelResponseRouter = None) 
 
     # ----- chat endpoint -----------------------------------------------------
     @app.post("/api/sendMessage", response_model=AgentMessage, tags=["chat"])
-    async def send_message(raw_body: Dict[str, Any] = Body(...)) -> AgentMessage:
+    def send_message(raw_body: Dict[str, Any] = Body(...)) -> AgentMessage:
 
        
         # log request body
@@ -73,7 +73,7 @@ def create_chat_app(agent: AgentProtocol, router: ChannelResponseRouter = None) 
             # Pass the raw messages dictionary directly to the agent
             msgs_obj = msgs_obj.model_dump()
             logger.info("Invoking agent with messages: %s", msgs_obj)
-            assistant_msg = await agent.invoke(msgs_obj)
+            assistant_msg = agent.invoke(msgs_obj)
 
             logger.info("Assistant message: %s", assistant_msg)
 
