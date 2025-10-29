@@ -57,6 +57,64 @@ class BedrockLLM(LLM):
             config=boto3_config
         )
     
+    #stream
+    def invoke_stream(
+        self,
+        messages: list,
+        model_id: str,
+        system_prompt: Optional[str] = None,
+        tools: Optional[list] = None,
+        max_tokens: int = 1000,
+        temperature: float = 0.0,
+        additional_params: Optional[Dict[str, Any]] = None,
+    ):
+        """
+        Stream response from Bedrock Converse API.
+        Yields raw event dicts from the EventStream.
+        
+        Args:
+            messages: Messages in Converse format (not Messages API format)
+            model_id: Bedrock model ID
+            system_prompt: System prompt string
+            tools: Tools in Converse toolConfig format
+            max_tokens: Max tokens to generate
+            temperature: Sampling temperature
+            additional_params: Additional inference config
+            
+        Yields:
+            Dict events from the stream
+        """
+        messages = self.normalize_message_roles(messages)
+        
+        request = {
+            "modelId": model_id,
+            "messages": messages,
+            "inferenceConfig": {
+                "maxTokens": max_tokens,
+                "temperature": temperature,
+            }
+        }
+        
+        if system_prompt:
+            request["system"] = [{"text": system_prompt}]
+        
+        if tools:
+            request["toolConfig"] = {"tools": tools}
+        
+        if additional_params:
+            request["inferenceConfig"].update(additional_params)
+        
+        logger.info("Streaming from model %s", model_id)
+        start_time = time.perf_counter()
+        
+        response = self.bedrock_runtime.converse_stream(**request)
+        
+        for event in response['stream']:
+            yield event
+        
+        elapsed = time.perf_counter() - start_time
+        logger.info("Stream completed in %.2f seconds", elapsed)
+
     def invoke(
         self,
         messages: List[Dict[str, Any]],
@@ -165,7 +223,7 @@ class BedrockLLM(LLM):
             return messages
         
         # Remove empty messages
-        messages = [msg for msg in messages if msg.get("content", "").strip()]
+        messages = [msg for msg in messages if self._is_content_non_empty(msg.get("content", ""))]
         
         if len(messages) <= 1:
             return messages.copy()
@@ -221,6 +279,28 @@ class BedrockLLM(LLM):
                 target_msg["content"] = [prev_content] + curr_content
         else:  # both strings
             target_msg["content"] = f"{prev_content}\n{curr_content}"
+    
+    def _is_content_non_empty(self, content: Any) -> bool:
+        """
+        Check if message content is non-empty, handling both string and list formats.
+        
+        Args:
+            content: Message content (can be string or list of dicts)
+            
+        Returns:
+            True if content is non-empty, False otherwise
+        """
+        if isinstance(content, str):
+            return bool(content.strip())
+        elif isinstance(content, list):
+            # Check if list has at least one item with non-empty text
+            return any(
+                isinstance(item, dict) and 
+                isinstance(item.get("text"), str) and 
+                item.get("text", "").strip()
+                for item in content
+            )
+        return False
     
     def _format_messages(self, messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """
