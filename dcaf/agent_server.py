@@ -6,6 +6,7 @@ import logging
 import os
 import traceback
 from .channel_routing import ChannelResponseRouter, SlackResponseRouter
+from fastapi.responses import StreamingResponse
 
 logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO"),
