@@ -91,8 +91,6 @@ def create_chat_app(agent: AgentProtocol, router: ChannelResponseRouter = None) 
             traceback_error = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
             logger.error("Unhandled exception in agent:\n%s", traceback_error)
             raise HTTPException(status_code=500, detail=str(e))
-
-    return app
     
     #----- stream chat endpoint -----------------------------------------------------
     @app.post("/api/sendMessageStream", tags=["chat"])
