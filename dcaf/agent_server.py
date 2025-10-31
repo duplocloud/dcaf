@@ -93,3 +93,36 @@ def create_chat_app(agent: AgentProtocol, router: ChannelResponseRouter = None) 
             raise HTTPException(status_code=500, detail=str(e))
 
     return app
+    
+    #----- stream chat endpoint -----------------------------------------------------
+    @app.post("/api/sendMessageStream", tags=["chat"])
+    def send_message_stream(raw_body: Dict[str, Any] = Body(...)):
+        """Stream response as NDJSON"""
+        
+        logger.info("Stream Request Body: %s", raw_body)
+        
+        # Validate
+        if "messages" not in raw_body:
+            raise HTTPException(status_code=400, detail="'messages' field missing")
+        
+        try:
+            msgs_obj = Messages.model_validate({"messages": raw_body["messages"]})
+        except ValidationError as ve:
+            raise HTTPException(status_code=422, detail=ve.errors())
+        
+        # Generator function
+        def event_generator():
+            try:
+                for event in agent.invoke_stream(msgs_obj.model_dump()):
+                    yield event.model_dump_json() + '\n'
+            except Exception as e:
+                logger.error("Stream error: %s", str(e), exc_info=True)
+                error_event = ErrorEvent(error=str(e))
+                yield error_event.model_dump_json() + '\n'
+        
+        return StreamingResponse(
+            event_generator(),
+            media_type='application/x-ndjson'
+        )
+
+    return app
