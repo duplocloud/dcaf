@@ -213,9 +213,11 @@ Focus primarily on the LATEST message, but use thread context to understand if t
                     }
 
             else:
+                # Extract tool use input from Bedrock Converse API response format
+                tool_use_input = response['output']['message']['content'][0]['toolUse']['input']
                 return {
-                    "should_respond": response.get("should_respond", False),
-                    "reasoning": response.get("reasoning", "No reasoning provided")
+                    "should_respond": tool_use_input.get("should_respond", False),
+                    "reasoning": tool_use_input.get("reasoning", "No reasoning provided")
                 }
             
         except Exception as e:
