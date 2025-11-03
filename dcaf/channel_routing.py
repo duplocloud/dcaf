@@ -31,7 +31,7 @@ class SlackResponseRouter(ChannelResponseRouter):
     the bot should engage or remain silent based on the conversation flow.
     """
     
-    def __init__(self, llm_client: BedrockLLM, agent_name: str = "Assistant", agent_description: str = ""):
+    def __init__(self, llm_client: BedrockLLM, agent_name: str = "Assistant", agent_description: str = "", model_id : str = None):
         """
         Initialize the Slack Response Router.
         
@@ -43,7 +43,7 @@ class SlackResponseRouter(ChannelResponseRouter):
         self.llm_client = llm_client
         self.agent_name = agent_name
         self.agent_description = agent_description
-        self.model_id = "arn:aws:bedrock:us-east-1:938690564755:application-inference-profile/1h5elwbuhmue"
+        self.model_id = model_id
     
     def _get_system_prompt(self) -> str:
         """
@@ -188,7 +188,7 @@ Focus primarily on the LATEST message, but use thread context to understand if t
             # Call LLM with forced tool use
             response = self.llm_client.invoke(
                 messages=messages,
-                model_id="us.anthropic.claude-3-5-haiku-20241022-v1:0",
+                model_id= self.model_id if self.model_id else "us.anthropic.claude-3-5-haiku-20241022-v1:0",
                 system_prompt=system_prompt,
                 tools=[routing_tool],
                 tool_choice={"type": "tool", "name": "slack_routing_decision"},

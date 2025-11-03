@@ -2,6 +2,7 @@ from typing import Protocol, runtime_checkable, Dict, Any, List
 from fastapi import FastAPI, HTTPException, Body
 from pydantic import ValidationError
 from .schemas.messages import AgentMessage, Messages
+from .schemas.events import DoneEvent
 import logging
 import os
 import traceback
@@ -40,13 +41,12 @@ def create_chat_app(agent: AgentProtocol, router: ChannelResponseRouter = None) 
     @app.post("/api/sendMessage", response_model=AgentMessage, tags=["chat"])
     def send_message(raw_body: Dict[str, Any] = Body(...)) -> AgentMessage:
 
-       
         # log request body
         logger.info("Request Body:")
         logger.info(str(raw_body))
 
-        source = raw_body.get("source", "No Source Provided. Defaulting to 'help-desk'")
-        logger.info("Request Source: %s", source)
+        source = raw_body.get("source")
+        logger.info("Request Source: %s", source if source else "No Source Provided. Defaulting to 'help-desk'")
 
         if source == "slack":
             if router:
@@ -99,6 +99,18 @@ def create_chat_app(agent: AgentProtocol, router: ChannelResponseRouter = None) 
         """Stream response as NDJSON"""
         
         logger.info("Stream Request Body: %s", raw_body)
+
+        source = raw_body.get("source")
+        logger.info("Request Source: %s", source if source else "No Source Provided. Defaulting to 'help-desk'")
+
+        if source == "slack":
+            if router:
+                should_respond = router.should_agent_respond(
+                    raw_body["messages"]
+                )
+                if not should_respond["should_respond"]:
+                    #return done event
+                    return DoneEvent().model_dump_json() + '\n'
         
         # Validate
         if "messages" not in raw_body:
