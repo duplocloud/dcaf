@@ -2,7 +2,7 @@ from typing import Protocol, runtime_checkable, Dict, Any, List
 from fastapi import FastAPI, HTTPException, Body
 from pydantic import ValidationError
 from .schemas.messages import AgentMessage, Messages
-from .schemas.events import DoneEvent
+from .schemas.events import DoneEvent, ErrorEvent
 import logging
 import os
 import traceback
@@ -109,8 +109,13 @@ def create_chat_app(agent: AgentProtocol, router: ChannelResponseRouter = None) 
                     raw_body["messages"]
                 )
                 if not should_respond["should_respond"]:
-                    #return done event
-                    return DoneEvent().model_dump_json() + '\n'
+                    #return done event using StreamingResponse
+                    def done_generator():
+                        yield DoneEvent().model_dump_json() + '\n'
+                    return StreamingResponse(
+                        done_generator(),
+                        media_type='application/x-ndjson'
+                    )
         
         # Validate
         if "messages" not in raw_body:
