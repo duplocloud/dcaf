@@ -93,6 +93,8 @@ class BedrockLLM(LLM):
         """
         
         logger.info(f"Invoking model {model_id} with Converse API")
+        logger.info(f"Messages Size: {len(messages)}")
+        logger.info(f"Logging max_tokens: {max_tokens}")
         logger.debug(f"Messages: {messages}")
         
         # Normalize messages to ensure proper role alternation
