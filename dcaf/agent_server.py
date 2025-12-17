@@ -1,4 +1,4 @@
-from typing import Protocol, runtime_checkable, Dict, Any, List 
+from typing import Protocol, runtime_checkable, Dict, Any, List, Optional
 from fastapi import FastAPI, HTTPException, Body
 from pydantic import ValidationError
 from .schemas.messages import AgentMessage, Messages
@@ -8,6 +8,7 @@ import os
 import traceback
 from .channel_routing import ChannelResponseRouter, SlackResponseRouter
 from fastapi.responses import StreamingResponse
+import inspect
 
 logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO"),
@@ -19,11 +20,11 @@ logger = logging.getLogger(__name__)
 @runtime_checkable            
 class AgentProtocol(Protocol):
     """Any agent that can respond to a chat."""
-    def invoke(self, messages: Dict[str, List[Dict[str, Any]]]) -> AgentMessage: ...
+    def invoke(self, messages: Dict[str, List[Dict[str, Any]]], thread_id: Optional[str] = None) -> AgentMessage: ...
 
 
 def create_chat_app(agent: AgentProtocol, router: ChannelResponseRouter = None) -> FastAPI:
-    # ONE-LINER guardrail — fails fast if agent doesn’t meet the protocol
+    # ONE-LINER guardrail — fails fast if agent doesn't meet the protocol
     if not isinstance(agent, AgentProtocol):
         raise TypeError(    
             "Agent must satisfy AgentProtocol "
@@ -73,8 +74,18 @@ def create_chat_app(agent: AgentProtocol, router: ChannelResponseRouter = None) 
         try:
             # Pass the raw messages dictionary directly to the agent
             msgs_obj = msgs_obj.model_dump()
-            logger.info("Invoking agent with messages: %s", msgs_obj)
-            assistant_msg = agent.invoke(msgs_obj)
+            
+            # Extract thread_id from raw_body if present
+            thread_id = raw_body.get("thread_id")
+            
+            # Check if the agent's invoke method accepts thread_id parameter
+            sig = inspect.signature(agent.invoke)
+            if "thread_id" in sig.parameters:
+                logger.info("Invoking agent with messages and thread_id: %s", thread_id)
+                assistant_msg = agent.invoke(msgs_obj, thread_id=thread_id)
+            else:
+                logger.info("Invoking agent with messages (no thread_id support)")
+                assistant_msg = agent.invoke(msgs_obj)
 
             logger.info("Assistant message: %s", assistant_msg)
 
@@ -126,11 +137,22 @@ def create_chat_app(agent: AgentProtocol, router: ChannelResponseRouter = None) 
         except ValidationError as ve:
             raise HTTPException(status_code=422, detail=ve.errors())
         
+        # Extract thread_id from raw_body if present
+        thread_id = raw_body.get("thread_id")
+        
         # Generator function
         def event_generator():
             try:
-                for event in agent.invoke_stream(msgs_obj.model_dump()):
-                    yield event.model_dump_json() + '\n'
+                # Check if the agent's invoke_stream method accepts thread_id parameter
+                sig = inspect.signature(agent.invoke_stream)
+                if "thread_id" in sig.parameters:
+                    logger.info("Invoking stream agent with messages and thread_id: %s", thread_id)
+                    for event in agent.invoke_stream(msgs_obj.model_dump(), thread_id=thread_id):
+                        yield event.model_dump_json() + '\n'
+                else:
+                    logger.info("Invoking stream agent with messages (no thread_id support)")
+                    for event in agent.invoke_stream(msgs_obj.model_dump()):
+                        yield event.model_dump_json() + '\n'
             except Exception as e:
                 logger.error("Stream error: %s", str(e), exc_info=True)
                 error_event = ErrorEvent(error=str(e))
