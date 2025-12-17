@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field, HttpUrl
 class FileObject(BaseModel):
     file_path: str
     file_content: str
+    refers_persistent_file: Optional[str] = None
 
 
 class Command(BaseModel):
@@ -64,6 +65,7 @@ class Data(BaseModel):
     tool_calls: List[ToolCall] = Field(default_factory=list)
     executed_tool_calls: List[ExecutedToolCall] = Field(default_factory=list)
     url_configs: List[URLConfig] = Field(default_factory=list)
+    user_file_uploads: List[FileObject] = Field(default_factory=list)
 
 
 class User(BaseModel):
