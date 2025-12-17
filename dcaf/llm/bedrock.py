@@ -121,7 +121,7 @@ class BedrockLLM(LLM):
         model_id: str,
         max_tokens: int = 1000,
         temperature: float = 0.0,
-        top_p: float = 0.9,
+        top_p: Optional[float] = None,
         system_prompt: Optional[str] = None,
         tools: Optional[List[Dict[str, Any]]] = None,
         tool_choice: Optional[Union[str, Dict[str, Any]]] = None,
@@ -170,8 +170,10 @@ class BedrockLLM(LLM):
         inference_config = {
             'maxTokens': max_tokens,
             'temperature': temperature,
-            'topP': top_p
         }
+        if top_p:
+            inference_config['topP'] = top_p
+            
         request['inferenceConfig'] = inference_config
         
         # Add tool configuration if provided
