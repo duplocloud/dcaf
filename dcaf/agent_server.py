@@ -185,13 +185,13 @@ def create_chat_app(agent: AgentProtocol, router: ChannelResponseRouter = None) 
                 logger.info("Stream completed - Event counts: %s", event_counts)
                 if text_parts:
                     full_text = ''.join(text_parts)
-                    logger.info("Streamed assistant message: %s", full_text)
+                    logger.info("Streamed assistant message: %s", f'{full_text}')
                 if executed_tool_calls:
-                    logger.info("Executed tool calls: %s", [tc.name for tc in executed_tool_calls])
+                    logger.info("Executed tool calls: %s", executed_tool_calls)
                 if tool_calls:
-                    logger.info("Tool calls requested: %s", [tc.name for tc in tool_calls])
+                    logger.info("Tool calls requested: %s", tool_calls)
                 if commands:
-                    logger.info("Commands requested: %s", [cmd.command for cmd in commands])
+                    logger.info("Commands requested: %s", commands)
                 if stop_reason:
                     logger.info("Stop reason: %s", stop_reason)
 
