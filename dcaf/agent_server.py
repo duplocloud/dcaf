@@ -142,17 +142,59 @@ def create_chat_app(agent: AgentProtocol, router: ChannelResponseRouter = None) 
         
         # Generator function
         def event_generator():
+            # Accumulate events for logging
+            text_parts = []
+            event_counts = {}
+            executed_commands = []
+            executed_tool_calls = []
+            tool_calls = []
+            commands = []
+            stop_reason = None
+
             try:
                 # Check if the agent's invoke_stream method accepts thread_id parameter
                 sig = inspect.signature(agent.invoke_stream)
                 if "thread_id" in sig.parameters:
                     logger.info("Invoking stream agent with messages and thread_id: %s", thread_id)
-                    for event in agent.invoke_stream(msgs_obj.model_dump(), thread_id=thread_id):
-                        yield event.model_dump_json() + '\n'
+                    event_stream = agent.invoke_stream(msgs_obj.model_dump(), thread_id=thread_id)
                 else:
                     logger.info("Invoking stream agent with messages (no thread_id support)")
-                    for event in agent.invoke_stream(msgs_obj.model_dump()):
-                        yield event.model_dump_json() + '\n'
+                    event_stream = agent.invoke_stream(msgs_obj.model_dump())
+
+                for event in event_stream:
+                    event_type = event.type
+                    event_counts[event_type] = event_counts.get(event_type, 0) + 1
+
+                    # Accumulate data based on event type
+                    if event_type == "text_delta":
+                        text_parts.append(event.text)
+                    elif event_type == "executed_commands":
+                        executed_commands.extend(event.executed_cmds)
+                    elif event_type == "executed_tool_calls":
+                        executed_tool_calls.extend(event.executed_tool_calls)
+                    elif event_type == "tool_calls":
+                        tool_calls.extend(event.tool_calls)
+                    elif event_type == "commands":
+                        commands.extend(event.commands)
+                    elif event_type == "done":
+                        stop_reason = event.stop_reason
+
+                    yield event.model_dump_json() + '\n'
+
+                # Log final aggregated response
+                logger.info("Stream completed - Event counts: %s", event_counts)
+                if text_parts:
+                    full_text = ''.join(text_parts)
+                    logger.info("Streamed assistant message: %s", full_text)
+                if executed_tool_calls:
+                    logger.info("Executed tool calls: %s", [tc.name for tc in executed_tool_calls])
+                if tool_calls:
+                    logger.info("Tool calls requested: %s", [tc.name for tc in tool_calls])
+                if commands:
+                    logger.info("Commands requested: %s", [cmd.command for cmd in commands])
+                if stop_reason:
+                    logger.info("Stop reason: %s", stop_reason)
+
             except Exception as e:
                 logger.error("Stream error: %s", str(e), exc_info=True)
                 error_event = ErrorEvent(error=str(e))

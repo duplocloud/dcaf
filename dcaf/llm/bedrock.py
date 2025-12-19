@@ -106,14 +106,24 @@ class BedrockLLM(LLM):
         
         logger.info("Streaming from model %s", model_id)
         start_time = time.perf_counter()
-        
+
+        # Track event statistics
+        event_counts = {}
+
         response = self.bedrock_runtime.converse_stream(**request)
-        
+
         for event in response['stream']:
+            # Count event types for statistics
+            event_type = list(event.keys())[0] if event else 'unknown'
+            event_counts[event_type] = event_counts.get(event_type, 0) + 1
+
+            # Log entire event at DEBUG level
+            logger.debug("Stream event: %s", event)
+
             yield event
-        
+
         elapsed = time.perf_counter() - start_time
-        logger.info("Stream completed in %.2f seconds", elapsed)
+        logger.info("Stream completed in %.2f seconds - Event breakdown: %s", elapsed, event_counts)
 
     def invoke(
         self,
