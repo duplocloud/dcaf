@@ -1,10 +1,135 @@
 """
 Tool system for creating LLM-powered agents with approval workflows.
+
+Supports two usage patterns:
+
+1. Simple (auto-schema from function signature):
+   
+   @tool(description="Get weather for a city")
+   def get_weather(city: str, units: str = "celsius") -> str:
+       return f"Weather in {city}: 72°F"
+
+2. Explicit schema (for complex cases):
+   
+   @tool(
+       schema={
+           "type": "object",
+           "properties": {
+               "city": {"type": "string", "enum": ["NYC", "LA", "CHI"]}
+           },
+           "required": ["city"]
+       },
+       description="Get weather for specific cities"
+   )
+   def get_weather(city: str) -> str:
+       return f"Weather in {city}: 72°F"
 """
 from pydantic import BaseModel, ConfigDict
-from typing import Callable, Dict, Any, Optional
+from typing import Callable, Dict, Any, Optional, Union, get_type_hints, get_origin, get_args
 import inspect
 import json
+
+
+# Type mapping from Python types to JSON Schema types
+PYTHON_TO_JSON_TYPE = {
+    str: "string",
+    int: "integer",
+    float: "number",
+    bool: "boolean",
+    list: "array",
+    dict: "object",
+    type(None): "null",
+}
+
+
+def _get_json_type(python_type: type) -> str:
+    """Convert Python type to JSON Schema type."""
+    # Handle Optional types (Union[X, None])
+    origin = get_origin(python_type)
+    if origin is Union:
+        args = get_args(python_type)
+        # Filter out NoneType for Optional
+        non_none_args = [a for a in args if a is not type(None)]
+        if len(non_none_args) == 1:
+            return _get_json_type(non_none_args[0])
+        # Multiple types - just use string as fallback
+        return "string"
+    
+    # Handle List[X]
+    if origin is list:
+        return "array"
+    
+    # Handle Dict[X, Y]
+    if origin is dict:
+        return "object"
+    
+    # Basic types
+    return PYTHON_TO_JSON_TYPE.get(python_type, "string")
+
+
+def _generate_schema_from_function(func: Callable) -> Dict[str, Any]:
+    """
+    Generate JSON Schema from function signature.
+    
+    Args:
+        func: The function to analyze
+        
+    Returns:
+        JSON Schema dict compatible with Anthropic's tool format
+    """
+    sig = inspect.signature(func)
+    
+    # Try to get type hints
+    try:
+        hints = get_type_hints(func)
+    except Exception:
+        hints = {}
+    
+    properties = {}
+    required = []
+    
+    for param_name, param in sig.parameters.items():
+        # Skip platform_context - it's injected at runtime
+        if param_name == "platform_context":
+            continue
+        
+        # Skip *args and **kwargs
+        if param.kind in (inspect.Parameter.VAR_POSITIONAL, inspect.Parameter.VAR_KEYWORD):
+            continue
+        
+        # Get type from hints or default to string
+        param_type = hints.get(param_name, str)
+        json_type = _get_json_type(param_type)
+        
+        # Build property schema
+        prop_schema: Dict[str, Any] = {"type": json_type}
+        
+        # Add description from docstring if available
+        # (Could parse docstring for param descriptions, but keeping it simple)
+        prop_schema["description"] = f"The {param_name} parameter"
+        
+        # Handle default values
+        if param.default is not inspect.Parameter.empty:
+            prop_schema["default"] = param.default
+        else:
+            # No default = required
+            required.append(param_name)
+        
+        # Handle List[X] - add items schema
+        origin = get_origin(param_type)
+        if origin is list:
+            args = get_args(param_type)
+            if args:
+                item_type = _get_json_type(args[0])
+                prop_schema["items"] = {"type": item_type}
+        
+        properties[param_name] = prop_schema
+    
+    return {
+        "type": "object",
+        "properties": properties,
+        "required": required,
+    }
 
 
 class Tool(BaseModel):
@@ -14,9 +139,15 @@ class Tool(BaseModel):
     func: Callable
     name: str
     description: str
-    schema: Dict[str, Any]
+    input_schema: Dict[str, Any]
     requires_approval: bool = False
     requires_platform_context: bool = False
+    
+    # Alias for backward compatibility
+    @property
+    def schema(self) -> Dict[str, Any]:
+        """Get the tool's schema (alias for input_schema)."""
+        return self.input_schema
     
     def __repr__(self):
         """Pretty representation showing key attributes."""
@@ -27,13 +158,12 @@ class Tool(BaseModel):
         )
     
     def get_schema(self) -> Dict[str, Any]:
-        """Get the tool's JSON schema for LLM consumption."""
-        # Check if self.schema is already a full tool specification
-        if isinstance(self.schema, dict) and "input_schema" in self.schema and "name" in self.schema and "description" in self.schema:
-            # Schema is already a full tool spec, return it as-is
-            return self.schema
-        else:
-            raise Exception("The schema does not have all the necessary fields: ['name', 'description', 'input_schema']")
+        """Get the full tool specification for LLM consumption."""
+        return {
+            "name": self.name,
+            "description": self.description,
+            "input_schema": self.input_schema,
+        }
     
     def describe(self):
         """Print detailed description of the tool."""
@@ -41,7 +171,7 @@ class Tool(BaseModel):
         print(f"Description: {self.description}")
         print(f"Requires Approval: {self.requires_approval}")
         print(f"Has Platform Context: {self.requires_platform_context}")
-        print(f"Schema: {json.dumps(self.schema, indent=2)}")
+        print(f"Schema: {json.dumps(self.input_schema, indent=2)}")
     
     def execute(self, input_args: Dict[str, Any], platform_context: Dict[str, Any] = None) -> str:
         """
@@ -55,126 +185,148 @@ class Tool(BaseModel):
             String output from the tool
         """
         if self.requires_platform_context:
-            # Tool expects platform_context
             if platform_context is None:
                 raise ValueError("Platform context is required for this tool")
             return str(self.func(**input_args, platform_context=platform_context))
         else:
-            # Tool doesn't need platform_context
             return str(self.func(**input_args))
 
 
 def tool(
-    schema: Dict[str, Any],
-    requires_approval: bool = True,
+    func: Optional[Callable] = None,
+    *,
+    description: Optional[str] = None,
     name: Optional[str] = None,
-    description: Optional[str] = None
+    requires_approval: bool = False,
+    schema: Optional[Dict[str, Any]] = None,
 ):
     """
     Decorator to create a tool from a function.
     
-    Args:
-        schema: JSON schema for the tool's input parameters (Anthropic format)
-                Must be a valid JSON schema with "type": "object" at root
-        requires_approval: Whether tool needs user approval before execution
-        name: Override the function name as tool name
-        description: Override the function docstring as description
+    Supports two usage patterns:
     
-    The schema should follow Anthropic's tool input_schema format:
-    {
-        "type": "object",
-        "properties": {
-            "param_name": {
-                "type": "string|integer|number|boolean|array|object",
-                "description": "Description of the parameter",
-                "enum": ["option1", "option2"],  # Optional: for enums
-                "items": {...},                   # Required for arrays
-                "default": value                  # Optional: default value
+    1. Simple (recommended) - auto-generates schema from function signature:
+    
+        @tool(description="Get weather for a city")
+        def get_weather(city: str, units: str = "celsius") -> str:
+            '''Get current weather.'''
+            return f"Weather in {city}"
+    
+    2. Explicit schema - for complex validation or enums:
+    
+        @tool(
+            description="Get weather",
+            schema={
+                "type": "object",
+                "properties": {
+                    "city": {"type": "string", "enum": ["NYC", "LA"]}
+                },
+                "required": ["city"]
             }
-        },
-        "required": ["param1", "param2"]  # List of required parameters
-    }
+        )
+        def get_weather(city: str) -> str:
+            return f"Weather in {city}"
+    
+    Args:
+        func: The function to wrap (auto-provided when used as @tool without parens)
+        description: Description shown to the LLM. Defaults to function docstring.
+        name: Tool name. Defaults to function name.
+        requires_approval: If True, tool execution requires user approval.
+        schema: Explicit JSON schema. If not provided, auto-generated from signature.
+    
+    Returns:
+        Tool: A Tool object that wraps the function
     
     Examples:
-        # Tool without platform_context
-        @tool(
-            schema={
-                "type": "object",
-                "properties": {
-                    "location": {"type": "string", "description": "City name"}
-                },
-                "required": ["location"]
-            }
-        )
-        def get_weather(location: str) -> str:
-            return f"Weather in {location}: Sunny"
+        # Minimal usage
+        @tool(description="Add two numbers")
+        def add(a: int, b: int) -> str:
+            return str(a + b)
         
-        # Tool with platform_context
-        @tool(
-            schema={
-                "type": "object",
-                "properties": {
-                    "filename": {"type": "string", "description": "File to delete"}
-                },
-                "required": ["filename"]
-            },
-            requires_approval=True
-        )
-        def delete_file(filename: str, platform_context: dict) -> str:
-            user = platform_context.get("user_id", "unknown")
-            return f"User {user} deleted {filename}"
+        # With approval required
+        @tool(description="Delete a file", requires_approval=True)
+        def delete_file(path: str) -> str:
+            os.remove(path)
+            return f"Deleted {path}"
+        
+        # With platform context
+        @tool(description="Get user info")
+        def get_user(user_id: str, platform_context: dict) -> str:
+            tenant = platform_context.get("tenant")
+            return f"User {user_id} in tenant {tenant}"
     """
-    def decorator(func: Callable) -> Tool:
+    def decorator(fn: Callable) -> Tool:
         # Get function metadata
-        func_name = func.__name__
-        func_doc = func.__doc__ or ""
+        func_name = fn.__name__
+        func_doc = fn.__doc__ or ""
+        
+        # Determine description
+        tool_description = description
+        if tool_description is None:
+            # Use first line of docstring, or generate default
+            tool_description = func_doc.split('\n')[0].strip() or f"Execute {func_name}"
+        
+        # Determine schema
+        tool_schema = schema
+        if tool_schema is None:
+            # Auto-generate from function signature
+            tool_schema = _generate_schema_from_function(fn)
         
         # Check if function has platform_context parameter
-        sig = inspect.signature(func)
+        sig = inspect.signature(fn)
         requires_platform_context = 'platform_context' in sig.parameters
         
         # Create the Tool
         return Tool(
-            func=func,
+            func=fn,
             name=name or func_name,
-            description=description or func_doc.split('\n')[0].strip() or f"Execute {func_name}",
-            schema=schema,
+            description=tool_description,
+            input_schema=tool_schema,
             requires_approval=requires_approval,
-            requires_platform_context=requires_platform_context
+            requires_platform_context=requires_platform_context,
         )
     
-    return decorator
+    # Handle both @tool and @tool(...) usage
+    if func is not None:
+        # Called as @tool without parentheses
+        return decorator(func)
+    else:
+        # Called as @tool(...) with arguments
+        return decorator
 
 
 def create_tool(
     func: Callable,
-    schema: Dict[str, Any],
-    name: Optional[str] = None,
     description: Optional[str] = None,
-    requires_approval: bool = False
+    name: Optional[str] = None,
+    requires_approval: bool = False,
+    schema: Optional[Dict[str, Any]] = None,
 ) -> Tool:
     """
     Create a tool programmatically without decorator.
     
     Args:
         func: The function to wrap as a tool
-        schema: JSON schema for the tool's input
-        name: Tool name (defaults to function name)
         description: Tool description (defaults to function docstring)
+        name: Tool name (defaults to function name)
         requires_approval: Whether tool needs user approval
+        schema: JSON schema for input. If None, auto-generated from signature.
     
     Example:
-        # Function without platform_context
         def add(x: int, y: int) -> str:
-            return f"Sum: {x + y}"
+            '''Add two numbers.'''
+            return str(x + y)
         
+        my_tool = create_tool(add, description="Add numbers")
+        
+        # Or with explicit schema
         my_tool = create_tool(
-            func=add,
+            add,
             schema={
                 "type": "object",
                 "properties": {
-                    "x": {"type": "integer"},
-                    "y": {"type": "integer"}
+                    "x": {"type": "integer", "minimum": 0},
+                    "y": {"type": "integer", "minimum": 0}
                 },
                 "required": ["x", "y"]
             }
@@ -183,6 +335,16 @@ def create_tool(
     func_name = func.__name__
     func_doc = func.__doc__ or ""
     
+    # Determine description
+    tool_description = description
+    if tool_description is None:
+        tool_description = func_doc.split('\n')[0].strip() or f"Execute {func_name}"
+    
+    # Determine schema
+    tool_schema = schema
+    if tool_schema is None:
+        tool_schema = _generate_schema_from_function(func)
+    
     # Check if function has platform_context parameter
     sig = inspect.signature(func)
     requires_platform_context = 'platform_context' in sig.parameters
@@ -190,8 +352,8 @@ def create_tool(
     return Tool(
         func=func,
         name=name or func_name,
-        description=description or func_doc.split('\n')[0].strip() or f"Execute {func_name}",
-        schema=schema,
+        description=tool_description,
+        input_schema=tool_schema,
         requires_approval=requires_approval,
-        requires_platform_context=requires_platform_context
+        requires_platform_context=requires_platform_context,
     )

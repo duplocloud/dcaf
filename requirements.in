@@ -2,8 +2,11 @@ fastapi
 pydantic
 uvicorn
 boto3
+aioboto3
 dotenv
 requests
 langchain_community
 duplocloud-client
 tiktoken
+agno
+anthropic[bedrock]

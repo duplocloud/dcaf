@@ -1,0 +1,183 @@
+# MkDocs configuration for DCAF documentation
+# Run locally: mkdocs serve
+# Build static: mkdocs build
+# Deploy to GitHub Pages: mkdocs gh-deploy
+
+site_name: DCAF Documentation
+site_description: DuploCloud Agent Framework - Build LLM-powered AI agents with tool calling and human-in-the-loop approval
+site_author: DuploCloud
+site_url: https://duplocloud.github.io/dcaf/
+
+repo_name: duplocloud/dcaf
+repo_url: https://github.com/duplocloud/service-desk-agents
+
+copyright: Copyright &copy; 2024 DuploCloud
+
+theme:
+  name: material
+  
+  # Color palette
+  palette:
+    # Light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    # Dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  
+  # Features
+  features:
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
+    - navigation.expand
+    - navigation.path
+    - navigation.top
+    - navigation.indexes
+    - search.suggest
+    - search.highlight
+    - search.share
+    - content.code.copy
+    - content.code.annotate
+    - content.tabs.link
+    - toc.follow
+  
+  # Icons
+  icon:
+    repo: fontawesome/brands/github
+  
+  # Logo and favicon (using SVG)
+  logo: assets/logo.svg
+  favicon: assets/logo.svg
+
+# Plugins
+plugins:
+  - search:
+      separator: '[\s\-,:!=\[\]()"/]+|(?!\b)(?=[A-Z][a-z])|\.(?!\d)|&[lg]t;'
+  # - minify:
+  #     minify_html: true  # Disabled - may break code block formatting
+
+# Markdown extensions
+markdown_extensions:
+  # Python Markdown
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - toc:
+      permalink: true
+      toc_depth: 3
+  
+  # PyMdown Extensions
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.betterem:
+      smart_enable: all
+  - pymdownx.caret
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.mark
+  - pymdownx.smartsymbols
+  - pymdownx.snippets
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tilde
+
+# Page tree / Navigation
+nav:
+  - Home: index.md
+  - Getting Started: getting-started.md
+  
+  - Core:
+    - Overview: core/index.md
+    - Server: core/server.md
+    - HelpDesk Protocol: core/helpdesk-protocol.md
+    - Domain Layer: core/domain.md
+    - Application Layer: core/application.md
+    - Adapters: core/adapters.md
+    - Testing: core/testing.md
+  
+  - Legacy API (v1):
+    - Overview: api-reference/index.md
+    - BedrockLLM: api-reference/llm.md
+    - Tools: api-reference/tools.md
+    - Agents: api-reference/agents.md
+    - Agent Server: api-reference/agent-server.md
+    - Schemas: api-reference/schemas.md
+    - Channel Routing: api-reference/channel-routing.md
+    - CLI: api-reference/cli.md
+    - Creating Agents (Legacy): guides/creating-custom-agents.md
+  
+  - Guides:
+    - Custom Agents: guides/custom-agents.md
+    - Interceptors: guides/interceptors.md
+    - Framework Adapters: guides/framework-adapters.md
+    - Building Tools: guides/building-tools.md
+    - Migration (v1 → Core): guides/migration.md
+    - Working with Bedrock: guides/working-with-bedrock.md
+    - Message Protocol: guides/message-protocol.md
+    - Streaming Responses: guides/streaming.md
+    - Documentation Versioning: guides/versioning.md
+  
+  - Architecture:
+    - Architecture Guide: architecture.md
+    - Engineering Handoff: engineering-handoff.md
+    - ADRs:
+      - Template: adrs/000-template.md
+      - "001: Clean Architecture": adrs/001-clean-architecture.md
+      - "002: DDD Tactical Patterns": adrs/002-ddd-tactical-patterns.md
+      - "003: Adapter Pattern": adrs/003-adapter-pattern-for-frameworks.md
+      - "004: Approval-First Design": adrs/004-approval-first-design.md
+      - "005: Cohesive Provider Modules": adrs/005-cohesive-provider-modules.md
+      - "006: Strangler Fig Migration": adrs/006-strangler-fig-migration.md
+      - "007: Lowercase Chat Endpoints": adrs/007-lowercase-chat-endpoints.md
+  
+  - Examples: examples/examples.md
+
+# Extra configuration
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/duplocloud
+    - icon: fontawesome/brands/twitter
+      link: https://twitter.com/duplocloud
+  
+  # Version provider for mike (only enable when deploying with mike)
+  # version:
+  #   provider: mike
+  #   default: latest
+
+# Temporarily disabled to debug code block issue
+# extra_css:
+#   - stylesheets/extra.css
+
+# extra_javascript:
+#   - javascripts/extra.js
+

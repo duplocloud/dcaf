@@ -6,6 +6,7 @@ from .schemas.events import DoneEvent, ErrorEvent
 import logging
 import os
 import traceback
+import asyncio
 from .channel_routing import ChannelResponseRouter, SlackResponseRouter
 from fastapi.responses import StreamingResponse
 
@@ -23,7 +24,7 @@ class AgentProtocol(Protocol):
 
 
 def create_chat_app(agent: AgentProtocol, router: ChannelResponseRouter = None) -> FastAPI:
-    # ONE-LINER guardrail — fails fast if agent doesn’t meet the protocol
+    # ONE-LINER guardrail — fails fast if agent doesn't meet the protocol
     if not isinstance(agent, AgentProtocol):
         raise TypeError(    
             "Agent must satisfy AgentProtocol "
@@ -33,14 +34,19 @@ def create_chat_app(agent: AgentProtocol, router: ChannelResponseRouter = None) 
     app = FastAPI(title="DuploCloud Chat Service", version="0.1.0")
 
     # ----- health check ------------------------------------------------------
+    # Health check is sync and fast - never blocked by LLM calls
     @app.get("/health", tags=["system"])
     def health() -> Dict[str, str]:
         return {"status": "ok"}
 
-    # ----- chat endpoint -----------------------------------------------------
-    @app.post("/api/sendMessage", response_model=AgentMessage, tags=["chat"])
-    def send_message(raw_body: Dict[str, Any] = Body(...)) -> AgentMessage:
-
+    # ----- shared logic for chat endpoints -----------------------------------
+    async def _handle_chat(raw_body: Dict[str, Any]) -> AgentMessage:
+        """
+        Shared async handler for chat endpoints.
+        
+        Runs the agent in a thread pool so LLM calls don't block
+        the event loop (which would block health checks).
+        """
         # log request body
         logger.info("Request Body:")
         logger.info(str(raw_body))
@@ -69,12 +75,14 @@ def create_chat_app(agent: AgentProtocol, router: ChannelResponseRouter = None) 
         except ValidationError as ve:
             raise HTTPException(status_code=422, detail=ve.errors())
 
-        # 2. delegate to agent
+        # 2. delegate to agent (run in thread pool to not block event loop)
         try:
-            # Pass the raw messages dictionary directly to the agent
             msgs_obj = msgs_obj.model_dump()
             logger.info("Invoking agent with messages: %s", msgs_obj)
-            assistant_msg = agent.invoke(msgs_obj)
+            
+            # Run sync agent.invoke() in a thread pool
+            # This prevents blocking the event loop so health checks stay responsive
+            assistant_msg = await asyncio.to_thread(agent.invoke, msgs_obj)
 
             logger.info("Assistant message: %s", assistant_msg)
 
@@ -92,12 +100,36 @@ def create_chat_app(agent: AgentProtocol, router: ChannelResponseRouter = None) 
             traceback_error = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
             logger.error("Unhandled exception in agent:\n%s", traceback_error)
             raise HTTPException(status_code=500, detail=str(e))
-    
-    #----- stream chat endpoint -----------------------------------------------------
-    @app.post("/api/sendMessageStream", tags=["chat"])
-    def send_message_stream(raw_body: Dict[str, Any] = Body(...)):
-        """Stream response as NDJSON"""
+
+    # ----- NEW: /api/chat endpoint (preferred) -------------------------------
+    @app.post("/api/chat", response_model=AgentMessage, tags=["chat"])
+    async def chat(raw_body: Dict[str, Any] = Body(...)) -> AgentMessage:
+        """
+        Chat endpoint (async).
         
+        Send a message to the agent and get a response.
+        LLM calls run in a thread pool so they don't block health checks.
+        """
+        return await _handle_chat(raw_body)
+
+    # ----- LEGACY: /api/sendMessage endpoint (backwards compatible) ----------
+    @app.post("/api/sendMessage", response_model=AgentMessage, tags=["chat", "legacy"])
+    async def send_message(raw_body: Dict[str, Any] = Body(...)) -> AgentMessage:
+        """
+        Legacy chat endpoint (async).
+        
+        DEPRECATED: Use /api/chat instead.
+        Kept for backwards compatibility with existing integrations.
+        """
+        return await _handle_chat(raw_body)
+
+    # ----- shared logic for stream endpoints ---------------------------------
+    async def _handle_stream(raw_body: Dict[str, Any]):
+        """
+        Shared async handler for streaming endpoints.
+        
+        Returns a StreamingResponse with NDJSON events.
+        """
         logger.info("Stream Request Body: %s", raw_body)
 
         source = raw_body.get("source")
@@ -109,8 +141,7 @@ def create_chat_app(agent: AgentProtocol, router: ChannelResponseRouter = None) 
                     raw_body["messages"]
                 )
                 if not should_respond["should_respond"]:
-                    #return done event using StreamingResponse
-                    def done_generator():
+                    async def done_generator():
                         yield DoneEvent().model_dump_json() + '\n'
                     return StreamingResponse(
                         done_generator(),
@@ -126,10 +157,15 @@ def create_chat_app(agent: AgentProtocol, router: ChannelResponseRouter = None) 
         except ValidationError as ve:
             raise HTTPException(status_code=422, detail=ve.errors())
         
-        # Generator function
-        def event_generator():
+        # Async generator function that yields events
+        async def event_generator():
             try:
-                for event in agent.invoke_stream(msgs_obj.model_dump()):
+                # Run the sync invoke_stream in a thread pool
+                def run_stream():
+                    return list(agent.invoke_stream(msgs_obj.model_dump()))
+                
+                events = await asyncio.to_thread(run_stream)
+                for event in events:
                     yield event.model_dump_json() + '\n'
             except Exception as e:
                 logger.error("Stream error: %s", str(e), exc_info=True)
@@ -140,5 +176,27 @@ def create_chat_app(agent: AgentProtocol, router: ChannelResponseRouter = None) 
             event_generator(),
             media_type='application/x-ndjson'
         )
+
+    # ----- NEW: /api/chat-stream endpoint (preferred) ------------------------
+    @app.post("/api/chat-stream", tags=["chat"])
+    async def chat_stream(raw_body: Dict[str, Any] = Body(...)):
+        """
+        Streaming chat endpoint (async).
+        
+        Stream agent response as NDJSON events.
+        LLM calls run in a thread pool so they don't block health checks.
+        """
+        return await _handle_stream(raw_body)
+
+    # ----- LEGACY: /api/sendMessageStream endpoint (backwards compatible) ----
+    @app.post("/api/sendMessageStream", tags=["chat", "legacy"])
+    async def send_message_stream(raw_body: Dict[str, Any] = Body(...)):
+        """
+        Legacy streaming endpoint (async).
+        
+        DEPRECATED: Use /api/chat-stream instead.
+        Kept for backwards compatibility with existing integrations.
+        """
+        return await _handle_stream(raw_body)
 
     return app

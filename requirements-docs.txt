@@ -1,0 +1,18 @@
+# Documentation dependencies
+# Install with: pip install -r requirements-docs.txt
+
+# MkDocs and Material theme
+mkdocs>=1.5.0
+mkdocs-material>=9.5.0
+
+# Plugins
+mkdocs-minify-plugin>=0.7.0
+mike>=2.0.0  # Versioning for MkDocs
+
+# Required for Material theme features
+pymdown-extensions>=10.0
+pygments>=2.16.0
+
+# Optional: for building PDF versions
+# mkdocs-pdf-export-plugin>=0.5.0
+

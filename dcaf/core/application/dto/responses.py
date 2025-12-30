@@ -1,0 +1,640 @@
+"""
+Response DTOs for application use cases.
+
+These DTOs are designed for full compatibility with the DuploCloud HelpDesk
+messaging protocol, supporting both tool calls and terminal commands with
+approval workflows.
+"""
+
+from dataclasses import dataclass, field
+from typing import List, Optional, Dict, Any, Union
+from enum import Enum
+
+
+# =============================================================================
+# Stream Event Types
+# =============================================================================
+
+class StreamEventType(Enum):
+    """
+    Types of streaming events.
+    
+    Matches the HelpDesk protocol event types:
+    - text_delta: Streaming text from LLM
+    - tool_calls: Tool calls needing approval
+    - commands: Terminal commands needing approval
+    - executed_tool_calls: Tool calls that were executed
+    - executed_commands: Terminal commands that were executed
+    - done: Stream finished
+    - error: Error occurred
+    
+    Additional events for internal use:
+    - tool_use_start/delta/end: Fine-grained tool streaming
+    - message_start/end: Message lifecycle
+    """
+    # HelpDesk protocol events
+    TEXT_DELTA = "text_delta"
+    TOOL_CALLS = "tool_calls"
+    COMMANDS = "commands"
+    EXECUTED_TOOL_CALLS = "executed_tool_calls"
+    EXECUTED_COMMANDS = "executed_commands"
+    DONE = "done"
+    ERROR = "error"
+    
+    # Fine-grained events (internal)
+    TOOL_USE_START = "tool_use_start"
+    TOOL_USE_DELTA = "tool_use_delta"
+    TOOL_USE_END = "tool_use_end"
+    MESSAGE_START = "message_start"
+    MESSAGE_END = "message_end"
+
+
+# =============================================================================
+# Command DTOs (Terminal Commands)
+# =============================================================================
+
+@dataclass
+class FileObject:
+    """
+    A file to be created before command execution.
+    
+    Used when commands need temporary files (e.g., kubectl apply -f).
+    
+    Attributes:
+        file_path: Path where file should be created
+        file_content: Content of the file
+    """
+    file_path: str
+    file_content: str
+    
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "file_path": self.file_path,
+            "file_content": self.file_content,
+        }
+
+
+@dataclass
+class CommandDTO:
+    """
+    A terminal command for approval.
+    
+    Represents a shell command that the agent wants to execute,
+    pending user approval.
+    
+    Attributes:
+        command: The shell command string
+        execute: Whether the user has approved execution
+        rejection_reason: Why the user rejected (if rejected)
+        files: Files to create before execution
+    """
+    command: str
+    execute: bool = False
+    rejection_reason: Optional[str] = None
+    files: Optional[List[FileObject]] = None
+    
+    def to_dict(self) -> Dict[str, Any]:
+        result = {
+            "command": self.command,
+            "execute": self.execute,
+        }
+        if self.rejection_reason:
+            result["rejection_reason"] = self.rejection_reason
+        if self.files:
+            result["files"] = [f.to_dict() for f in self.files]
+        return result
+    
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "CommandDTO":
+        files = None
+        if data.get("files"):
+            files = [FileObject(**f) for f in data["files"]]
+        return cls(
+            command=data["command"],
+            execute=data.get("execute", False),
+            rejection_reason=data.get("rejection_reason"),
+            files=files,
+        )
+
+
+@dataclass
+class ExecutedCommandDTO:
+    """
+    A terminal command that was executed.
+    
+    Represents a command that has been run, with its output.
+    
+    Attributes:
+        command: The shell command that was run
+        output: The stdout/stderr output
+    """
+    command: str
+    output: str
+    
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "command": self.command,
+            "output": self.output,
+        }
+    
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "ExecutedCommandDTO":
+        return cls(
+            command=data["command"],
+            output=data["output"],
+        )
+
+
+# =============================================================================
+# Tool Call DTOs
+# =============================================================================
+
+@dataclass
+class ToolCallDTO:
+    """
+    DTO representing a tool call in a response.
+    
+    This matches the HelpDesk protocol ToolCall structure.
+    
+    Attributes:
+        id: Unique identifier for the tool call
+        name: Name of the tool
+        input: Input parameters for the tool
+        execute: Whether approved for execution
+        tool_description: Human-readable description of the tool
+        input_description: Descriptions of input parameters
+        intent: LLM's explanation of why it's calling this tool
+        requires_approval: Whether this call needs approval
+        status: Current status (pending, approved, executed, etc.)
+        result: Execution result (if executed)
+        error: Error message (if failed)
+        rejection_reason: Why the user rejected (if rejected)
+    """
+    id: str
+    name: str
+    input: Dict[str, Any]
+    execute: bool = False
+    tool_description: str = ""
+    input_description: Dict[str, Any] = field(default_factory=dict)
+    intent: Optional[str] = None
+    requires_approval: bool = True
+    status: str = "pending"
+    result: Optional[str] = None
+    error: Optional[str] = None
+    rejection_reason: Optional[str] = None
+    
+    # Alias for backward compatibility
+    @property
+    def description(self) -> str:
+        return self.tool_description
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for serialization (HelpDesk format)."""
+        result = {
+            "id": self.id,
+            "name": self.name,
+            "input": self.input,
+            "execute": self.execute,
+            "tool_description": self.tool_description,
+            "input_description": self.input_description,
+        }
+        if self.intent:
+            result["intent"] = self.intent
+        if self.rejection_reason:
+            result["rejection_reason"] = self.rejection_reason
+        # Include status/result for internal tracking
+        result["status"] = self.status
+        if self.result:
+            result["result"] = self.result
+        if self.error:
+            result["error"] = self.error
+        return result
+    
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "ToolCallDTO":
+        """Create from dictionary (HelpDesk format)."""
+        return cls(
+            id=data["id"],
+            name=data["name"],
+            input=data.get("input", {}),
+            execute=data.get("execute", False),
+            tool_description=data.get("tool_description", ""),
+            input_description=data.get("input_description", {}),
+            intent=data.get("intent"),
+            requires_approval=not data.get("execute", False),
+            status=data.get("status", "pending"),
+            result=data.get("result"),
+            error=data.get("error"),
+            rejection_reason=data.get("rejection_reason"),
+        )
+    
+    @classmethod
+    def from_tool_call(cls, tool_call) -> "ToolCallDTO":
+        """Create from a domain ToolCall entity."""
+        return cls(
+            id=str(tool_call.id),
+            name=tool_call.tool_name,
+            input=tool_call.input.parameters,
+            tool_description=tool_call.description,
+            intent=tool_call.intent,
+            requires_approval=tool_call.requires_approval,
+            status=tool_call.status.value,
+            result=tool_call.result,
+            error=tool_call.error,
+        )
+
+
+@dataclass
+class ExecutedToolCallDTO:
+    """
+    A tool call that was executed.
+    
+    Represents a tool call that has been run, with its output.
+    
+    Attributes:
+        id: The tool call ID
+        name: Name of the tool
+        input: Input parameters used
+        output: The result output
+    """
+    id: str
+    name: str
+    input: Dict[str, Any]
+    output: str
+    
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "id": self.id,
+            "name": self.name,
+            "input": self.input,
+            "output": self.output,
+        }
+    
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "ExecutedToolCallDTO":
+        return cls(
+            id=data["id"],
+            name=data["name"],
+            input=data.get("input", {}),
+            output=data["output"],
+        )
+
+
+# =============================================================================
+# Data Container (HelpDesk Protocol)
+# =============================================================================
+
+@dataclass
+class DataDTO:
+    """
+    Container for all actionable data in a message.
+    
+    This matches the HelpDesk protocol Data structure, which holds
+    both pending and executed items for commands and tool calls.
+    
+    Attributes:
+        cmds: Terminal commands awaiting approval
+        executed_cmds: Terminal commands that were executed
+        tool_calls: Tool calls awaiting approval
+        executed_tool_calls: Tool calls that were executed
+    """
+    cmds: List[CommandDTO] = field(default_factory=list)
+    executed_cmds: List[ExecutedCommandDTO] = field(default_factory=list)
+    tool_calls: List[ToolCallDTO] = field(default_factory=list)
+    executed_tool_calls: List[ExecutedToolCallDTO] = field(default_factory=list)
+    
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "cmds": [c.to_dict() for c in self.cmds],
+            "executed_cmds": [c.to_dict() for c in self.executed_cmds],
+            "tool_calls": [t.to_dict() for t in self.tool_calls],
+            "executed_tool_calls": [t.to_dict() for t in self.executed_tool_calls],
+        }
+    
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "DataDTO":
+        return cls(
+            cmds=[CommandDTO.from_dict(c) for c in data.get("cmds", [])],
+            executed_cmds=[ExecutedCommandDTO.from_dict(c) for c in data.get("executed_cmds", [])],
+            tool_calls=[ToolCallDTO.from_dict(t) for t in data.get("tool_calls", [])],
+            executed_tool_calls=[ExecutedToolCallDTO.from_dict(t) for t in data.get("executed_tool_calls", [])],
+        )
+    
+    @property
+    def has_pending_items(self) -> bool:
+        """Check if there are any items awaiting approval."""
+        pending_cmds = any(not c.execute for c in self.cmds)
+        pending_tools = any(not t.execute for t in self.tool_calls)
+        return pending_cmds or pending_tools
+    
+    @property
+    def is_empty(self) -> bool:
+        """Check if data container is empty."""
+        return (
+            not self.cmds and 
+            not self.executed_cmds and 
+            not self.tool_calls and 
+            not self.executed_tool_calls
+        )
+
+
+# =============================================================================
+# Agent Response
+# =============================================================================
+
+@dataclass
+class AgentResponse:
+    """
+    Response DTO from agent execution.
+    
+    This DTO is fully compatible with the HelpDesk messaging protocol,
+    supporting both tool calls and terminal commands.
+    
+    Attributes:
+        conversation_id: ID of the conversation
+        text: Text content of the response (maps to 'content' in HelpDesk)
+        data: Container with commands and tool calls
+        has_pending_approvals: Whether there are items awaiting approval
+        is_complete: Whether the agent turn is complete
+        metadata: Optional additional metadata
+    """
+    conversation_id: str
+    text: Optional[str] = None
+    data: DataDTO = field(default_factory=DataDTO)
+    has_pending_approvals: bool = False
+    is_complete: bool = True
+    metadata: Dict[str, Any] = field(default_factory=dict)
+    
+    # Convenience accessors for backward compatibility
+    @property
+    def tool_calls(self) -> List[ToolCallDTO]:
+        """Get all tool calls (pending and executed combined for approval)."""
+        return self.data.tool_calls
+    
+    @property
+    def commands(self) -> List[CommandDTO]:
+        """Get all commands awaiting approval."""
+        return self.data.cmds
+    
+    @property
+    def pending_tool_calls(self) -> List[ToolCallDTO]:
+        """Get tool calls that are pending approval."""
+        return [tc for tc in self.data.tool_calls if not tc.execute]
+    
+    @property
+    def pending_commands(self) -> List[CommandDTO]:
+        """Get commands that are pending approval."""
+        return [c for c in self.data.cmds if not c.execute]
+    
+    @property
+    def approved_tool_calls(self) -> List[ToolCallDTO]:
+        """Get tool calls that have been approved."""
+        return [tc for tc in self.data.tool_calls if tc.execute]
+    
+    @property
+    def approved_commands(self) -> List[CommandDTO]:
+        """Get commands that have been approved."""
+        return [c for c in self.data.cmds if c.execute]
+    
+    @property
+    def executed_tool_calls(self) -> List[ExecutedToolCallDTO]:
+        """Get tool calls that have been executed."""
+        return self.data.executed_tool_calls
+    
+    @property
+    def executed_commands(self) -> List[ExecutedCommandDTO]:
+        """Get commands that have been executed."""
+        return self.data.executed_cmds
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for serialization (HelpDesk format)."""
+        return {
+            "conversation_id": self.conversation_id,
+            "content": self.text or "",
+            "data": self.data.to_dict(),
+            "has_pending_approvals": self.has_pending_approvals,
+            "is_complete": self.is_complete,
+            "metadata": self.metadata,
+        }
+    
+    def to_helpdesk_message(self, role: str = "assistant") -> Dict[str, Any]:
+        """
+        Convert to full HelpDesk message format.
+        
+        Returns a message dict compatible with the HelpDesk protocol.
+        """
+        return {
+            "role": role,
+            "content": self.text or "",
+            "data": self.data.to_dict(),
+            "meta_data": self.metadata,
+        }
+    
+    @classmethod
+    def text_only(cls, conversation_id: str, text: str) -> "AgentResponse":
+        """Create a text-only response."""
+        return cls(
+            conversation_id=conversation_id,
+            text=text,
+            is_complete=True,
+        )
+    
+    @classmethod
+    def with_tool_calls(
+        cls, 
+        conversation_id: str, 
+        tool_calls: List[ToolCallDTO],
+        text: Optional[str] = None,
+    ) -> "AgentResponse":
+        """Create a response with tool calls awaiting approval."""
+        data = DataDTO(tool_calls=tool_calls)
+        pending = any(not tc.execute for tc in tool_calls)
+        return cls(
+            conversation_id=conversation_id,
+            text=text,
+            data=data,
+            has_pending_approvals=pending,
+            is_complete=not pending,
+        )
+    
+    @classmethod
+    def with_commands(
+        cls,
+        conversation_id: str,
+        commands: List[CommandDTO],
+        text: Optional[str] = None,
+    ) -> "AgentResponse":
+        """Create a response with commands awaiting approval."""
+        data = DataDTO(cmds=commands)
+        pending = any(not c.execute for c in commands)
+        return cls(
+            conversation_id=conversation_id,
+            text=text,
+            data=data,
+            has_pending_approvals=pending,
+            is_complete=not pending,
+        )
+    
+    @classmethod
+    def with_data(
+        cls,
+        conversation_id: str,
+        data: DataDTO,
+        text: Optional[str] = None,
+    ) -> "AgentResponse":
+        """Create a response with full data container."""
+        return cls(
+            conversation_id=conversation_id,
+            text=text,
+            data=data,
+            has_pending_approvals=data.has_pending_items,
+            is_complete=not data.has_pending_items,
+        )
+
+
+# =============================================================================
+# Stream Events
+# =============================================================================
+
+@dataclass
+class StreamEvent:
+    """
+    A single event in a streaming response.
+    
+    Fully compatible with HelpDesk protocol stream events.
+    
+    Attributes:
+        event_type: Type of the event
+        data: Event-specific data
+        index: Optional index for ordering
+    """
+    event_type: StreamEventType
+    data: Dict[str, Any] = field(default_factory=dict)
+    index: Optional[int] = None
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to HelpDesk stream event format."""
+        result = {"type": self.event_type.value}
+        result.update(self.data)
+        return result
+    
+    # -------------------------------------------------------------------------
+    # HelpDesk Protocol Events
+    # -------------------------------------------------------------------------
+    
+    @classmethod
+    def text_delta(cls, text: str, index: int = 0) -> "StreamEvent":
+        """Create a text delta event."""
+        return cls(
+            event_type=StreamEventType.TEXT_DELTA,
+            data={"text": text},
+            index=index,
+        )
+    
+    @classmethod
+    def tool_calls_event(cls, tool_calls: List[ToolCallDTO]) -> "StreamEvent":
+        """Create a tool_calls event for approval boxes."""
+        return cls(
+            event_type=StreamEventType.TOOL_CALLS,
+            data={"tool_calls": [tc.to_dict() for tc in tool_calls]},
+        )
+    
+    @classmethod
+    def commands_event(cls, commands: List[CommandDTO]) -> "StreamEvent":
+        """Create a commands event for approval boxes."""
+        return cls(
+            event_type=StreamEventType.COMMANDS,
+            data={"commands": [c.to_dict() for c in commands]},
+        )
+    
+    @classmethod
+    def executed_tool_calls_event(
+        cls, 
+        executed_tool_calls: List[ExecutedToolCallDTO],
+    ) -> "StreamEvent":
+        """Create an executed_tool_calls event."""
+        return cls(
+            event_type=StreamEventType.EXECUTED_TOOL_CALLS,
+            data={"executed_tool_calls": [t.to_dict() for t in executed_tool_calls]},
+        )
+    
+    @classmethod
+    def executed_commands_event(
+        cls, 
+        executed_cmds: List[ExecutedCommandDTO],
+    ) -> "StreamEvent":
+        """Create an executed_commands event."""
+        return cls(
+            event_type=StreamEventType.EXECUTED_COMMANDS,
+            data={"executed_cmds": [c.to_dict() for c in executed_cmds]},
+        )
+    
+    @classmethod
+    def done(cls, stop_reason: Optional[str] = None) -> "StreamEvent":
+        """Create a done event."""
+        data = {}
+        if stop_reason:
+            data["stop_reason"] = stop_reason
+        return cls(event_type=StreamEventType.DONE, data=data)
+    
+    @classmethod
+    def error(cls, message: str, code: Optional[str] = None) -> "StreamEvent":
+        """Create an error event."""
+        data = {"error": message}
+        if code:
+            data["code"] = code
+        return cls(event_type=StreamEventType.ERROR, data=data)
+    
+    # -------------------------------------------------------------------------
+    # Fine-grained Events (for detailed streaming)
+    # -------------------------------------------------------------------------
+    
+    @classmethod
+    def tool_use_start(
+        cls, 
+        tool_call_id: str, 
+        tool_name: str,
+        index: int = 0,
+    ) -> "StreamEvent":
+        """Create a tool use start event."""
+        return cls(
+            event_type=StreamEventType.TOOL_USE_START,
+            data={"tool_call_id": tool_call_id, "tool_name": tool_name},
+            index=index,
+        )
+    
+    @classmethod
+    def tool_use_delta(
+        cls, 
+        tool_call_id: str, 
+        input_delta: str,
+        index: int = 0,
+    ) -> "StreamEvent":
+        """Create a tool use delta event."""
+        return cls(
+            event_type=StreamEventType.TOOL_USE_DELTA,
+            data={"tool_call_id": tool_call_id, "input_delta": input_delta},
+            index=index,
+        )
+    
+    @classmethod
+    def tool_use_end(cls, tool_call_id: str, index: int = 0) -> "StreamEvent":
+        """Create a tool use end event."""
+        return cls(
+            event_type=StreamEventType.TOOL_USE_END,
+            data={"tool_call_id": tool_call_id},
+            index=index,
+        )
+    
+    @classmethod
+    def message_start(cls) -> "StreamEvent":
+        """Create a message start event."""
+        return cls(event_type=StreamEventType.MESSAGE_START)
+    
+    @classmethod
+    def message_end(cls, response: AgentResponse) -> "StreamEvent":
+        """Create a message end event with the final response."""
+        return cls(
+            event_type=StreamEventType.MESSAGE_END,
+            data={"response": response.to_dict()},
+        )

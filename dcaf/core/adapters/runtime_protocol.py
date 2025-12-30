@@ -1,0 +1,87 @@
+"""
+Runtime Adapter Protocol - The contract for LLM framework adapters.
+
+All framework adapters (Agno, Strands, LangChain, etc.) must implement
+this protocol. This enables the plugin-style architecture where new
+frameworks can be added without modifying the Agent class.
+
+Convention:
+    Each adapter module must:
+    1. Be located at: dcaf/core/adapters/outbound/{framework_name}/
+    2. Export a create_adapter(**kwargs) function in __init__.py
+    3. Return an adapter that implements RuntimeAdapter
+
+Example:
+    # dcaf/core/adapters/outbound/strands/__init__.py
+    def create_adapter(**kwargs):
+        from .adapter import StrandsAdapter
+        return StrandsAdapter(**kwargs)
+"""
+
+from typing import Protocol, List, Iterator, Any, Optional, runtime_checkable
+
+
+@runtime_checkable
+class RuntimeAdapter(Protocol):
+    """
+    Protocol that all framework adapters must implement.
+    
+    This is the contract between DCAF's Agent class and any LLM framework.
+    Implementing this protocol allows seamless swapping of frameworks.
+    
+    Required Methods:
+        invoke: Synchronous request/response
+        invoke_stream: Streaming response
+        
+    Properties:
+        model_id: The model being used
+        provider: The provider (for frameworks that support multiple)
+    """
+    
+    @property
+    def model_id(self) -> str:
+        """Get the model identifier."""
+        ...
+    
+    @property
+    def provider(self) -> str:
+        """Get the provider name."""
+        ...
+    
+    def invoke(
+        self,
+        messages: List[Any],
+        tools: List[Any],
+        system_prompt: Optional[str] = None,
+    ) -> Any:  # Returns AgentResponse
+        """
+        Execute a single request and return the response.
+        
+        Args:
+            messages: List of conversation messages
+            tools: List of tools available to the agent
+            system_prompt: Optional system instructions
+            
+        Returns:
+            AgentResponse with the result
+        """
+        ...
+    
+    def invoke_stream(
+        self,
+        messages: List[Any],
+        tools: List[Any],
+        system_prompt: Optional[str] = None,
+    ) -> Iterator[Any]:  # Yields StreamEvent
+        """
+        Execute with streaming response.
+        
+        Args:
+            messages: List of conversation messages
+            tools: List of tools available to the agent
+            system_prompt: Optional system instructions
+            
+        Yields:
+            StreamEvent objects
+        """
+        ...

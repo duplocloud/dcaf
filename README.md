@@ -1,22 +1,265 @@
-# DCAF (DuploCloud Agent Framework)
+# DCAF - DuploCloud Agent Framework
 
-Build tool-calling agents for DuploCloud Help Desk.
+**DCAF** is a Python framework for building LLM-powered AI agents with tool calling and human-in-the-loop approval. Designed for the DuploCloud HelpDesk, it makes it easy to create agents that can execute infrastructure operations safely.
 
-## What's Inside
+---
+
+## Features
+
+| Feature | Description |
+|---------|-------------|
+| 🛠️ **Tool Calling** | Simple `@tool` decorator to create capabilities |
+| ✅ **Human-in-the-Loop** | Built-in approval flow for dangerous operations |
+| 🔌 **Interceptors** | Hook into request/response for validation, context, security |
+| 🌐 **REST API** | One-line server with `serve(agent)` |
+| 📡 **Streaming** | Real-time token-by-token responses |
+| 🔀 **Custom Logic** | Build complex agents with any structure |
+
+---
+
+## Quick Start
+
+### 1. Install
+
+```bash
+pip install git+https://github.com/duplocloud/service-desk-agents.git
+```
+
+### 2. Create an Agent
+
+```python
+from dcaf.core import Agent, serve
+from dcaf.tools import tool
+
+# Define tools with the @tool decorator
+@tool(description="List Kubernetes pods")
+def list_pods(namespace: str = "default") -> str:
+    """List pods in a namespace."""
+    return f"Pods in {namespace}: nginx, redis, api"
+
+@tool(requires_approval=True, description="Delete a pod")
+def delete_pod(name: str, namespace: str = "default") -> str:
+    """Delete a pod. Requires user approval."""
+    return f"Deleted pod {name} from {namespace}"
+
+# Create the agent
+agent = Agent(
+    tools=[list_pods, delete_pod],
+    system_prompt="You are a helpful Kubernetes assistant.",
+)
+
+# Start the server
+serve(agent)  # Running at http://0.0.0.0:8000
+```
+
+### 3. Test It
+
+```bash
+curl -X POST http://localhost:8000/api/chat \
+  -H "Content-Type: application/json" \
+  -d '{"messages": [{"role": "user", "content": "What pods are running?"}]}'
+```
+
+---
+
+## How It Works
+
+```
+User Request → Agent → LLM (Claude) → Tool Calls → Approval → Execution → Response
+```
+
+1. **User sends a message** via the REST API
+2. **Agent processes** the message and calls the LLM
+3. **LLM decides** what tools to use (if any)
+4. **Tools requiring approval** are paused for user confirmation
+5. **Approved tools execute** and results are returned
+
+---
+
+## Core Concepts
+
+### Tools
+
+Tools are functions your agent can call. Use the `@tool` decorator:
+
+```python
+from dcaf.tools import tool
+
+@tool(description="Get current weather")
+def get_weather(city: str) -> str:
+    """Get weather for a city."""
+    return f"Weather in {city}: 72°F, sunny"
+
+@tool(requires_approval=True, description="Send an email")
+def send_email(to: str, subject: str, body: str) -> str:
+    """Send an email. Requires approval because it's an external action."""
+    # Email sending logic here
+    return f"Email sent to {to}"
+```
+
+### Approval Flow
+
+Tools with `requires_approval=True` pause for user confirmation:
+
+```python
+response = agent.run(messages=[
+    {"role": "user", "content": "Delete the nginx pod"}
+])
+
+if response.needs_approval:
+    print("Pending approvals:")
+    for tool in response.pending_tools:
+        print(f"  - {tool.name}: {tool.input}")
+    
+    # Approve and continue
+    response = response.approve_all()
+
+print(response.text)
+```
+
+### Interceptors
+
+Interceptors let you hook into the request/response pipeline:
+
+```python
+from dcaf.core import Agent, LLMRequest, LLMResponse, InterceptorError
+
+# Add context before sending to LLM
+def add_tenant_context(request: LLMRequest) -> LLMRequest:
+    tenant = request.context.get("tenant_name", "unknown")
+    request.add_system_context(f"User's tenant: {tenant}")
+    return request
+
+# Block suspicious input
+def validate_input(request: LLMRequest) -> LLMRequest:
+    if "ignore instructions" in request.get_latest_user_message().lower():
+        raise InterceptorError("I can't process this request.")
+    return request
+
+# Clean up responses
+def redact_secrets(response: LLMResponse) -> LLMResponse:
+    response.text = response.text.replace("sk-secret", "[REDACTED]")
+    return response
+
+agent = Agent(
+    tools=[...],
+    request_interceptors=[validate_input, add_tenant_context],
+    response_interceptors=redact_secrets,
+)
+```
+
+### Streaming
+
+For real-time responses:
+
+```python
+for event in agent.run_stream(messages=[...]):
+    if isinstance(event, TextDeltaEvent):
+        print(event.text, end="", flush=True)
+```
+
+---
+
+## API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/health` | GET | Health check |
+| `/api/chat` | POST | Synchronous chat |
+| `/api/chat-stream` | POST | Streaming (NDJSON) |
+
+---
+
+## Environment Setup
+
+Create a `.env` file:
+
+```bash
+AWS_ACCESS_KEY_ID=your_key
+AWS_SECRET_ACCESS_KEY=your_secret
+AWS_REGION=us-east-1
+BEDROCK_MODEL_ID=anthropic.claude-3-sonnet-20240229-v1:0
+```
+
+---
+
+## Requirements
+
+- **Python 3.12+**
+- **AWS credentials** with Bedrock access
+- **Dependencies**: `fastapi`, `pydantic`, `uvicorn`, `boto3`, `agno`, `anthropic`
+
+DCAF uses the [Agno SDK](https://docs.agno.com/) for agent orchestration with Claude models on AWS Bedrock.
+
+---
+
+## Documentation
+
+Full documentation is available at the [DCAF Documentation Site](https://duplocloud.github.io/dcaf/).
+
+### View Locally
+
+```bash
+# Install docs dependencies
+pip install -e ".[docs]"
+
+# Serve documentation
+mkdocs serve
+# Open http://localhost:8000
+```
+
+### Key Guides
+
+- [Getting Started](docs/getting-started.md) - Installation and first steps
+- [Core Overview](docs/core/index.md) - Agent class and API
+- [Interceptors Guide](docs/guides/interceptors.md) - Request/response hooks
+- [Custom Agents](docs/guides/custom-agents.md) - Building complex agents
+- [Architecture](docs/architecture.md) - How DCAF works internally
+
+---
+
+## Project Structure
 
 ```
 dcaf/
-├── llm/
-│   └── bedrock.py              # AWS Bedrock Converse API wrapper
-├── tools.py                    # Tool creation system (@tool decorator)
-├── agents/
-│   └── tool_calling_agent.py   # Agent that calls tools and handles approvals
-├── schemas/
-│   └── messages.py             # Message schemas for Help Desk protocol
-└── agent_server.py             # FastAPI server that hosts agents
+├── core/                  # New Core API (recommended)
+│   ├── agent.py          # Agent class (main entry point)
+│   ├── interceptors.py   # LLMRequest, LLMResponse, InterceptorError
+│   ├── server.py         # serve() function
+│   └── ...
+├── agents/               # Legacy agents (v1)
+├── llm/                  # LLM wrappers (Bedrock)
+├── tools.py              # @tool decorator
+├── schemas/              # Message schemas
+└── agent_server.py       # FastAPI server
 ```
 
-## Quick Start
+---
+
+## Legacy API (v1)
+
+> ⚠️ **Note**: The examples below use the legacy v1 API. New projects should use the [Core API](#quick-start) shown above. The legacy API is still supported for backwards compatibility.
+
+### BedrockLLM (Legacy)
+
+Direct access to AWS Bedrock:
+
+```python
+from dcaf.llm import BedrockLLM
+
+llm = BedrockLLM(region_name="us-east-1")
+
+response = llm.invoke(
+    messages=[{"role": "user", "content": "Hello"}],
+    model_id="us.anthropic.claude-3-5-sonnet-20240620-v1:0",
+    max_tokens=1000,
+    tools=[...],  # Optional tool schemas
+)
+```
+
+### ToolCallingAgent (Legacy)
+
+The original agent class with manual LLM wiring:
 
 ```python
 from dcaf.llm import BedrockLLM
@@ -25,7 +268,7 @@ from dcaf.tools import tool
 from dcaf.agent_server import create_chat_app
 import uvicorn
 
-# 1. Create tools
+# Create tools with full schema
 @tool(
     schema={
         "name": "get_weather",
@@ -43,73 +286,32 @@ import uvicorn
 def get_weather(city: str) -> str:
     return f"Weather in {city}: 72°F, sunny"
 
-# 2. Create agent
+# Create LLM and agent separately
 llm = BedrockLLM(region_name="us-east-1")
 agent = ToolCallingAgent(
     llm=llm,
     tools=[get_weather],
-    system_prompt="You are a helpful assistant."
+    system_prompt="You are a helpful assistant.",
+    model_id="us.anthropic.claude-3-5-sonnet-20240620-v1:0",
+    max_iterations=10,
+    enable_terminal_cmds=True,
 )
 
-# 3. Create server
+# Create and run server
 app = create_chat_app(agent)
 
-# 4. Run
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
 ```
 
-## Core Components
+### Legacy Tool Schema Format
 
-### 1. BedrockLLM
-
-Calls AWS Bedrock models using the Converse API.
+The legacy API requires explicit JSON schemas:
 
 ```python
-from dcaf.llm import BedrockLLM
-
-llm = BedrockLLM(region_name="us-east-1")
-
-response = llm.invoke(
-    messages=[
-        {"role": "user", "content": "Hello"}
-    ],
-    model_id="us.anthropic.claude-3-5-sonnet-20240620-v1:0",
-    max_tokens=1000,
-    tools=[...],  # Optional tool schemas
-)
-
-**Configuration Priority:** Explicit `boto3_config` > Environment Variables > Defaults
-
-```python
-# 1. With explicit config (full control, overrides everything)
-from botocore.config import Config
-llm = BedrockLLM(
-    boto3_config=Config(read_timeout=60, retries={'max_attempts': 5, 'mode': 'adaptive'})
-)
-
-# 2. With environment variables (deployment-time configuration)
-# export BOTO3_READ_TIMEOUT=30
-# export BOTO3_CONNECT_TIMEOUT=15
-# export BOTO3_MAX_ATTEMPTS=5
-# export BOTO3_RETRY_MODE=adaptive
-llm = BedrockLLM()  # Reads from env vars
-
-# 3. Defaults: read_timeout=20s, connect_timeout=10s, max_attempts=3, mode=standard
-llm = BedrockLLM()  # Works out of the box
-```
-
-### 2. Tools
-
-Functions the agent can call. Two ways to create them:
-
-**Using @tool decorator:**
-```python
-from dcaf.tools import tool
-
 @tool(
     schema={
-        "name": "delete_file", 
+        "name": "delete_file",
         "description": "Delete a file",
         "input_schema": {
             "type": "object",
@@ -119,225 +321,65 @@ from dcaf.tools import tool
             "required": ["path"]
         }
     },
-    requires_approval=True  # User must approve before execution
+    requires_approval=True
 )
 def delete_file(path: str) -> str:
-    # Delete logic here
     return f"Deleted {path}"
 ```
 
-**Using create_tool:**
-```python
-from dcaf.tools import create_tool
-
-def multiply(a: int, b: int) -> str:
-    return str(a * b)
-
-multiply_tool = create_tool(
-    func=multiply,
-    schema={
-        "name": "multiply",
-        "description": "Multiply two numbers", 
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "a": {"type": "integer"},
-                "b": {"type": "integer"}
-            },
-            "required": ["a", "b"]
-        }
-    }
-)
-```
-
-**Tools with platform context:**
-```python
-@tool(
-    schema={
-        "name": "log_action",
-        "description": "Log an action",
-        "input_schema": {
-            "type": "object", 
-            "properties": {
-                "action": {"type": "string"}
-            },
-            "required": ["action"]
-        }
-    }
-)
-def log_action(action: str, platform_context: dict) -> str:
-    user = platform_context.get("user_id", "unknown")
-    return f"User {user} performed: {action}"
-```
-
-### 3. ToolCallingAgent
-
-Orchestrates tool calls and handles approvals.
+Compare with the Core API (simpler):
 
 ```python
-from dcaf.agents import ToolCallingAgent
-
-agent = ToolCallingAgent(
-    llm=llm,
-    tools=[tool1, tool2, tool3],
-    system_prompt="Your instructions here",
-    model_id="us.anthropic.claude-3-5-sonnet-20240620-v1:0",
-    max_iterations=10,
-    enable_terminal_cmds=True  # Allow terminal command suggestions
-)
+@tool(requires_approval=True, description="Delete a file")
+def delete_file(path: str) -> str:
+    """Delete a file at the given path."""
+    return f"Deleted {path}"
 ```
 
-### 4. Agent Server
+### Legacy Endpoints
 
-FastAPI server that hosts your agent.
+| Legacy Endpoint | New Endpoint | Description |
+|-----------------|--------------|-------------|
+| `/api/sendMessage` | `/api/chat` | Synchronous chat |
+| `/api/sendMessageStream` | `/api/chat-stream` | Streaming |
 
-```python
-from dcaf.agent_server import create_chat_app
+The legacy endpoints still work for backwards compatibility.
 
-app = create_chat_app(agent)
-# Serves at POST /api/sendMessage
-```
+### Migration Guide
 
-## Installation
+For migrating from v1 to Core API, see the [Migration Guide](docs/guides/migration.md).
+
+---
+
+## Development
 
 ```bash
-# From GitHub
-pip install git+https://github.com/duplocloud/service-desk-agents.git
-
-# For development
+# Clone the repo
 git clone https://github.com/duplocloud/service-desk-agents.git
 cd service-desk-agents
-pip install -r requirements.txt
+
+# Install with dev dependencies
+pip install -e ".[dev]"
+
+# Run linter
+ruff check .
+
+# Run type checker
+mypy dcaf/
+
+# Run tests
+pytest
 ```
 
-## Environment Setup
-
-Create `.env`:
-```bash
-AWS_ACCESS_KEY_ID=your_key
-AWS_SECRET_ACCESS_KEY=your_secret
-AWS_REGION=us-east-1
-BEDROCK_MODEL_ID=us.anthropic.claude-3-5-sonnet-20240620-v1:0
-```
-
-Or use the credential updater:
-```bash
-./env_update_aws_creds.sh --tenant=your-tenant
-```
-
-## Running Examples
-
-```bash
-# Basic agent with tools
-python examples/agent_app.py
-
-# Log analysis agent with OpenSearch
-python examples/log_analysis_agent.py  
-
-# Tool creation examples
-python examples/create_tools.py
-```
-
-## Message Protocol
-
-The agent receives and returns structured messages:
-
-**Input:**
-```json
-{
-  "messages": [
-    {"role": "user", "content": "Hello"},
-    {"role": "assistant", "content": "Hi there!"}
-  ],
-  "platform_context": {
-    "tenant_name": "production",
-    "user_id": "user123"
-  }
-}
-```
-
-**Output (AgentMessage):**
-```python
-AgentMessage(
-    content="Here's my response",
-    data=Data(
-        tool_calls=[...],      # Tools needing approval
-        executed_tool_calls=[...],  # Already executed tools
-        cmds=[...]             # Terminal commands for approval
-    )
-)
-```
-
-## Common Issues
-
-### Tool Schema Validation Error
-```
-ValidationException: The value at toolConfig.tools.0.toolSpec.inputSchema.json.type must be one of the following: object
-```
-**Fix:** Ensure your tool schema has this structure:
-```python
-{
-    "name": "tool_name",
-    "description": "What it does",
-    "input_schema": {  # Must have input_schema
-        "type": "object",  # Must be "object"
-        "properties": {...},
-        "required": [...]
-    }
-}
-```
-
-### Expired AWS Credentials
-```
-ExpiredTokenException: The security token included in the request is expired
-```
-**Fix:** Run `./env_update_aws_creds.sh` to refresh credentials.
-
-## Creating Your Own Agent
-
-1. **Simple agent without tools:**
-```python
-from dcaf.agent_server import AgentProtocol
-from dcaf.schemas.messages import AgentMessage
-
-class MyAgent(AgentProtocol):
-    def invoke(self, messages):
-        user_message = messages["messages"][-1]["content"]
-        return AgentMessage(content=f"You said: {user_message}")
-```
-
-2. **Agent with tools:**
-```python
-from dcaf.agents import ToolCallingAgent
-from dcaf.tools import tool
-
-@tool(schema={...})
-def my_tool(param: str) -> str:
-    return "result"
-
-agent = ToolCallingAgent(
-    llm=llm,
-    tools=[my_tool],
-    system_prompt="Custom instructions"
-)
-```
-
-## API Reference
-
-### POST /api/sendMessage
-
-Send messages to the agent.
-
-```bash
-curl -X POST http://localhost:8000/api/sendMessage \
-  -H "Content-Type: application/json" \
-  -d '{
-    "messages": [
-      {"role": "user", "content": "What is the weather?"}
-    ]
-  }'
-```
+---
 
 ## License
 
-See [LICENSE](LICENSE) file.
+MIT License - See [LICENSE](LICENSE) for details.
+
+---
+
+## Support
+
+- **GitHub Issues**: [service-desk-agents](https://github.com/duplocloud/service-desk-agents/issues)
+- **DuploCloud Support**: support@duplocloud.com
