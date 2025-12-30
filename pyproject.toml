@@ -7,7 +7,7 @@ name = "dcaf"
 version = "0.0.1"
 description = "DuploCloud Agent Builder (DAB) - A framework for building LLM powered AI agents and workflows that integrate with the DuploCloud Help Desk."
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.11"
 license = {text = "MIT"}
 authors = [
     {name = "DuploCloud", email = "support@duplocloud.com"}
@@ -18,6 +18,7 @@ classifiers = [
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Topic :: Software Development :: Libraries :: Python Modules",
@@ -74,7 +75,7 @@ dcaf = ["*.py"]
 # Ruff - Fast Python linter and formatter
 # =============================================================================
 [tool.ruff]
-target-version = "py312"
+target-version = "py311"
 line-length = 100
 exclude = [
     ".git",
@@ -122,7 +123,7 @@ line-ending = "auto"
 # MyPy - Static type checker
 # =============================================================================
 [tool.mypy]
-python_version = "3.12"
+python_version = "3.11"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = false  # Start permissive, tighten over time

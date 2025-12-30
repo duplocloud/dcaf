@@ -8,7 +8,7 @@ This guide walks you through installation, setup, and building your first agent.
 
 ### Required
 
-- **Python 3.12+** - DCAF supports Python 3.12 and 3.13
+- **Python 3.11+** - DCAF supports Python 3.11, 3.12, and 3.13
 - **AWS Account** - With access to AWS Bedrock
 - **AWS Credentials** - With permissions to invoke Bedrock models
 
