@@ -22,13 +22,28 @@ Example - Custom function:
         return AgentResult(text=response.text)
     
     serve(my_agent, port=8000)
+
+Example - With custom routes:
+    from dcaf.core import Agent, serve
+    from fastapi import APIRouter
+    
+    agent = Agent(tools=[my_tool])
+    
+    custom_router = APIRouter()
+    
+    @custom_router.get("/api/custom/schema")
+    async def get_schema():
+        return {"schema": "..."}
+    
+    serve(agent, additional_routers=[custom_router])
 """
 
-from typing import TYPE_CHECKING, Callable, Union
+from typing import TYPE_CHECKING, Callable, Sequence, Union
 import logging
 
 if TYPE_CHECKING:
     from .agent import Agent
+    from fastapi import APIRouter
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +57,7 @@ def serve(
     host: str = "0.0.0.0",
     reload: bool = False,
     log_level: str = "info",
+    additional_routers: Sequence["APIRouter"] | None = None,
 ) -> None:
     """
     Start a REST server for the agent.
@@ -56,6 +72,8 @@ def serve(
         host: Host to bind to (default: 0.0.0.0 for all interfaces)
         reload: Enable auto-reload on code changes (default: False)
         log_level: Logging level (default: "info")
+        additional_routers: Optional list of FastAPI APIRouter instances to include.
+                           Use this to add custom endpoints beyond /api/chat.
         
     Endpoints:
         GET  /health           - Health check
@@ -93,6 +111,23 @@ def serve(
         
         serve(my_agent, port=8000)
         
+    Example - With custom routes:
+        from dcaf.core import Agent, serve
+        from fastapi import APIRouter
+        
+        agent = Agent(tools=[my_tool])
+        custom_router = APIRouter()
+        
+        @custom_router.get("/api/custom/status")
+        async def get_status():
+            return {"status": "ok"}
+        
+        @custom_router.get("/api/custom/schema")
+        async def get_schema():
+            return {"schema": "..."}
+        
+        serve(agent, additional_routers=[custom_router])
+        
     Example - Custom port:
         serve(agent, port=8080)
         
@@ -106,13 +141,15 @@ def serve(
     import uvicorn
     
     # Create the FastAPI app
-    app = create_app(agent)
+    app = create_app(agent, additional_routers=additional_routers)
     
     logger.info(f"Starting DCAF server at http://{host}:{port}")
     logger.info("Endpoints:")
     logger.info(f"  GET  http://{host}:{port}/health")
     logger.info(f"  POST http://{host}:{port}/api/chat")
     logger.info(f"  POST http://{host}:{port}/api/chat-stream")
+    if additional_routers:
+        logger.info(f"  + {len(additional_routers)} custom router(s)")
     
     # Run the server
     uvicorn.run(
@@ -124,7 +161,10 @@ def serve(
     )
 
 
-def create_app(agent: Union["Agent", AgentHandler]):
+def create_app(
+    agent: Union["Agent", AgentHandler],
+    additional_routers: Sequence["APIRouter"] | None = None,
+):
     """
     Create a FastAPI application for the agent without starting the server.
     
@@ -134,11 +174,13 @@ def create_app(agent: Union["Agent", AgentHandler]):
     Args:
         agent: Either an Agent instance OR a callable function.
                If callable, signature must be: (messages: list, context: dict) -> AgentResult
+        additional_routers: Optional list of FastAPI APIRouter instances to include.
+                           Use this to add custom endpoints beyond /api/chat.
         
     Returns:
         FastAPI application instance
         
-    Example - Add custom endpoints:
+    Example - Add custom endpoints directly:
         from dcaf.core import Agent, create_app
         
         agent = Agent(tools=[...])
@@ -151,6 +193,24 @@ def create_app(agent: Union["Agent", AgentHandler]):
         # Run with uvicorn
         import uvicorn
         uvicorn.run(app, host="0.0.0.0", port=8000)
+        
+    Example - Add custom endpoints via router:
+        from dcaf.core import Agent, create_app
+        from fastapi import APIRouter
+        
+        agent = Agent(tools=[...])
+        
+        custom_router = APIRouter(prefix="/api/custom")
+        
+        @custom_router.get("/schema")
+        async def get_schema():
+            return {"schema": "..."}
+        
+        @custom_router.get("/status")
+        async def get_status():
+            return {"status": "ok"}
+        
+        app = create_app(agent, additional_routers=[custom_router])
         
     Example - Custom function with custom endpoints:
         from dcaf.core import create_app
@@ -170,7 +230,15 @@ def create_app(agent: Union["Agent", AgentHandler]):
     # Create the appropriate adapter based on agent type
     adapter = _create_adapter(agent)
     
-    return create_chat_app(adapter)
+    # Create the base app
+    app = create_chat_app(adapter)
+    
+    # Add any additional routers
+    if additional_routers:
+        for router in additional_routers:
+            app.include_router(router)
+    
+    return app
 
 
 def _create_adapter(agent: Union["Agent", AgentHandler]):

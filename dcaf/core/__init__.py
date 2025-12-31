@@ -44,6 +44,7 @@ __version__ = "1.0.0"
 from .models import ChatMessage, PlatformContext
 from .agent import Agent, AgentResponse, PendingToolCall
 from .server import serve, create_app
+from .session import Session
 
 # HelpDesk Protocol DTOs (for full compatibility)
 from .application.dto import (
@@ -99,6 +100,7 @@ __all__ = [
     "PendingToolCall",
     "ChatMessage",
     "PlatformContext",
+    "Session",
     "serve",
     "create_app",
     # HelpDesk Protocol DTOs

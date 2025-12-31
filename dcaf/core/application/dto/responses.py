@@ -290,26 +290,33 @@ class DataDTO:
     Container for all actionable data in a message.
     
     This matches the HelpDesk protocol Data structure, which holds
-    both pending and executed items for commands and tool calls.
+    both pending and executed items for commands and tool calls,
+    plus session state for persistence across conversation turns.
     
     Attributes:
         cmds: Terminal commands awaiting approval
         executed_cmds: Terminal commands that were executed
         tool_calls: Tool calls awaiting approval
         executed_tool_calls: Tool calls that were executed
+        session: Session state that persists across conversation turns
     """
     cmds: List[CommandDTO] = field(default_factory=list)
     executed_cmds: List[ExecutedCommandDTO] = field(default_factory=list)
     tool_calls: List[ToolCallDTO] = field(default_factory=list)
     executed_tool_calls: List[ExecutedToolCallDTO] = field(default_factory=list)
+    session: Dict[str, Any] = field(default_factory=dict)
     
     def to_dict(self) -> Dict[str, Any]:
-        return {
+        result = {
             "cmds": [c.to_dict() for c in self.cmds],
             "executed_cmds": [c.to_dict() for c in self.executed_cmds],
             "tool_calls": [t.to_dict() for t in self.tool_calls],
             "executed_tool_calls": [t.to_dict() for t in self.executed_tool_calls],
         }
+        # Only include session if it has data
+        if self.session:
+            result["session"] = self.session
+        return result
     
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "DataDTO":
@@ -318,6 +325,7 @@ class DataDTO:
             executed_cmds=[ExecutedCommandDTO.from_dict(c) for c in data.get("executed_cmds", [])],
             tool_calls=[ToolCallDTO.from_dict(t) for t in data.get("tool_calls", [])],
             executed_tool_calls=[ExecutedToolCallDTO.from_dict(t) for t in data.get("executed_tool_calls", [])],
+            session=data.get("session", {}),
         )
     
     @property
@@ -405,6 +413,55 @@ class AgentResponse:
     def executed_commands(self) -> List[ExecutedCommandDTO]:
         """Get commands that have been executed."""
         return self.data.executed_cmds
+    
+    @property
+    def session(self) -> Dict[str, Any]:
+        """
+        Get the session data.
+        
+        Session state persists across conversation turns. The client
+        should send this back in the next request to maintain state.
+        
+        Returns:
+            Dictionary of session data
+            
+        Example:
+            # After getting response
+            session = response.session
+            
+            # Send session back in next request
+            next_response = agent.run(
+                messages=[...],
+                session=session,
+            )
+        """
+        return self.data.session
+    
+    def with_session(self, session: Dict[str, Any]) -> "AgentResponse":
+        """
+        Return a copy with updated session data.
+        
+        Args:
+            session: New session data
+            
+        Returns:
+            New AgentResponse with updated session
+        """
+        new_data = DataDTO(
+            cmds=self.data.cmds,
+            executed_cmds=self.data.executed_cmds,
+            tool_calls=self.data.tool_calls,
+            executed_tool_calls=self.data.executed_tool_calls,
+            session=session,
+        )
+        return AgentResponse(
+            conversation_id=self.conversation_id,
+            text=self.text,
+            data=new_data,
+            has_pending_approvals=self.has_pending_approvals,
+            is_complete=self.is_complete,
+            metadata=self.metadata,
+        )
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for serialization (HelpDesk format)."""
