@@ -7,7 +7,7 @@ from ..ports.agent_runtime import AgentRuntime
 from ..ports.conversation_repository import ConversationRepository
 from ..ports.event_publisher import EventPublisher
 from ..dto.requests import AgentRequest
-from ..dto.responses import AgentResponse, ToolCallDTO, StreamEvent
+from ..dto.responses import AgentResponse, ToolCallDTO, StreamEvent, DataDTO
 from ...domain.entities import Conversation, ToolCall, Message, MessageRole
 from ...domain.value_objects import (
     ConversationId, 
@@ -166,7 +166,7 @@ class AgentService:
         response = AgentResponse(
             conversation_id=str(conversation.id),
             text=final_text,
-            tool_calls=collected_tool_calls,
+            data=DataDTO(tool_calls=collected_tool_calls),
             is_complete=True,
         )
         
@@ -236,10 +236,10 @@ class AgentService:
         
         return AgentResponse(
             conversation_id=str(conversation.id),
-            tool_calls=[
+            data=DataDTO(tool_calls=[
                 ToolCallDTO.from_tool_call(tc) 
                 for tc in conversation.all_tool_calls
-            ],
+            ]),
             is_complete=not conversation.has_pending_approvals,
         )
     
@@ -389,7 +389,7 @@ class AgentService:
         return AgentResponse(
             conversation_id=str(conversation.id),
             text=runtime_response.text,
-            tool_calls=processed_tool_calls,
+            data=DataDTO(tool_calls=processed_tool_calls),
             has_pending_approvals=conversation.has_pending_approvals,
             is_complete=not conversation.has_pending_approvals,
         )
