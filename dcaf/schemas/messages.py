@@ -45,12 +45,33 @@ class URLConfig(BaseModel):
 
 
 class PlatformContext(BaseModel):
+    """
+    Platform context for agent execution.
+    
+    Contains tenant, namespace, credentials, and role information
+    needed by tools during execution.
+    """
+    # Tenant identification
+    tenant_id: Optional[str] = None
+    tenant_name: Optional[str] = None
+    
+    # User roles for access control
+    user_roles: List[str] = Field(default_factory=list)
+    
+    # Kubernetes context
     k8s_namespace: Optional[str] = None
+    kubeconfig: Optional[str] = None
+    
+    # DuploCloud context
     duplo_base_url: Optional[str] = None
     duplo_token: Optional[str] = None
-    tenant_name: Optional[str] = None
+    
+    # AWS context
     aws_credentials: Optional[Dict[str, Any]] = None
-    kubeconfig: Optional[str] = None
+    aws_region: Optional[str] = None
+    
+    class Config:
+        extra = "allow"  # Allow additional fields to pass through
 
 
 #unused - covered by executed_cmds

@@ -30,7 +30,7 @@ from .tool_converter import AgnoToolConverter
 from .message_converter import AgnoMessageConverter
 from .types import DEFAULT_MODEL_ID, DEFAULT_PROVIDER, DEFAULT_MAX_TOKENS
 from ....domain.entities import Message
-from ....application.dto.responses import AgentResponse, ToolCallDTO, StreamEvent
+from ....application.dto.responses import AgentResponse, ToolCallDTO, StreamEvent, DataDTO
 
 logger = logging.getLogger(__name__)
 
@@ -900,10 +900,13 @@ class AgnoAdapter:
             and not has_pending
         )
         
+        # Wrap tool calls in DataDTO (AgentResponse expects data, not tool_calls)
+        data = DataDTO(tool_calls=tool_calls)
+        
         return AgentResponse(
             conversation_id=conversation_id,
             text=text,
-            tool_calls=tool_calls,
+            data=data,
             has_pending_approvals=has_pending,
             is_complete=is_complete,
         )

@@ -19,16 +19,21 @@ class PlatformContext:
     tenant, namespace, or cloud account.
     
     Attributes:
+        tenant_id: Unique tenant identifier (for tenant scoping)
+        tenant_name: DuploCloud tenant name (human-readable)
+        user_roles: List of user roles for access control (e.g., ["Administrator", "Developer"])
         k8s_namespace: Kubernetes namespace for kubectl operations
+        kubeconfig: Path to kubeconfig file or inline kubeconfig content
         duplo_base_url: DuploCloud API base URL
         duplo_token: DuploCloud authentication token
-        tenant_name: DuploCloud tenant name
         aws_credentials: AWS credentials dict (access_key, secret_key, session_token, region)
-        kubeconfig: Path to kubeconfig file or inline kubeconfig content
+        aws_region: AWS region (e.g., "us-west-2")
         
     Example:
         context = PlatformContext(
+            tenant_id="123",
             tenant_name="acme-prod",
+            user_roles=["Administrator"],
             k8s_namespace="default",
             duplo_base_url="https://acme.duplocloud.net",
         )
@@ -36,40 +41,61 @@ class PlatformContext:
         # Pass with a message
         msg = ChatMessage.user("List pods", context=context.to_dict())
     """
-    k8s_namespace: Optional[str] = None
-    duplo_base_url: Optional[str] = None
-    duplo_token: Optional[str] = None
+    # Tenant identification
+    tenant_id: Optional[str] = None
     tenant_name: Optional[str] = None
-    aws_credentials: Optional[dict[str, Any]] = None
+    
+    # User roles for access control
+    user_roles: list[str] = field(default_factory=list)
+    
+    # Kubernetes context
+    k8s_namespace: Optional[str] = None
     kubeconfig: Optional[str] = None
     
+    # DuploCloud context
+    duplo_base_url: Optional[str] = None
+    duplo_token: Optional[str] = None
+    
+    # AWS context
+    aws_credentials: Optional[dict[str, Any]] = None
+    aws_region: Optional[str] = None
+    
     def to_dict(self) -> dict[str, Any]:
-        """Convert to dictionary, excluding None values."""
+        """Convert to dictionary, excluding None/empty values."""
         result = {}
+        if self.tenant_id:
+            result["tenant_id"] = self.tenant_id
+        if self.tenant_name:
+            result["tenant_name"] = self.tenant_name
+        if self.user_roles:
+            result["user_roles"] = self.user_roles
         if self.k8s_namespace:
             result["k8s_namespace"] = self.k8s_namespace
+        if self.kubeconfig:
+            result["kubeconfig"] = self.kubeconfig
         if self.duplo_base_url:
             result["duplo_base_url"] = self.duplo_base_url
         if self.duplo_token:
             result["duplo_token"] = self.duplo_token
-        if self.tenant_name:
-            result["tenant_name"] = self.tenant_name
         if self.aws_credentials:
             result["aws_credentials"] = self.aws_credentials
-        if self.kubeconfig:
-            result["kubeconfig"] = self.kubeconfig
+        if self.aws_region:
+            result["aws_region"] = self.aws_region
         return result
     
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "PlatformContext":
         """Create from dictionary."""
         return cls(
+            tenant_id=data.get("tenant_id"),
+            tenant_name=data.get("tenant_name"),
+            user_roles=data.get("user_roles", []),
             k8s_namespace=data.get("k8s_namespace"),
+            kubeconfig=data.get("kubeconfig"),
             duplo_base_url=data.get("duplo_base_url"),
             duplo_token=data.get("duplo_token"),
-            tenant_name=data.get("tenant_name"),
             aws_credentials=data.get("aws_credentials"),
-            kubeconfig=data.get("kubeconfig"),
+            aws_region=data.get("aws_region"),
         )
     
     def get(self, key: str, default: Any = None) -> Any:
