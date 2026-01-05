@@ -57,6 +57,8 @@ def serve(
     host: str = "0.0.0.0",
     reload: bool = False,
     log_level: str = "info",
+    workers: int = 1,
+    timeout_keep_alive: int = 5,
     additional_routers: Sequence["APIRouter"] | None = None,
 ) -> None:
     """
@@ -72,6 +74,12 @@ def serve(
         host: Host to bind to (default: 0.0.0.0 for all interfaces)
         reload: Enable auto-reload on code changes (default: False)
         log_level: Logging level (default: "info")
+        workers: Number of worker processes (default: 1). For production,
+                 a common formula is (2 * cpu_cores) + 1. Cannot be used
+                 with reload=True.
+        timeout_keep_alive: Keep-alive timeout in seconds (default: 5).
+                           Set this to match or exceed your load balancer's
+                           idle timeout (e.g., AWS ALB defaults to 60s).
         additional_routers: Optional list of FastAPI APIRouter instances to include.
                            Use this to add custom endpoints beyond /api/chat.
         
@@ -134,11 +142,31 @@ def serve(
     Example - Development mode:
         serve(agent, port=8000, reload=True)
         
+    Example - Production mode:
+        serve(
+            agent,
+            port=8000,
+            workers=4,
+            timeout_keep_alive=30,
+            log_level="warning",
+        )
+        
     Note:
         This function blocks until the server is stopped (Ctrl+C).
         For programmatic control, use create_app() instead.
+        
+    Raises:
+        ValueError: If reload=True and workers > 1 (mutually exclusive in uvicorn).
     """
     import uvicorn
+    
+    # Validate reload and workers are not used together
+    if reload and workers > 1:
+        raise ValueError(
+            "Cannot use reload=True with workers > 1. "
+            "These options are mutually exclusive in uvicorn. "
+            "Use workers=1 for development with hot reload."
+        )
     
     # Create the FastAPI app
     app = create_app(agent, additional_routers=additional_routers)
@@ -150,6 +178,8 @@ def serve(
     logger.info(f"  POST http://{host}:{port}/api/chat-stream")
     if additional_routers:
         logger.info(f"  + {len(additional_routers)} custom router(s)")
+    if workers > 1:
+        logger.info(f"Configuration: {workers} workers, {timeout_keep_alive}s keep-alive")
     
     # Run the server
     uvicorn.run(
@@ -158,6 +188,8 @@ def serve(
         port=port,
         reload=reload,
         log_level=log_level,
+        workers=workers,
+        timeout_keep_alive=timeout_keep_alive,
     )
 
 
