@@ -38,6 +38,28 @@ serve(agent, host="0.0.0.0", port=3000)
 serve(agent, port=8000, reload=True)
 ```
 
+### Production Configuration
+
+For production deployments, configure worker processes and keep-alive timeouts:
+
+```python
+serve(
+    agent,
+    port=8000,
+    workers=4,              # Multiple workers for parallelism
+    timeout_keep_alive=30,  # Match your load balancer's idle timeout
+    log_level="warning",
+)
+```
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `workers` | `1` | Number of worker processes. For production, use `(2 × cpu_cores) + 1`. |
+| `timeout_keep_alive` | `5` | Keep-alive timeout in seconds. Set this to match or exceed your load balancer's idle timeout (e.g., AWS ALB defaults to 60s). |
+
+!!! warning "reload and workers are mutually exclusive"
+    You cannot use `reload=True` with `workers > 1`. Use `workers=1` for development with hot reload.
+
 ### Programmatic Control
 
 If you need more control over the FastAPI app:
@@ -296,14 +318,14 @@ RUN pip install -r requirements.txt
 
 COPY . .
 
-# Use 0.0.0.0 to accept connections from outside the container
-CMD ["python", "-c", "from my_agent import agent; from dcaf.core import serve; serve(agent, host='0.0.0.0', port=8000)"]
+CMD ["python", "main.py"]
 ```
 
-Or with a proper entry point:
+With a production-ready entry point:
 
 ```python
 # main.py
+import os
 from dcaf.core import Agent, serve
 from my_tools import list_pods, delete_pod
 
@@ -313,12 +335,22 @@ agent = Agent(
 )
 
 if __name__ == "__main__":
-    serve(agent)
+    serve(
+        agent,
+        host="0.0.0.0",
+        port=int(os.getenv("PORT", 8000)),
+        workers=int(os.getenv("WORKERS", 4)),
+        timeout_keep_alive=int(os.getenv("KEEP_ALIVE", 30)),
+        log_level=os.getenv("LOG_LEVEL", "warning"),
+    )
 ```
 
-```dockerfile
-CMD ["python", "main.py"]
-```
+!!! tip "Environment Variables"
+    Use environment variables for configuration so you can tune without rebuilding:
+    
+    ```bash
+    docker run -e WORKERS=8 -e KEEP_ALIVE=60 my-agent:latest
+    ```
 
 ---
 
@@ -345,6 +377,53 @@ spec:
               port: 8000
             periodSeconds: 5
 ```
+
+---
+
+## API Reference
+
+### serve()
+
+```python
+def serve(
+    agent: Agent | Callable,
+    port: int = 8000,
+    host: str = "0.0.0.0",
+    reload: bool = False,
+    log_level: str = "info",
+    workers: int = 1,
+    timeout_keep_alive: int = 5,
+    additional_routers: Sequence[APIRouter] | None = None,
+) -> None
+```
+
+Start a REST server for the agent.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `agent` | `Agent` or `Callable` | Required | Agent instance or callable `(messages, context) -> AgentResult` |
+| `port` | `int` | `8000` | Port to listen on |
+| `host` | `str` | `"0.0.0.0"` | Host to bind to |
+| `reload` | `bool` | `False` | Enable auto-reload on code changes (development only) |
+| `log_level` | `str` | `"info"` | Logging level (`debug`, `info`, `warning`, `error`) |
+| `workers` | `int` | `1` | Number of worker processes for parallelism |
+| `timeout_keep_alive` | `int` | `5` | Keep-alive timeout in seconds |
+| `additional_routers` | `Sequence[APIRouter]` | `None` | Custom FastAPI routers to include |
+
+**Raises:**
+
+- `ValueError` - If `reload=True` and `workers > 1` (mutually exclusive)
+
+### create_app()
+
+```python
+def create_app(
+    agent: Agent | Callable,
+    additional_routers: Sequence[APIRouter] | None = None,
+) -> FastAPI
+```
+
+Create a FastAPI application without starting the server. Use this for programmatic control or custom uvicorn configuration.
 
 ---
 
