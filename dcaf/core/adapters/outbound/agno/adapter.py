@@ -192,6 +192,7 @@ class AgnoAdapter:
         messages: List[Any],
         tools: List[Any],
         system_prompt: Optional[str] = None,
+        platform_context: Optional[Dict[str, Any]] = None,
     ) -> AgentResponse:
         """
         Invoke the agent synchronously.
@@ -202,6 +203,7 @@ class AgnoAdapter:
             messages: List of message objects (domain Message or dicts)
             tools: List of dcaf Tool objects
             system_prompt: Optional system prompt
+            platform_context: Optional platform context to inject into tools
             
         Returns:
             AgentResponse with the result
@@ -218,22 +220,23 @@ class AgnoAdapter:
                 with concurrent.futures.ThreadPoolExecutor() as pool:
                     future = pool.submit(
                         asyncio.run,
-                        self.ainvoke(messages, tools, system_prompt)
+                        self.ainvoke(messages, tools, system_prompt, platform_context)
                     )
                     return future.result()
             else:
                 return loop.run_until_complete(
-                    self.ainvoke(messages, tools, system_prompt)
+                    self.ainvoke(messages, tools, system_prompt, platform_context)
                 )
         except RuntimeError:
             # No event loop - create one
-            return asyncio.run(self.ainvoke(messages, tools, system_prompt))
+            return asyncio.run(self.ainvoke(messages, tools, system_prompt, platform_context))
     
     def invoke_stream(
         self,
         messages: List[Any],
         tools: List[Any],
         system_prompt: Optional[str] = None,
+        platform_context: Optional[Dict[str, Any]] = None,
     ) -> Iterator[StreamEvent]:
         """
         Invoke with synchronous streaming.
@@ -244,6 +247,7 @@ class AgnoAdapter:
             messages: List of message objects
             tools: List of dcaf Tool objects
             system_prompt: Optional system prompt
+            platform_context: Optional platform context to inject into tools
             
         Yields:
             StreamEvent objects for real-time updates
@@ -252,7 +256,7 @@ class AgnoAdapter:
         
         async def collect_events():
             events = []
-            async for event in self.ainvoke_stream(messages, tools, system_prompt):
+            async for event in self.ainvoke_stream(messages, tools, system_prompt, platform_context):
                 events.append(event)
             return events
         
@@ -274,6 +278,7 @@ class AgnoAdapter:
         messages: List[Any],
         tools: List[Any],
         system_prompt: Optional[str] = None,
+        platform_context: Optional[Dict[str, Any]] = None,
     ) -> AgentResponse:
         """
         Invoke the agent asynchronously.
@@ -285,12 +290,13 @@ class AgnoAdapter:
             messages: List of message objects (domain Message or dicts)
             tools: List of dcaf Tool objects
             system_prompt: Optional system prompt
+            platform_context: Optional platform context to inject into tools
             
         Returns:
             AgentResponse with the result
         """
-        # Create the Agno agent with tools
-        agno_agent = await self._create_agent_async(tools, system_prompt)
+        # Create the Agno agent with tools (context injected into tool wrappers)
+        agno_agent = await self._create_agent_async(tools, system_prompt, platform_context=platform_context)
         
         # Build the message list for Agno
         messages_to_send = self._build_message_list(messages)
@@ -329,6 +335,7 @@ class AgnoAdapter:
         messages: List[Any],
         tools: List[Any],
         system_prompt: Optional[str] = None,
+        platform_context: Optional[Dict[str, Any]] = None,
     ) -> AsyncIterator[StreamEvent]:
         """
         Invoke the agent with async streaming response.
@@ -337,12 +344,13 @@ class AgnoAdapter:
             messages: List of message objects
             tools: List of dcaf Tool objects
             system_prompt: Optional system prompt
+            platform_context: Optional platform context to inject into tools
             
         Yields:
             StreamEvent objects for real-time updates
         """
-        # Create the Agno agent with tools and streaming enabled
-        agno_agent = await self._create_agent_async(tools, system_prompt, stream=True)
+        # Create the Agno agent with tools and streaming enabled (context injected)
+        agno_agent = await self._create_agent_async(tools, system_prompt, stream=True, platform_context=platform_context)
         
         # Build the message list for Agno
         messages_to_send = self._build_message_list(messages)
@@ -517,6 +525,7 @@ class AgnoAdapter:
         tools: List[Any],
         system_prompt: Optional[str] = None,
         stream: bool = False,
+        platform_context: Optional[Dict[str, Any]] = None,
     ) -> AgnoAgent:
         """
         Create an Agno Agent with async session.
@@ -525,6 +534,7 @@ class AgnoAdapter:
             tools: List of dcaf Tool objects
             system_prompt: Optional system prompt
             stream: Whether streaming is enabled
+            platform_context: Optional platform context to inject into tools
             
         Returns:
             Configured AgnoAgent
@@ -532,8 +542,8 @@ class AgnoAdapter:
         # Create the model with async session
         model = await self._get_or_create_model_async()
         
-        # Convert tools to Agno format
-        agno_tools = self._convert_tools_to_agno(tools)
+        # Convert tools to Agno format (with context injection for tools that need it)
+        agno_tools = self._convert_tools_to_agno(tools, platform_context)
         
         # WORKAROUND: Prepend instruction to prevent parallel tool calls
         # This is necessary because Agno has a bug handling multiple toolUse blocks
@@ -784,28 +794,74 @@ class AgnoAdapter:
     # Tool Conversion
     # =========================================================================
     
-    def _convert_tools_to_agno(self, tools: List[Any]) -> List[Callable]:
+    def _convert_tools_to_agno(
+        self, 
+        tools: List[Any],
+        platform_context: Optional[Dict[str, Any]] = None,
+    ) -> List[Callable]:
         """
         Convert dcaf Tools to Agno-compatible tool format.
         
-        Uses Agno's @tool decorator for proper integration.
+        Uses Agno's @tool decorator with the full JSON schema for proper
+        integration. The schema is critical for the LLM to understand
+        tool parameters, types, constraints (enums), and descriptions.
+        
+        For tools that require platform_context, this method creates wrapper
+        functions that automatically inject the context when Agno executes them.
+        This bridges the gap between interceptor-set context and tool execution.
         
         Args:
             tools: List of dcaf Tool objects
+            platform_context: Optional platform context to inject into tools
+                             that declare a `platform_context` parameter
             
         Returns:
-            List of Agno-decorated tool functions
+            List of Agno-decorated tool functions with proper schemas
         """
         agno_tools = []
         
         for tool_obj in tools:
-            # Use Agno's @tool decorator like production code
+            # Get the full tool schema including input_schema
+            # This ensures enums, descriptions, and constraints are passed to the LLM
+            tool_schema = self._tool_converter.to_agno(tool_obj)
+            
+            # Determine which function to wrap with Agno's decorator
+            if tool_obj.requires_platform_context and platform_context is not None:
+                # Create a wrapper that injects platform_context
+                # Use default arguments to capture values at definition time
+                def create_context_wrapper(original_func, ctx):
+                    """Create a closure that injects platform_context."""
+                    def wrapper(*args, **kwargs):
+                        kwargs['platform_context'] = ctx
+                        return original_func(*args, **kwargs)
+                    # Preserve function metadata
+                    wrapper.__name__ = original_func.__name__
+                    wrapper.__doc__ = original_func.__doc__
+                    return wrapper
+                
+                func_to_wrap = create_context_wrapper(tool_obj.func, platform_context)
+                logger.debug(
+                    f"Tool '{tool_obj.name}' will receive platform_context injection"
+                )
+            else:
+                # No context needed - use the raw function
+                func_to_wrap = tool_obj.func
+            
+            # Use Agno's @tool decorator with the complete schema
+            # The input_schema is passed as 'parameters' to match Agno's expected format
             decorated_tool = agno_tool_decorator(
-                name=tool_obj.name,
-                description=tool_obj.description,
-            )(tool_obj.func)
+                name=tool_schema["name"],
+                description=tool_schema["description"],
+                # Pass the JSON schema so LLM knows parameter types, enums, etc.
+                parameters=tool_schema["input_schema"],
+            )(func_to_wrap)
             
             agno_tools.append(decorated_tool)
+            
+            logger.debug(
+                f"Converted tool '{tool_obj.name}' with schema: "
+                f"{list(tool_schema['input_schema'].get('properties', {}).keys())}"
+            )
         
         return agno_tools
     

@@ -47,6 +47,7 @@ class AgentRuntime(Protocol):
         messages: List[Message],
         tools: List[ToolLike],
         system_prompt: Optional[str] = None,
+        platform_context: Optional[dict] = None,
     ) -> AgentResponse:
         """
         Invoke the agent with messages and tools.
@@ -62,6 +63,8 @@ class AgentRuntime(Protocol):
             messages: List of messages in the conversation
             tools: List of tools available to the agent
             system_prompt: Optional system prompt to prepend
+            platform_context: Optional platform context (tenant, namespace, etc.)
+                             to inject into tools that require it
             
         Returns:
             AgentResponse containing the agent's response and any tool calls
@@ -73,6 +76,7 @@ class AgentRuntime(Protocol):
         messages: List[Message],
         tools: List[ToolLike],
         system_prompt: Optional[str] = None,
+        platform_context: Optional[dict] = None,
     ) -> Iterator[StreamEvent]:
         """
         Invoke the agent with streaming response.
@@ -84,6 +88,8 @@ class AgentRuntime(Protocol):
             messages: List of messages in the conversation
             tools: List of tools available to the agent
             system_prompt: Optional system prompt to prepend
+            platform_context: Optional platform context (tenant, namespace, etc.)
+                             to inject into tools that require it
             
         Yields:
             StreamEvent objects containing chunks of the response

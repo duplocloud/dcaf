@@ -103,6 +103,7 @@ class AgentService:
             messages=conversation.messages,
             tools=request.tools,
             system_prompt=request.system_prompt,
+            platform_context=context.to_dict() if context else None,
         )
         
         # 4. Process the response
@@ -153,6 +154,7 @@ class AgentService:
             messages=conversation.messages,
             tools=request.tools,
             system_prompt=request.system_prompt,
+            platform_context=context.to_dict() if context else None,
         ):
             # Track text for final response
             if event.event_type.value == "text_delta":
@@ -183,15 +185,15 @@ class AgentService:
         # 9. Yield final event
         yield StreamEvent.message_end(response)
     
-    def continue_after_approval(
+    def resume(
         self,
         conversation_id: str,
         tools: List,
     ) -> AgentResponse:
         """
-        Continue execution after tool calls have been approved.
+        Resume execution after tool calls have been approved/rejected.
         
-        This is called after the user has approved pending tool calls.
+        This is called after the user has approved or rejected pending tool calls.
         It executes the approved tools and continues the conversation.
         
         Args:
