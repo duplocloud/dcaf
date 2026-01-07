@@ -1,7 +1,7 @@
 """Conversation aggregate root."""
 
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
 from ..value_objects.conversation_id import ConversationId
 from ..value_objects.platform_context import PlatformContext
@@ -49,8 +49,8 @@ class Conversation:
         self._messages: List[Message] = list(messages) if messages else []
         self._pending_tool_calls: List[ToolCall] = []
         self._context = context or PlatformContext.empty()
-        self._created_at = datetime.utcnow()
-        self._updated_at = datetime.utcnow()
+        self._created_at = datetime.now(timezone.utc)
+        self._updated_at = datetime.now(timezone.utc)
         self._domain_events: List = []  # Will hold domain events
     
     # Properties
@@ -134,7 +134,7 @@ class Conversation:
         
         message = Message(role=MessageRole.USER, content=content)
         self._messages.append(message)
-        self._updated_at = datetime.utcnow()
+        self._updated_at = datetime.now(timezone.utc)
         return message
     
     def add_assistant_message(self, content: str | MessageContent) -> Message:
@@ -155,7 +155,7 @@ class Conversation:
             
         message = Message(role=MessageRole.ASSISTANT, content=content)
         self._messages.append(message)
-        self._updated_at = datetime.utcnow()
+        self._updated_at = datetime.now(timezone.utc)
         return message
     
     def add_system_message(self, content: str | MessageContent) -> Message:
@@ -176,7 +176,7 @@ class Conversation:
             
         message = Message(role=MessageRole.SYSTEM, content=content)
         self._messages.append(message)
-        self._updated_at = datetime.utcnow()
+        self._updated_at = datetime.now(timezone.utc)
         return message
     
     def add_message(self, message: Message) -> None:
@@ -194,7 +194,7 @@ class Conversation:
                 "Cannot add user message while tool calls are pending approval."
             )
         self._messages.append(message)
-        self._updated_at = datetime.utcnow()
+        self._updated_at = datetime.now(timezone.utc)
     
     def request_tool_approval(self, tool_calls: List[ToolCall]) -> None:
         """
@@ -208,7 +208,7 @@ class Conversation:
         for tc in tool_calls:
             if tc.requires_approval and tc.is_pending:
                 self._pending_tool_calls.append(tc)
-        self._updated_at = datetime.utcnow()
+        self._updated_at = datetime.now(timezone.utc)
         
         # Record domain event
         from ..events import ApprovalRequested
@@ -232,7 +232,7 @@ class Conversation:
         """
         tool_call = self._find_tool_call(tool_call_id)
         tool_call.approve()
-        self._updated_at = datetime.utcnow()
+        self._updated_at = datetime.now(timezone.utc)
         return tool_call
     
     def reject_tool_call(self, tool_call_id: str, reason: str) -> ToolCall:
@@ -251,7 +251,7 @@ class Conversation:
         """
         tool_call = self._find_tool_call(tool_call_id)
         tool_call.reject(reason)
-        self._updated_at = datetime.utcnow()
+        self._updated_at = datetime.now(timezone.utc)
         return tool_call
     
     def complete_tool_call(self, tool_call_id: str, result: str) -> ToolCall:
@@ -268,7 +268,7 @@ class Conversation:
         tool_call = self._find_tool_call(tool_call_id)
         tool_call.start_execution()
         tool_call.complete(result)
-        self._updated_at = datetime.utcnow()
+        self._updated_at = datetime.now(timezone.utc)
         
         # Record domain event
         from ..events import ToolExecuted
@@ -294,13 +294,13 @@ class Conversation:
         tool_call = self._find_tool_call(tool_call_id)
         tool_call.start_execution()
         tool_call.fail(error)
-        self._updated_at = datetime.utcnow()
+        self._updated_at = datetime.now(timezone.utc)
         return tool_call
     
     def update_context(self, context: PlatformContext) -> None:
         """Update the platform context."""
         self._context = context
-        self._updated_at = datetime.utcnow()
+        self._updated_at = datetime.now(timezone.utc)
     
     def clear_events(self) -> List:
         """Clear and return domain events."""

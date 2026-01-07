@@ -2,7 +2,7 @@
 
 from enum import Enum
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
 from ..value_objects.tool_call_id import ToolCallId
 from ..value_objects.tool_input import ToolInput
@@ -69,8 +69,8 @@ class ToolCall:
         self._rejection_reason: Optional[str] = None
         self._result: Optional[str] = None
         self._error: Optional[str] = None
-        self._created_at = datetime.utcnow()
-        self._updated_at = datetime.utcnow()
+        self._created_at = datetime.now(timezone.utc)
+        self._updated_at = datetime.now(timezone.utc)
     
     # Properties (read-only access)
     
@@ -169,7 +169,7 @@ class ToolCall:
                 attempted_state=ToolCallStatus.APPROVED.value,
             )
         self._status = ToolCallStatus.APPROVED
-        self._updated_at = datetime.utcnow()
+        self._updated_at = datetime.now(timezone.utc)
     
     def reject(self, reason: str) -> None:
         """
@@ -189,7 +189,7 @@ class ToolCall:
             )
         self._status = ToolCallStatus.REJECTED
         self._rejection_reason = reason
-        self._updated_at = datetime.utcnow()
+        self._updated_at = datetime.now(timezone.utc)
     
     def start_execution(self) -> None:
         """
@@ -205,7 +205,7 @@ class ToolCall:
                 attempted_state=ToolCallStatus.EXECUTING.value,
             )
         self._status = ToolCallStatus.EXECUTING
-        self._updated_at = datetime.utcnow()
+        self._updated_at = datetime.now(timezone.utc)
     
     def complete(self, result: str) -> None:
         """
@@ -225,7 +225,7 @@ class ToolCall:
             )
         self._status = ToolCallStatus.COMPLETED
         self._result = result
-        self._updated_at = datetime.utcnow()
+        self._updated_at = datetime.now(timezone.utc)
     
     def fail(self, error: str) -> None:
         """
@@ -245,7 +245,7 @@ class ToolCall:
             )
         self._status = ToolCallStatus.FAILED
         self._error = error
-        self._updated_at = datetime.utcnow()
+        self._updated_at = datetime.now(timezone.utc)
     
     def auto_approve(self) -> None:
         """
@@ -256,7 +256,7 @@ class ToolCall:
         """
         if not self._requires_approval and self._status == ToolCallStatus.PENDING:
             self._status = ToolCallStatus.APPROVED
-            self._updated_at = datetime.utcnow()
+            self._updated_at = datetime.now(timezone.utc)
     
     # Identity
     

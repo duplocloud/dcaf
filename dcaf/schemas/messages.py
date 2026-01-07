@@ -1,7 +1,7 @@
 from typing import List, Optional, Dict, Any, Literal, Union
 from datetime import datetime
 
-from pydantic import BaseModel, Field, HttpUrl
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 
 
 class FileObject(BaseModel):
@@ -70,8 +70,7 @@ class PlatformContext(BaseModel):
     aws_credentials: Optional[Dict[str, Any]] = None
     aws_region: Optional[str] = None
     
-    class Config:
-        extra = "allow"  # Allow additional fields to pass through
+    model_config = ConfigDict(extra="allow")  # Allow additional fields to pass through
 
 
 #unused - covered by executed_cmds

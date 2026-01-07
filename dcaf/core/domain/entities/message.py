@@ -2,7 +2,7 @@
 
 from enum import Enum
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, timezone
 
 from ..value_objects.message_content import MessageContent, ContentBlock
 
@@ -44,7 +44,7 @@ class Message:
         """
         self._role = role
         self._content = content
-        self._created_at = created_at or datetime.utcnow()
+        self._created_at = created_at or datetime.now(timezone.utc)
     
     @property
     def role(self) -> MessageRole:
