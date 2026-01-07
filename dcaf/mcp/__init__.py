@@ -75,10 +75,13 @@ class MCPIntegrationError(Exception):
 
 
 def serve(
-    server: Union["Agent", "FastMCPType"],
+    agent: "Agent",
     name: Optional[str] = None,
     port: int = 8000,
     host: str = "0.0.0.0",
+    additional_tools: Optional[List[Callable]] = None,
+    additional_resources: Optional[List[tuple]] = None,
+    additional_routes: Optional[List[tuple]] = None,
 ) -> None:
     """
     Start a FastMCP server that exposes both MCP protocol AND HTTP REST endpoints.
@@ -90,10 +93,13 @@ def serve(
     - All on a single port!
     
     Args:
-        server: Either a DCAF Agent OR a FastMCP instance (from create_server())
-        name: Name for the server (only used when passing an Agent)
+        agent: The DCAF Agent to serve
+        name: Name for the server (defaults to agent.name or "dcaf-agent")
         port: Port to listen on (default: 8000)
         host: Host to bind to (default: 0.0.0.0)
+        additional_tools: List of functions to expose as MCP tools
+        additional_resources: List of (uri, function) tuples to expose as MCP resources
+        additional_routes: List of (path, methods, handler) tuples for custom HTTP routes
         
     Endpoints:
         GET  /health           - Health check
@@ -102,44 +108,75 @@ def serve(
         *    /mcp              - MCP protocol (SSE transport)
         
     Example - Simple:
-        from dcaf.core import Agent
         from dcaf.mcp import serve
         
         agent = Agent(tools=[list_pods])
-        serve(agent)  # That's it!
+        serve(agent)
         
-    Example - With Customization:
-        from dcaf.mcp import create_server, serve
+    Example - With additional tools:
+        def cluster_status() -> str:
+            '''Get cluster health'''
+            return "healthy"
         
-        mcp = create_server(agent, name="k8s-agent")
+        serve(agent, additional_tools=[cluster_status])
         
-        @mcp.tool()
-        def extra_tool() -> str:
-            return "custom"
+    Example - With additional resources:
+        def get_config() -> str:
+            '''Cluster config'''
+            return json.dumps({"region": "us-west-2"})
         
-        @mcp.resource("data://config")
-        def config() -> str:
-            return "{...}"
+        serve(agent, additional_resources=[
+            ("cluster://config", get_config),
+        ])
         
-        serve(mcp)  # Pass the customized server
+    Example - With additional HTTP routes:
+        async def custom_status(request):
+            return JSONResponse({"custom": "data"})
+        
+        serve(agent, additional_routes=[
+            ("/api/v2/status", ["GET"], custom_status),
+        ])
+        
+    Example - All together:
+        serve(
+            agent,
+            additional_tools=[cluster_status, scale_deployment],
+            additional_resources=[("cluster://config", get_config)],
+            additional_routes=[("/api/v2/status", ["GET"], custom_status)],
+        )
         
     Note:
         This function blocks until the server is stopped (Ctrl+C).
     """
-    # Check if it's already a FastMCP server
     try:
         from fastmcp import FastMCP
-        if isinstance(server, FastMCP):
-            mcp = server
-            server_name = mcp.name
-        else:
-            # It's an Agent - create the server
-            server_name = name or getattr(server, "name", None) or "dcaf-agent"
-            mcp = create_server(server, name=server_name)
     except ImportError as e:
         raise MCPIntegrationError(
             "FastMCP is not installed. Install with: pip install dcaf[mcp]"
         ) from e
+    
+    server_name = name or getattr(agent, "name", None) or "dcaf-agent"
+    mcp = create_server(agent, name=server_name)
+    
+    # Add additional tools
+    if additional_tools:
+        from fastmcp.tools import Tool
+        for tool_func in additional_tools:
+            tool_obj = Tool.from_function(tool_func)
+            mcp.add_tool(tool_obj)
+            logger.debug(f"Added additional tool: {tool_func.__name__}")
+    
+    # Add additional resources
+    if additional_resources:
+        for uri, resource_func in additional_resources:
+            mcp.resource(uri)(resource_func)
+            logger.debug(f"Added additional resource: {uri}")
+    
+    # Add additional HTTP routes
+    if additional_routes:
+        for path, methods, handler in additional_routes:
+            mcp.custom_route(path, methods=methods)(handler)
+            logger.debug(f"Added additional route: {methods} {path}")
     
     logger.info(f"Starting DCAF server '{server_name}' at http://{host}:{port}")
     logger.info("Endpoints:")
