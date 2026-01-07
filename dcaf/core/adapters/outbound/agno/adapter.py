@@ -828,15 +828,30 @@ class AgnoAdapter:
             # Determine which function to wrap with Agno's decorator
             if tool_obj.requires_platform_context and platform_context is not None:
                 # Create a wrapper that injects platform_context
-                # Use default arguments to capture values at definition time
+                # IMPORTANT: We must preserve the function signature (minus platform_context)
+                # so that Agno can infer the parameter schema correctly.
+                import functools
+                import inspect
+                
                 def create_context_wrapper(original_func, ctx):
-                    """Create a closure that injects platform_context."""
+                    """Create a closure that injects platform_context while preserving signature."""
+                    @functools.wraps(original_func)
                     def wrapper(*args, **kwargs):
                         kwargs['platform_context'] = ctx
                         return original_func(*args, **kwargs)
-                    # Preserve function metadata
-                    wrapper.__name__ = original_func.__name__
-                    wrapper.__doc__ = original_func.__doc__
+                    
+                    # Copy the signature but REMOVE platform_context parameter
+                    # This is what Agno will see when it inspects the function
+                    try:
+                        original_sig = inspect.signature(original_func)
+                        filtered_params = [
+                            param for name, param in original_sig.parameters.items()
+                            if name != 'platform_context'
+                        ]
+                        wrapper.__signature__ = original_sig.replace(parameters=filtered_params)
+                    except (ValueError, TypeError) as e:
+                        logger.warning(f"Could not copy signature for {original_func.__name__}: {e}")
+                    
                     return wrapper
                 
                 func_to_wrap = create_context_wrapper(tool_obj.func, platform_context)
