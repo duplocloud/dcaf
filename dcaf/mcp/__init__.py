@@ -1,19 +1,19 @@
 """
 DCAF MCP (Model Context Protocol) Integration.
 
-This module provides integration with FastMCP, enabling agents to expose
-their tools to AI assistants like Claude and ChatGPT via the MCP protocol.
+This module provides integration with FastMCP, enabling agents to be served
+via FastMCP as the primary server framework. This exposes:
 
-MCP (Model Context Protocol) is Anthropic's standard for connecting AI
-assistants to external tools, resources, and capabilities. Using this module,
-you can expose your DCAF agent's tools to any MCP-compatible client.
+1. MCP protocol at /mcp (for AI assistants like Claude)
+2. HTTP REST endpoints at /api/chat (for web frontends like HelpDesk)
+3. All on a single port!
 
 Installation:
     pip install dcaf[mcp]
 
-Quick Start - MCP Server:
+Quick Start - FastMCP as Primary Server:
     from dcaf.core import Agent
-    from dcaf.mcp import serve_mcp
+    from dcaf.mcp import serve
     from dcaf.tools import tool
     
     @tool(description="Query infrastructure")
@@ -21,19 +21,15 @@ Quick Start - MCP Server:
         return f"Results for: {query}"
     
     agent = Agent(tools=[query_infra])
-    serve_mcp(agent, name="infrastructure-agent")
-
-Quick Start - Both HTTP and MCP:
-    from dcaf.core import Agent, serve
-    
-    agent = Agent(tools=[query_infra])
-    serve(agent, mcp=True)  # Runs HTTP on 8000, MCP on 8001
+    serve(agent)  # MCP + HTTP on same port!
+    # MCP at http://localhost:8000/mcp
+    # Chat at http://localhost:8000/api/chat
 
 Programmatic Control:
-    from dcaf.mcp import create_mcp_server
+    from dcaf.mcp import create_server
     
     agent = Agent(tools=[...])
-    mcp = create_mcp_server(agent, name="my-agent")
+    mcp = create_server(agent, name="my-agent")
     
     # Add custom resources
     @mcp.resource("db://schema")
@@ -52,16 +48,21 @@ Note:
     pip install dcaf[mcp]
 """
 
-from typing import TYPE_CHECKING, Optional, List, Any
+from typing import TYPE_CHECKING, Optional, List, Callable, Any
 import logging
+import json
 
 if TYPE_CHECKING:
     from ..core.agent import Agent
 
 __all__ = [
-    "create_mcp_server",
-    "serve_mcp",
+    "serve",
+    "create_server",
     "MCPIntegrationError",
+    # Legacy names for backwards compatibility
+    "serve_mcp",
+    "create_mcp_server",
+    "get_mcp_tool_schemas",
 ]
 
 logger = logging.getLogger(__name__)
@@ -72,79 +73,84 @@ class MCPIntegrationError(Exception):
     pass
 
 
-def serve_mcp(
+def serve(
     agent: "Agent",
     name: Optional[str] = None,
-    version: str = "1.0.0",
-    transport: str = "stdio",
+    port: int = 8000,
     host: str = "0.0.0.0",
-    port: int = 8001,
+    log_level: str = "info",
 ) -> None:
     """
-    Start an MCP server for the agent.
+    Start a FastMCP server that exposes both MCP protocol AND HTTP REST endpoints.
     
-    This is the simplest way to expose an agent's tools via MCP. It creates
-    a FastMCP server and runs it with the specified transport.
+    This is the recommended way to serve a DCAF agent. It provides:
+    - MCP protocol at /mcp (for AI assistants like Claude)
+    - HTTP REST at /api/chat and /api/chat-stream (for web frontends)
+    - Health check at /health
+    - All on a single port!
     
     Args:
-        agent: The DCAF Agent whose tools should be exposed
-        name: Name for the MCP server (defaults to agent.name or "dcaf-agent")
-        version: Version string for the server
-        transport: Transport mode - "stdio" (default) or "sse"
-                  - stdio: Standard input/output (for Claude Desktop, etc.)
-                  - sse: Server-Sent Events over HTTP (for web clients)
-        host: Host to bind to for SSE transport (default: 0.0.0.0)
-        port: Port for SSE transport (default: 8001)
+        agent: The DCAF Agent to serve
+        name: Name for the server (defaults to agent.name or "dcaf-agent")
+        port: Port to listen on (default: 8000)
+        host: Host to bind to (default: 0.0.0.0)
+        log_level: Logging level (default: "info")
         
-    Example - stdio transport (for Claude Desktop):
+    Endpoints:
+        GET  /health           - Health check
+        POST /api/chat         - Synchronous chat (HelpDesk protocol)
+        POST /api/chat-stream  - Streaming chat (NDJSON)
+        *    /mcp              - MCP protocol (SSE transport)
+        
+    Example:
         from dcaf.core import Agent
-        from dcaf.mcp import serve_mcp
+        from dcaf.mcp import serve
         
         agent = Agent(tools=[list_pods, delete_pod])
-        serve_mcp(agent, name="k8s-assistant")
+        serve(agent, name="k8s-assistant", port=8000)
         
-    Example - SSE transport (for web clients):
-        serve_mcp(agent, transport="sse", port=8001)
+        # Now available:
+        # - Claude Desktop can connect to http://localhost:8000/mcp
+        # - HelpDesk can POST to http://localhost:8000/api/chat
         
     Note:
-        This function blocks until the server is stopped.
-        For programmatic control, use create_mcp_server() instead.
+        This function blocks until the server is stopped (Ctrl+C).
+        For programmatic control, use create_server() instead.
     """
     server_name = name or getattr(agent, "name", None) or "dcaf-agent"
-    mcp = create_mcp_server(agent, name=server_name, version=version)
+    mcp = create_server(agent, name=server_name)
     
-    logger.info(f"Starting MCP server '{server_name}' with {transport} transport")
+    logger.info(f"Starting DCAF server '{server_name}' at http://{host}:{port}")
+    logger.info("Endpoints:")
+    logger.info(f"  GET  http://{host}:{port}/health")
+    logger.info(f"  POST http://{host}:{port}/api/chat")
+    logger.info(f"  POST http://{host}:{port}/api/chat-stream")
+    logger.info(f"  MCP  http://{host}:{port}/mcp")
+    logger.info(f"Tools: {[t.name for t in agent.tools]}")
     
-    if transport == "stdio":
-        logger.info("MCP server running (stdio mode)")
-        logger.info("Connect via Claude Desktop or other MCP clients")
-        mcp.run()
-    elif transport == "sse":
-        logger.info(f"MCP server running at http://{host}:{port}")
-        mcp.run(transport="sse", host=host, port=port)
-    else:
-        raise ValueError(f"Unknown transport: {transport}. Use 'stdio' or 'sse'.")
+    # Run with SSE transport (HTTP-based)
+    mcp.run(transport="sse", host=host, port=port)
 
 
-def create_mcp_server(
+def create_server(
     agent: "Agent",
     name: str = "dcaf-agent",
     version: str = "1.0.0",
-    include_agent_tool: bool = True,
+    include_chat_endpoints: bool = True,
 ):
     """
     Create a FastMCP server from a DCAF Agent.
     
-    This function creates an MCP server that exposes the agent's tools
-    via the Model Context Protocol, making them discoverable and callable
-    by AI assistants.
+    This creates a server that exposes:
+    - All agent tools via MCP protocol
+    - Optionally, HTTP REST endpoints for chat
     
     Args:
         agent: The DCAF Agent whose tools should be exposed
-        name: Name for the MCP server (shown to AI assistants)
+        name: Name for the server (shown to AI assistants)
         version: Version string for the server
-        include_agent_tool: If True, adds a special "chat" tool that invokes
-                           the full agent (with LLM reasoning). Default: True.
+        include_chat_endpoints: If True (default), adds /api/chat endpoints
+                               for HelpDesk compatibility
         
     Returns:
         A FastMCP server instance ready to customize or run
@@ -154,38 +160,34 @@ def create_mcp_server(
         
     Example - Basic usage:
         from dcaf.core import Agent
-        from dcaf.mcp import create_mcp_server
+        from dcaf.mcp import create_server
         
-        agent = Agent(tools=[my_tool, other_tool])
-        mcp = create_mcp_server(agent, name="my-agent")
+        agent = Agent(tools=[my_tool])
+        mcp = create_server(agent, name="my-agent")
         mcp.run()
         
     Example - Add custom resources:
-        mcp = create_mcp_server(agent, name="my-agent")
+        mcp = create_server(agent, name="my-agent")
         
         @mcp.resource("config://settings")
         def get_settings() -> str:
             return json.dumps(settings)
         
-        @mcp.resource("db://schema")
-        async def get_schema() -> str:
-            return await fetch_schema()
+        mcp.run()
+        
+    Example - Add custom HTTP routes:
+        mcp = create_server(agent, name="my-agent")
+        
+        @mcp.custom_route("/api/custom/status", methods=["GET"])
+        async def custom_status(request):
+            from starlette.responses import JSONResponse
+            return JSONResponse({"custom": "data"})
         
         mcp.run()
         
-    Example - Add custom tools:
-        mcp = create_mcp_server(agent, name="my-agent")
-        
-        @mcp.tool()
-        def calculate(expression: str) -> str:
-            \"\"\"Evaluate a math expression.\"\"\"
-            return str(eval(expression))
-        
-        mcp.run()
-        
-    Example - Without the "chat" agent tool:
-        # Only expose individual tools, not the full agent
-        mcp = create_mcp_server(agent, include_agent_tool=False)
+    Example - MCP only (no chat endpoints):
+        mcp = create_server(agent, include_chat_endpoints=False)
+        mcp.run()  # Only exposes MCP protocol at /mcp
     """
     try:
         from fastmcp import FastMCP
@@ -202,17 +204,24 @@ def create_mcp_server(
         _register_tool(mcp, tool)
         logger.debug(f"Registered MCP tool: {tool.name}")
     
-    # Optionally add a "chat" tool that invokes the full agent
-    if include_agent_tool:
-        _add_agent_chat_tool(mcp, agent, name)
+    # Add a "chat" tool for full agent invocation
+    _add_agent_chat_tool(mcp, agent, name)
     
-    # Add agent info as a resource
+    # Add agent info resource
     _add_agent_info_resource(mcp, agent, name, version)
     
-    logger.info(f"Created MCP server '{name}' with {len(agent.tools)} tools")
+    # Add HTTP chat endpoints for HelpDesk compatibility
+    if include_chat_endpoints:
+        _add_chat_endpoints(mcp, agent)
+    
+    logger.info(f"Created FastMCP server '{name}' with {len(agent.tools)} tools")
     
     return mcp
 
+
+# =============================================================================
+# Internal: Tool Registration
+# =============================================================================
 
 def _register_tool(mcp, tool) -> None:
     """Register a single DCAF tool with FastMCP."""
@@ -220,11 +229,10 @@ def _register_tool(mcp, tool) -> None:
     tool_description = tool.description
     tool_func = tool.func
     
-    # FastMCP's @tool decorator handles schema inference from the function
-    # We wrap it to handle any platform_context injection if needed
+    # Handle tools that need platform_context
     if tool.requires_platform_context:
-        # Create wrapper that provides empty context (MCP doesn't have platform context)
         import functools
+        import inspect
         
         @functools.wraps(tool_func)
         def wrapper(*args, **kwargs):
@@ -233,7 +241,6 @@ def _register_tool(mcp, tool) -> None:
             return tool_func(*args, **kwargs)
         
         # Copy signature without platform_context
-        import inspect
         try:
             sig = inspect.signature(tool_func)
             filtered_params = [
@@ -251,9 +258,8 @@ def _register_tool(mcp, tool) -> None:
 
 def _add_agent_chat_tool(mcp, agent: "Agent", server_name: str) -> None:
     """Add a 'chat' tool that invokes the full agent with LLM reasoning."""
-    agent_description = getattr(agent, "description", None) or f"Chat with {server_name}"
     
-    def chat(message: str) -> str:
+    def chat_with_agent(message: str) -> str:
         """
         Send a message to the agent and get a response.
         
@@ -277,26 +283,16 @@ def _add_agent_chat_tool(mcp, agent: "Agent", server_name: str) -> None:
             logger.exception(f"Agent chat error: {e}")
             return f"Error: {str(e)}"
     
-    chat.__doc__ = f"""Chat with the {server_name} agent.
-
-This tool invokes the full agent with LLM reasoning. The agent can:
-- Use any of its available tools
-- Reason about which tools to use
-- Combine multiple tool calls if needed
-
-Use this for complex queries. For simple, direct tool calls, use the
-individual tool functions instead.
-
-{agent_description}
-"""
+    mcp.tool(
+        name="chat",
+        description=f"Chat with {server_name} (full agent with LLM reasoning)"
+    )(chat_with_agent)
     
-    mcp.tool(name="chat", description=f"Chat with {server_name} (full agent with LLM)")(chat)
     logger.debug("Added 'chat' tool for full agent invocation")
 
 
 def _add_agent_info_resource(mcp, agent: "Agent", name: str, version: str) -> None:
     """Add a resource with agent information."""
-    import json
     
     @mcp.resource(f"agent://{name}/info")
     def agent_info() -> str:
@@ -324,7 +320,154 @@ def _add_agent_info_resource(mcp, agent: "Agent", name: str, version: str) -> No
 
 
 # =============================================================================
-# Utility functions for advanced use cases
+# Internal: HTTP Chat Endpoints
+# =============================================================================
+
+def _add_chat_endpoints(mcp, agent: "Agent") -> None:
+    """Add HTTP REST endpoints for HelpDesk chat compatibility."""
+    from starlette.requests import Request
+    from starlette.responses import JSONResponse, StreamingResponse
+    
+    @mcp.custom_route("/health", methods=["GET"])
+    async def health_check(request: Request):
+        """Health check endpoint."""
+        return JSONResponse({"status": "healthy"})
+    
+    @mcp.custom_route("/api/chat", methods=["POST"])
+    async def chat_endpoint(request: Request):
+        """
+        Synchronous chat endpoint (HelpDesk protocol).
+        
+        Accepts: {"messages": [{"role": "user", "content": "..."}]}
+        Returns: {"role": "assistant", "content": "...", "data": {...}}
+        """
+        try:
+            body = await request.json()
+            messages = body.get("messages", [])
+            
+            # Extract platform context from last user message
+            context = {}
+            for msg in reversed(messages):
+                if msg.get("role") == "user":
+                    ctx = msg.get("platform_context", {})
+                    if ctx:
+                        context = dict(ctx) if not hasattr(ctx, "model_dump") else ctx.model_dump()
+                    break
+            
+            # Run the agent
+            result = agent.run(messages=messages, context=context)
+            
+            # Convert to HelpDesk protocol format
+            response = _to_helpdesk_response(result)
+            return JSONResponse(response)
+            
+        except Exception as e:
+            logger.exception(f"Chat endpoint error: {e}")
+            return JSONResponse(
+                {"role": "assistant", "content": f"Error: {str(e)}", "data": {}},
+                status_code=500
+            )
+    
+    @mcp.custom_route("/api/chat-stream", methods=["POST"])
+    async def chat_stream_endpoint(request: Request):
+        """
+        Streaming chat endpoint (NDJSON).
+        
+        Accepts: {"messages": [{"role": "user", "content": "..."}]}
+        Streams: {"type": "text_delta", "text": "..."} per line
+        """
+        try:
+            body = await request.json()
+            messages = body.get("messages", [])
+            
+            # Extract platform context
+            context = {}
+            for msg in reversed(messages):
+                if msg.get("role") == "user":
+                    ctx = msg.get("platform_context", {})
+                    if ctx:
+                        context = dict(ctx) if not hasattr(ctx, "model_dump") else ctx.model_dump()
+                    break
+            
+            async def generate():
+                try:
+                    # For now, wrap sync call (full streaming support coming)
+                    result = agent.run(messages=messages, context=context)
+                    
+                    # Emit text content
+                    if result.text:
+                        yield json.dumps({"type": "text_delta", "text": result.text}) + "\n"
+                    
+                    # Emit tool calls if any
+                    if result.pending_tools:
+                        tool_calls = [
+                            {
+                                "id": t.id,
+                                "name": t.name,
+                                "input": t.input,
+                                "execute": False,
+                            }
+                            for t in result.pending_tools
+                        ]
+                        yield json.dumps({"type": "tool_calls", "tool_calls": tool_calls}) + "\n"
+                    
+                    yield json.dumps({"type": "done"}) + "\n"
+                    
+                except Exception as e:
+                    yield json.dumps({"type": "error", "error": str(e)}) + "\n"
+            
+            return StreamingResponse(
+                generate(),
+                media_type="application/x-ndjson"
+            )
+            
+        except Exception as e:
+            logger.exception(f"Stream endpoint error: {e}")
+            return JSONResponse(
+                {"error": str(e)},
+                status_code=500
+            )
+    
+    logger.debug("Added HTTP chat endpoints: /health, /api/chat, /api/chat-stream")
+
+
+def _to_helpdesk_response(result) -> dict:
+    """Convert AgentResponse to HelpDesk protocol format."""
+    response = {
+        "role": "assistant",
+        "content": result.text or "",
+        "data": {
+            "tool_calls": [],
+            "executed_tool_calls": [],
+            "cmds": [],
+            "executed_cmds": [],
+        }
+    }
+    
+    # Add pending tool calls
+    for pending in result.pending_tools:
+        response["data"]["tool_calls"].append({
+            "id": pending.id,
+            "name": pending.name,
+            "input": pending.input,
+            "execute": False,
+            "tool_description": pending.description or "",
+        })
+    
+    # Add executed tool calls
+    for executed in result.executed_tools:
+        response["data"]["executed_tool_calls"].append({
+            "id": executed.id,
+            "name": executed.name,
+            "input": executed.input,
+            "output": executed.output,
+        })
+    
+    return response
+
+
+# =============================================================================
+# Utility Functions
 # =============================================================================
 
 def get_mcp_tool_schemas(agent: "Agent") -> List[dict]:
@@ -349,3 +492,39 @@ def get_mcp_tool_schemas(agent: "Agent") -> List[dict]:
         }
         schemas.append(schema)
     return schemas
+
+
+# =============================================================================
+# Legacy Aliases (for backwards compatibility)
+# =============================================================================
+
+def serve_mcp(
+    agent: "Agent",
+    name: Optional[str] = None,
+    version: str = "1.0.0",
+    transport: str = "sse",
+    host: str = "0.0.0.0",
+    port: int = 8000,
+) -> None:
+    """
+    Legacy function - use serve() instead.
+    
+    This function is kept for backwards compatibility.
+    """
+    logger.warning("serve_mcp() is deprecated. Use serve() instead.")
+    serve(agent, name=name, port=port, host=host)
+
+
+def create_mcp_server(
+    agent: "Agent",
+    name: str = "dcaf-agent",
+    version: str = "1.0.0",
+    include_agent_tool: bool = True,
+):
+    """
+    Legacy function - use create_server() instead.
+    
+    This function is kept for backwards compatibility.
+    """
+    logger.warning("create_mcp_server() is deprecated. Use create_server() instead.")
+    return create_server(agent, name=name, version=version)
