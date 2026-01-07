@@ -847,13 +847,12 @@ class AgnoAdapter:
                 # No context needed - use the raw function
                 func_to_wrap = tool_obj.func
             
-            # Use Agno's @tool decorator with the complete schema
-            # The input_schema is passed as 'parameters' to match Agno's expected format
+            # Use Agno's @tool decorator
+            # Note: Agno infers parameter schema from function signature automatically.
+            # We only pass name and description - 'parameters' is NOT a valid Agno arg.
             decorated_tool = agno_tool_decorator(
                 name=tool_schema["name"],
                 description=tool_schema["description"],
-                # Pass the JSON schema so LLM knows parameter types, enums, etc.
-                parameters=tool_schema["input_schema"],
             )(func_to_wrap)
             
             agno_tools.append(decorated_tool)
