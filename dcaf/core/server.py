@@ -60,6 +60,11 @@ def serve(
     workers: int = 1,
     timeout_keep_alive: int = 5,
     additional_routers: Sequence["APIRouter"] | None = None,
+    a2a: bool = False,
+    a2a_adapter: str = "agno",
+    mcp: bool = False,
+    mcp_port: int = 8001,
+    mcp_transport: str = "sse",
 ) -> None:
     """
     Start a REST server for the agent.
@@ -82,11 +87,31 @@ def serve(
                            idle timeout (e.g., AWS ALB defaults to 60s).
         additional_routers: Optional list of FastAPI APIRouter instances to include.
                            Use this to add custom endpoints beyond /api/chat.
+        a2a: Enable A2A (Agent-to-Agent) protocol support (default: False).
+            When enabled, adds A2A endpoints for agent discovery and task handling.
+        a2a_adapter: A2A adapter to use (default: "agno").
+                    Currently only "agno" is supported.
+        mcp: Enable MCP (Model Context Protocol) server (default: False).
+            When enabled, starts an MCP server alongside the HTTP server.
+            This allows AI assistants like Claude to discover and use the
+            agent's tools via the MCP protocol.
+        mcp_port: Port for the MCP server when mcp=True (default: 8001).
+        mcp_transport: Transport for MCP server - "sse" (default) or "stdio".
+                      SSE runs an HTTP server, stdio uses standard I/O.
         
     Endpoints:
         GET  /health           - Health check
         POST /api/chat         - Synchronous chat (async, non-blocking)
         POST /api/chat-stream  - Streaming chat (NDJSON, async)
+        
+    A2A Endpoints (when a2a=True):
+        GET  /.well-known/agent.json  - Agent card (A2A discovery)
+        POST /a2a/tasks/send          - Receive A2A tasks
+        GET  /a2a/tasks/{id}          - A2A task status
+        
+    MCP Server (when mcp=True):
+        Runs on mcp_port (default: 8001). Exposes agent tools via MCP protocol
+        for AI assistants like Claude Desktop to discover and call.
         
     Example - Using Agent class:
         from dcaf.core import Agent, serve
@@ -147,6 +172,15 @@ def serve(
             log_level="warning",
         )
         
+    Example - With MCP enabled (HTTP + MCP servers):
+        serve(agent, mcp=True)
+        # HTTP at http://localhost:8000
+        # MCP at http://localhost:8001 (SSE transport)
+        
+    Example - MCP only (use serve_mcp from dcaf.mcp):
+        from dcaf.mcp import serve_mcp
+        serve_mcp(agent, name="my-agent")
+        
     Note:
         This function blocks until the server is stopped (Ctrl+C).
         For programmatic control, use create_app() instead.
@@ -165,33 +199,52 @@ def serve(
         )
     
     # Create the FastAPI app
-    app = create_app(agent, additional_routers=additional_routers)
+    app = create_app(agent, additional_routers=additional_routers, a2a=a2a, a2a_adapter=a2a_adapter)
     
     logger.info(f"Starting DCAF server at http://{host}:{port}")
     logger.info("Endpoints:")
     logger.info(f"  GET  http://{host}:{port}/health")
     logger.info(f"  POST http://{host}:{port}/api/chat")
     logger.info(f"  POST http://{host}:{port}/api/chat-stream")
+    if a2a:
+        logger.info("A2A Endpoints:")
+        logger.info(f"  GET  http://{host}:{port}/.well-known/agent.json")
+        logger.info(f"  POST http://{host}:{port}/a2a/tasks/send")
+        logger.info(f"  GET  http://{host}:{port}/a2a/tasks/{{id}}")
     if additional_routers:
         logger.info(f"  + {len(additional_routers)} custom router(s)")
     if workers > 1:
         logger.info(f"Configuration: {workers} workers, {timeout_keep_alive}s keep-alive")
     
-    # Run the server
-    uvicorn.run(
-        app,
-        host=host,
-        port=port,
-        reload=reload,
-        log_level=log_level,
-        workers=workers,
-        timeout_keep_alive=timeout_keep_alive,
-    )
+    # Start MCP server in background if enabled
+    mcp_process = None
+    if mcp:
+        mcp_process = _start_mcp_server(agent, host, mcp_port, mcp_transport)
+    
+    try:
+        # Run the HTTP server (blocking)
+        uvicorn.run(
+            app,
+            host=host,
+            port=port,
+            reload=reload,
+            log_level=log_level,
+            workers=workers,
+            timeout_keep_alive=timeout_keep_alive,
+        )
+    finally:
+        # Clean up MCP server if it was started
+        if mcp_process:
+            logger.info("Stopping MCP server...")
+            mcp_process.terminate()
+            mcp_process.join(timeout=5)
 
 
 def create_app(
     agent: Union["Agent", AgentHandler],
     additional_routers: Sequence["APIRouter"] | None = None,
+    a2a: bool = False,
+    a2a_adapter: str = "agno",
 ):
     """
     Create a FastAPI application for the agent without starting the server.
@@ -204,6 +257,8 @@ def create_app(
                If callable, signature must be: (messages: list, context: dict) -> AgentResult
         additional_routers: Optional list of FastAPI APIRouter instances to include.
                            Use this to add custom endpoints beyond /api/chat.
+        a2a: Enable A2A (Agent-to-Agent) protocol support (default: False).
+        a2a_adapter: A2A adapter to use (default: "agno").
         
     Returns:
         FastAPI application instance
@@ -261,6 +316,21 @@ def create_app(
     # Create the base app
     app = create_chat_app(adapter)
     
+    # Add A2A routes if enabled
+    if a2a:
+        try:
+            from .a2a import create_a2a_routes
+            a2a_routers = create_a2a_routes(agent)
+            for router in a2a_routers:
+                app.include_router(router)
+            logger.info("A2A protocol enabled")
+        except ImportError as e:
+            logger.error(f"Failed to enable A2A: {e}")
+            raise RuntimeError(
+                "A2A support requires additional dependencies. "
+                "Install with: pip install httpx"
+            ) from e
+    
     # Add any additional routers
     if additional_routers:
         for router in additional_routers:
@@ -285,6 +355,50 @@ def _create_adapter(agent: Union["Agent", AgentHandler]):
     raise TypeError(
         f"agent must be an Agent instance or a callable function, got {type(agent)}"
     )
+
+
+def _start_mcp_server(agent, host: str, port: int, transport: str):
+    """
+    Start an MCP server in a background process.
+    
+    Args:
+        agent: The DCAF Agent to expose via MCP
+        host: Host to bind to
+        port: Port for SSE transport
+        transport: "sse" or "stdio"
+        
+    Returns:
+        Process object for the MCP server
+    """
+    import multiprocessing
+    
+    def run_mcp():
+        try:
+            from ..mcp import create_mcp_server
+            
+            server_name = getattr(agent, "name", None) or "dcaf-agent"
+            mcp = create_mcp_server(agent, name=server_name)
+            
+            logger.info(f"Starting MCP server '{server_name}' on port {port}")
+            
+            if transport == "sse":
+                mcp.run(transport="sse", host=host, port=port)
+            else:
+                mcp.run()
+        except ImportError as e:
+            logger.error(
+                f"MCP server failed to start: {e}. "
+                "Install with: pip install dcaf[mcp]"
+            )
+        except Exception as e:
+            logger.exception(f"MCP server error: {e}")
+    
+    logger.info(f"MCP Server: http://{host}:{port} ({transport} transport)")
+    
+    process = multiprocessing.Process(target=run_mcp, daemon=True)
+    process.start()
+    
+    return process
 
 
 class CallableAdapter:
