@@ -112,17 +112,6 @@ def create_chat_app(agent: AgentProtocol, router: ChannelResponseRouter = None) 
         """
         return await _handle_chat(raw_body)
 
-    # ----- LEGACY: /api/sendMessage endpoint (backwards compatible) ----------
-    @app.post("/api/sendMessage", response_model=AgentMessage, tags=["chat", "legacy"])
-    async def send_message(raw_body: Dict[str, Any] = Body(...)) -> AgentMessage:
-        """
-        Legacy chat endpoint (async).
-        
-        DEPRECATED: Use /api/chat instead.
-        Kept for backwards compatibility with existing integrations.
-        """
-        return await _handle_chat(raw_body)
-
     # ----- shared logic for stream endpoints ---------------------------------
     async def _handle_stream(raw_body: Dict[str, Any]):
         """
@@ -185,17 +174,6 @@ def create_chat_app(agent: AgentProtocol, router: ChannelResponseRouter = None) 
         
         Stream agent response as NDJSON events.
         LLM calls run in a thread pool so they don't block health checks.
-        """
-        return await _handle_stream(raw_body)
-
-    # ----- LEGACY: /api/sendMessageStream endpoint (backwards compatible) ----
-    @app.post("/api/sendMessageStream", tags=["chat", "legacy"])
-    async def send_message_stream(raw_body: Dict[str, Any] = Body(...)):
-        """
-        Legacy streaming endpoint (async).
-        
-        DEPRECATED: Use /api/chat-stream instead.
-        Kept for backwards compatibility with existing integrations.
         """
         return await _handle_stream(raw_body)
 

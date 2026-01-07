@@ -88,10 +88,6 @@ def serve(
         POST /api/chat         - Synchronous chat (async, non-blocking)
         POST /api/chat-stream  - Streaming chat (NDJSON, async)
         
-        Legacy (backwards compatible):
-        POST /api/sendMessage       - Alias for /api/chat
-        POST /api/sendMessageStream - Alias for /api/chat-stream
-        
     Example - Using Agent class:
         from dcaf.core import Agent, serve
         from dcaf.tools import tool
