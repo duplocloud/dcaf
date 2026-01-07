@@ -48,12 +48,13 @@ Note:
     pip install dcaf[mcp]
 """
 
-from typing import TYPE_CHECKING, Optional, List, Callable, Any
+from typing import TYPE_CHECKING, Optional, List, Callable, Any, Union
 import logging
 import json
 
 if TYPE_CHECKING:
     from ..core.agent import Agent
+    from fastmcp import FastMCP as FastMCPType
 
 __all__ = [
     "serve",
@@ -74,11 +75,10 @@ class MCPIntegrationError(Exception):
 
 
 def serve(
-    agent: "Agent",
+    server: Union["Agent", "FastMCPType"],
     name: Optional[str] = None,
     port: int = 8000,
     host: str = "0.0.0.0",
-    log_level: str = "info",
 ) -> None:
     """
     Start a FastMCP server that exposes both MCP protocol AND HTTP REST endpoints.
@@ -90,11 +90,10 @@ def serve(
     - All on a single port!
     
     Args:
-        agent: The DCAF Agent to serve
-        name: Name for the server (defaults to agent.name or "dcaf-agent")
+        server: Either a DCAF Agent OR a FastMCP instance (from create_server())
+        name: Name for the server (only used when passing an Agent)
         port: Port to listen on (default: 8000)
         host: Host to bind to (default: 0.0.0.0)
-        log_level: Logging level (default: "info")
         
     Endpoints:
         GET  /health           - Health check
@@ -102,23 +101,45 @@ def serve(
         POST /api/chat-stream  - Streaming chat (NDJSON)
         *    /mcp              - MCP protocol (SSE transport)
         
-    Example:
+    Example - Simple:
         from dcaf.core import Agent
         from dcaf.mcp import serve
         
-        agent = Agent(tools=[list_pods, delete_pod])
-        serve(agent, name="k8s-assistant", port=8000)
+        agent = Agent(tools=[list_pods])
+        serve(agent)  # That's it!
         
-        # Now available:
-        # - Claude Desktop can connect to http://localhost:8000/mcp
-        # - HelpDesk can POST to http://localhost:8000/api/chat
+    Example - With Customization:
+        from dcaf.mcp import create_server, serve
+        
+        mcp = create_server(agent, name="k8s-agent")
+        
+        @mcp.tool()
+        def extra_tool() -> str:
+            return "custom"
+        
+        @mcp.resource("data://config")
+        def config() -> str:
+            return "{...}"
+        
+        serve(mcp)  # Pass the customized server
         
     Note:
         This function blocks until the server is stopped (Ctrl+C).
-        For programmatic control, use create_server() instead.
     """
-    server_name = name or getattr(agent, "name", None) or "dcaf-agent"
-    mcp = create_server(agent, name=server_name)
+    # Check if it's already a FastMCP server
+    try:
+        from fastmcp import FastMCP
+        if isinstance(server, FastMCP):
+            mcp = server
+            server_name = mcp.name
+        else:
+            # It's an Agent - create the server
+            server_name = name or getattr(server, "name", None) or "dcaf-agent"
+            mcp = create_server(server, name=server_name)
+    except ImportError as e:
+        raise MCPIntegrationError(
+            "FastMCP is not installed. Install with: pip install dcaf[mcp]"
+        ) from e
     
     logger.info(f"Starting DCAF server '{server_name}' at http://{host}:{port}")
     logger.info("Endpoints:")
@@ -126,7 +147,6 @@ def serve(
     logger.info(f"  POST http://{host}:{port}/api/chat")
     logger.info(f"  POST http://{host}:{port}/api/chat-stream")
     logger.info(f"  MCP  http://{host}:{port}/mcp")
-    logger.info(f"Tools: {[t.name for t in agent.tools]}")
     
     # Run with SSE transport (HTTP-based)
     mcp.run(transport="sse", host=host, port=port)
