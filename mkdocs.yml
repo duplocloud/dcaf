@@ -118,6 +118,7 @@ nav:
   - Core:
     - Overview: core/index.md
     - Server: core/server.md
+    - A2A (Agent-to-Agent): core/a2a.md
     - HelpDesk Protocol: core/helpdesk-protocol.md
     - Domain Layer: core/domain.md
     - Application Layer: core/application.md
@@ -137,9 +138,10 @@ nav:
   
   - Guides:
     - Custom Agents: guides/custom-agents.md
+    - Building Tools: guides/building-tools.md
+    - Session Management: guides/session-management.md
     - Interceptors: guides/interceptors.md
     - Framework Adapters: guides/framework-adapters.md
-    - Building Tools: guides/building-tools.md
     - Migration (v1 → Core): guides/migration.md
     - Working with Bedrock: guides/working-with-bedrock.md
     - Message Protocol: guides/message-protocol.md

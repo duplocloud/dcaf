@@ -610,6 +610,7 @@ For `/api/chat-stream`, responses are NDJSON (newline-delimited JSON):
 | **Tool Call** | A request to execute a tool with specific inputs; has lifecycle (pending→approved→executed) |
 | **Approval Gate** | A checkpoint requiring human authorization before tool execution |
 | **Platform Context** | Runtime environment data (tenant, namespace, credentials) |
+| **Session** | Key-value store for persisting state across conversation turns |
 | **Agent Runtime** | The port/interface that framework adapters implement |
 | **Adapter** | Translates between our domain and a specific framework |
 
@@ -704,6 +705,193 @@ Autonomous agents executing infrastructure operations is risky:
 - `ToolCall` entity in `domain/entities/tool_call.py`
 - `ApprovalPolicy` service in `domain/services/approval_policy.py`
 - `ApprovalCallback` port in `application/ports/approval_callback.py`
+
+---
+
+## Session Management
+
+Sessions provide a mechanism for persisting state across conversation turns. This is essential for multi-step workflows where tools need to share data.
+
+### Session Class
+
+The `Session` class (`dcaf/core/session.py`) is a key-value store with typed serialization support:
+
+```python
+from dcaf.core import Session
+
+session = Session()
+
+# Basic operations
+session.set("user_id", "12345")
+user_id = session.get("user_id")
+session.delete("user_id")
+
+# With defaults
+count = session.get("count", 0)
+
+# Dict-like access
+session["key"] = "value"
+value = session["key"]
+
+# Bulk operations
+session.update({"a": 1, "b": 2})
+session.clear()
+```
+
+### Typed Storage
+
+Session supports automatic serialization/deserialization of Pydantic models and dataclasses:
+
+```python
+from pydantic import BaseModel
+from dcaf.core import Session
+
+class UserPrefs(BaseModel):
+    theme: str = "light"
+    language: str = "en"
+
+session = Session()
+
+# Store Pydantic model (auto-serializes via model_dump())
+session.set("prefs", UserPrefs(theme="dark"))
+
+# Retrieve as typed model (auto-deserializes via model_validate())
+prefs = session.get("prefs", as_type=UserPrefs)
+print(prefs.theme)  # "dark"
+
+# Without type - returns raw dict
+raw = session.get("prefs")  # {"theme": "dark", "language": "en"}
+```
+
+**Serialization/Deserialization:**
+
+| Type | Serialization | Deserialization |
+|------|---------------|-----------------|
+| Pydantic model | `model_dump()` | `model_validate()` |
+| Dataclass | `asdict()` | Constructor `cls(**data)` |
+| Primitives/dicts | Stored as-is | Returned as-is |
+
+### Using Session in Tools
+
+Tools can declare a `Session` parameter that DCAF automatically injects:
+
+```python
+from pydantic import BaseModel, Field
+from dcaf.core import Session
+from dcaf.tools import tool
+
+class ShoppingCart(BaseModel):
+    items: list[dict] = Field(default_factory=list)
+
+@tool(description="Add item to cart")
+def add_to_cart(item: str, quantity: int, session: Session) -> str:
+    # Get as typed model
+    cart = session.get("cart", as_type=ShoppingCart) or ShoppingCart()
+    cart.items.append({"item": item, "quantity": quantity})
+    session.set("cart", cart)
+    return f"Added {quantity}x {item}"
+```
+
+### Protocol Integration
+
+Session data travels with the HelpDesk protocol in the `data.session` field:
+
+**Response (agent → HelpDesk):**
+
+```json
+{
+  "role": "assistant",
+  "content": "Added item to cart.",
+  "data": {
+    "session": {
+      "cart": [{"item": "Widget", "quantity": 2}]
+    }
+  }
+}
+```
+
+**Subsequent Request (HelpDesk → agent):**
+
+```json
+{
+  "messages": [{
+    "role": "user",
+    "content": "What's in my cart?",
+    "data": {
+      "session": {
+        "cart": [{"item": "Widget", "quantity": 2}]
+      }
+    }
+  }]
+}
+```
+
+### Implementation Points
+
+- `Session` class in `dcaf/core/session.py`
+- Session injection in tool execution pipeline
+- Serialization in `AgentResponse.to_helpdesk_message()`
+
+---
+
+## Tool Schema Options
+
+DCAF supports three ways to define tool schemas, providing flexibility from simple auto-generation to full type-safe Pydantic models:
+
+### Option 1: Auto-Generate from Function Signature
+
+```python
+@tool(description="List pods")
+def list_pods(namespace: str = "default") -> str:
+    return kubectl(f"get pods -n {namespace}")
+```
+
+Schema is automatically generated from type hints.
+
+### Option 2: Explicit Dict Schema
+
+```python
+@tool(
+    description="Delete a pod",
+    schema={
+        "type": "object",
+        "properties": {
+            "name": {"type": "string", "description": "Pod name"},
+            "namespace": {"type": "string", "default": "default"}
+        },
+        "required": ["name"]
+    }
+)
+def delete_pod(name: str, namespace: str = "default") -> str:
+    return kubectl(f"delete pod {name} -n {namespace}")
+```
+
+### Option 3: Pydantic Model
+
+```python
+from pydantic import BaseModel, Field
+
+class DeletePodInput(BaseModel):
+    name: str = Field(..., description="Pod name")
+    namespace: str = Field(default="default")
+
+@tool(description="Delete a pod", schema=DeletePodInput)
+def delete_pod(name: str, namespace: str = "default") -> str:
+    return kubectl(f"delete pod {name} -n {namespace}")
+```
+
+DCAF automatically converts Pydantic models to JSON schema via `model_json_schema()`.
+
+### Accessing Tool Schema
+
+The `Tool` class provides access to the schema:
+
+```python
+tool = create_tool(delete_pod)
+print(tool.name)         # "delete_pod"
+print(tool.description)  # "Delete a pod"
+print(tool.schema)       # Full schema dict including input_schema
+```
 
 ---
 
@@ -844,6 +1032,201 @@ dcaf/core/
     ├── builders.py            # Test data builders
     └── fixtures.py            # pytest fixtures
 ```
+
+---
+
+## A2A (Agent-to-Agent) Protocol
+
+DCAF supports the A2A (Agent-to-Agent) protocol developed by Google, enabling agents to discover and communicate with each other using standardized HTTP/JSON-RPC interfaces.
+
+### What is A2A?
+
+A2A is an open protocol for agent-to-agent communication that enables:
+
+- **Agent Discovery**: Agents expose a card describing their capabilities
+- **Task Execution**: Agents can send tasks to other agents
+- **Async Support**: Long-running tasks can execute asynchronously
+- **Standard Protocol**: Uses HTTP, JSON-RPC, and SSE (Server-Sent Events)
+
+### Architecture Overview
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         A2A ARCHITECTURE                         │
+└─────────────────────────────────────────────────────────────────┘
+
+  ┌──────────────┐                          ┌──────────────┐
+  │ Orchestrator │                          │ K8s Agent    │
+  │   Agent      │                          │ (Specialist) │
+  └──────┬───────┘                          └──────▲───────┘
+         │                                         │
+         │  1. Fetch Agent Card                   │
+         │  GET /.well-known/agent.json           │
+         │─────────────────────────────────────────│
+         │                                         │
+         │  2. Send Task                           │
+         │  POST /a2a/tasks/send                   │
+         │  {"message": "List failing pods"}       │
+         │─────────────────────────────────────────│
+         │                                         │
+         │  3. TaskResult                          │
+         │  {"text": "Found 3 failing pods..."}    │
+         │◄─────────────────────────────────────────│
+         │                                         │
+```
+
+### Code Structure
+
+```
+dcaf/core/a2a/
+├── __init__.py          # Public exports: RemoteAgent, AgentCard, etc.
+├── models.py            # AgentCard, Task, TaskResult, Artifact
+├── client.py            # RemoteAgent (user-facing client)
+├── server.py            # A2A server routes/utilities
+├── protocols.py         # Abstract interfaces (for swapping implementations)
+└── adapters/
+    ├── __init__.py
+    └── agno.py          # Agno A2A implementation (hidden from users)
+```
+
+### User-Facing API
+
+**Server Side (Exposing an Agent):**
+
+```python
+from dcaf.core import Agent, serve
+
+agent = Agent(
+    name="k8s-assistant",              # A2A identity
+    description="Kubernetes helper",   # A2A description
+    tools=[list_pods, delete_pod],
+)
+
+# Enable A2A alongside REST API
+serve(agent, port=8000, a2a=True)
+```
+
+**Client Side (Calling Remote Agents):**
+
+```python
+from dcaf.core.a2a import RemoteAgent
+
+# Connect to remote agent
+k8s = RemoteAgent(url="http://k8s-agent:8000")
+
+# Direct call
+result = k8s.send("What pods are failing in production?")
+print(result.text)
+
+# Use as a tool for another agent
+orchestrator = Agent(
+    tools=[k8s.as_tool()],
+    system="Route requests to specialist agents"
+)
+```
+
+### Internal Implementation
+
+The A2A implementation follows DCAF's adapter pattern to remain framework-agnostic:
+
+1. **Protocols** (`protocols.py`): Abstract interfaces for A2A client and server
+2. **Models** (`models.py`): Framework-agnostic data structures (AgentCard, Task, etc.)
+3. **Adapters** (`adapters/agno.py`): Concrete implementation using Agno's A2A support
+4. **Facades** (`client.py`, `server.py`): User-facing APIs that hide implementation details
+
+This allows swapping A2A implementations (e.g., from Agno to a custom implementation) without changing user code.
+
+### A2A Protocol Endpoints
+
+When `serve(agent, a2a=True)` is called, these endpoints are added:
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/.well-known/agent.json` | GET | Agent card (discovery) |
+| `/a2a/tasks/send` | POST | Receive tasks from other agents |
+| `/a2a/tasks/{id}` | GET | Task status (for async tasks) |
+
+### AgentCard Generation
+
+Agent cards are automatically generated from DCAF Agent configuration:
+
+```python
+{
+  "name": "k8s-assistant",                    # From agent.name
+  "description": "Manages Kubernetes...",     # From agent.description
+  "url": "http://k8s-agent:8000",            # From server URL
+  "skills": ["list_pods", "delete_pod"],     # From agent.tools
+  "version": "1.0",                          # A2A protocol version
+  "metadata": {
+    "framework": "dcaf",
+    "model": "anthropic.claude-3-sonnet...",
+    "provider": "bedrock"
+  }
+}
+```
+
+### Multi-Agent Patterns
+
+**Peer-to-Peer:**
+
+```python
+# Agent 1
+k8s = Agent(name="k8s", tools=[...])
+serve(k8s, port=8001, a2a=True)
+
+# Agent 2
+aws = Agent(name="aws", tools=[...])
+serve(aws, port=8002, a2a=True)
+
+# Each can call the other
+k8s_remote = RemoteAgent(url="http://localhost:8001")
+aws_remote = RemoteAgent(url="http://localhost:8002")
+```
+
+**Orchestration:**
+
+```python
+# Specialist agents
+k8s = RemoteAgent(url="http://k8s-agent:8000")
+aws = RemoteAgent(url="http://aws-agent:8000")
+
+# Orchestrator routes to specialists
+orchestrator = Agent(
+    name="orchestrator",
+    tools=[k8s.as_tool(), aws.as_tool()],
+    system="Route to the appropriate specialist agent"
+)
+```
+
+### Testing A2A Agents
+
+Use the `RemoteAgent` client to test A2A-enabled agents:
+
+```python
+from dcaf.core.a2a import RemoteAgent
+
+# Start agent with A2A
+agent = Agent(name="test", tools=[...])
+serve(agent, port=8000, a2a=True)
+
+# Test from another process/terminal
+remote = RemoteAgent(url="http://localhost:8000")
+
+# Check agent card
+print(remote.card.name)       # "test"
+print(remote.card.skills)     # Tool names
+
+# Send task
+result = remote.send("List pods")
+assert result.status == "completed"
+```
+
+### Future Enhancements
+
+- **Dynamic Discovery**: Agent registry/service mesh integration
+- **Streaming Tasks**: Real-time task updates via SSE
+- **Hierarchical Teams**: Agents managing sub-agents
+- **Workflow Orchestration**: Complex multi-agent workflows
 
 ---
 

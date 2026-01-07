@@ -54,7 +54,9 @@ serve(agent)
 
 ## Slide 4: Tool Definitions
 
-### Auto-Generated Schemas from Type Hints
+### Three Ways to Define Tool Schemas
+
+**Option 1: Auto-Generate (Simplest)**
 
 ```python
 @tool(description="Delete a Kubernetes pod")
@@ -62,10 +64,32 @@ def delete_pod(name: str, namespace: str = "default") -> str:
     return kubectl(f"delete pod {name} -n {namespace}")
 ```
 
-The framework automatically infers:
-- Parameter names and types from the function signature
-- Required vs optional from default values
-- Description from the decorator
+The framework automatically infers parameter names, types, and required/optional from the signature.
+
+**Option 2: Dict Schema (Full Control)**
+
+```python
+@tool(
+    description="Delete a Kubernetes pod",
+    schema={"type": "object", "properties": {"name": {"type": "string"}, ...}}
+)
+def delete_pod(name: str, namespace: str = "default") -> str:
+    return kubectl(f"delete pod {name} -n {namespace}")
+```
+
+**Option 3: Pydantic Model (Type-Safe)**
+
+```python
+from pydantic import BaseModel, Field
+
+class DeletePodInput(BaseModel):
+    name: str = Field(..., description="Pod name")
+    namespace: str = Field(default="default")
+
+@tool(description="Delete a pod", schema=DeletePodInput)
+def delete_pod(name: str, namespace: str = "default") -> str:
+    return kubectl(f"delete pod {name} -n {namespace}")
+```
 
 ### Adding Approval Requirements
 
@@ -513,7 +537,7 @@ if __name__ == "__main__":
 | Concept | Description |
 |---------|-------------|
 | **Agent** | Your LLM-powered assistant with tools |
-| **Tool** | A function the agent can call |
+| **Tool** | A function the agent can call (auto-generate, dict, or Pydantic schema) |
 | **Approval** | Human authorization for sensitive tools |
 | **serve()** | One-line REST API server |
 | **create_app()** | Programmatic FastAPI control |
@@ -553,19 +577,255 @@ serve(agent)
 
 ---
 
-## Slide 21: Q&A
+## Slide 21: A2A (Agent-to-Agent) Protocol
+
+### Multi-Agent Systems Made Easy
+
+DCAF now supports **Google's A2A protocol** for agent-to-agent communication.
+
+**What is A2A?**
+- 🔍 Agent Discovery via Agent Cards
+- 📡 Standardized task execution
+- 🌐 HTTP/JSON-RPC based
+- ⚡ Async task support
+
+**Why A2A?**
+- **Specialize**: Build focused agents (K8s, AWS, databases)
+- **Compose**: Combine agents into powerful systems
+- **Interoperate**: Work with agents from other frameworks
+
+---
+
+## Slide 22: A2A Server - Expose Your Agent
+
+### Make Your Agent Discoverable
+
+```python
+from dcaf.core import Agent, serve
+
+agent = Agent(
+    name="k8s-assistant",              # A2A identity
+    description="Kubernetes helper",   # A2A description
+    tools=[list_pods, delete_pod],
+)
+
+# Enable A2A alongside REST API
+serve(agent, port=8000, a2a=True)
+```
+
+### Automatic Endpoints
+
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /.well-known/agent.json` | Agent card (discovery) |
+| `POST /a2a/tasks/send` | Receive tasks |
+| `GET /a2a/tasks/{id}` | Task status |
+
+---
+
+## Slide 23: A2A Client - Call Remote Agents
+
+### Connect and Call
+
+```python
+from dcaf.core.a2a import RemoteAgent
+
+# Connect to remote agent
+k8s = RemoteAgent(url="http://k8s-agent:8000")
+
+# Send a task
+result = k8s.send("What pods are failing in production?")
+print(result.text)
+
+# Check agent capabilities
+print(f"Agent: {k8s.name}")           # "k8s-assistant"
+print(f"Skills: {k8s.skills}")        # ["list_pods", "delete_pod", ...]
+```
+
+**Agent Card (Auto-Generated):**
+```json
+{
+  "name": "k8s-assistant",
+  "description": "Kubernetes helper",
+  "skills": ["list_pods", "delete_pod"],
+  "url": "http://k8s-agent:8000"
+}
+```
+
+---
+
+## Slide 24: Multi-Agent Orchestration
+
+### Pattern: Orchestrator + Specialists
+
+```python
+from dcaf.core import Agent
+from dcaf.core.a2a import RemoteAgent
+
+# Connect to specialist agents
+k8s = RemoteAgent(url="http://k8s-agent:8000")
+aws = RemoteAgent(url="http://aws-agent:8000")
+db = RemoteAgent(url="http://db-agent:8000")
+
+# Orchestrator routes to specialists
+orchestrator = Agent(
+    name="orchestrator",
+    tools=[
+        k8s.as_tool(),  # Remote agent as tool
+        aws.as_tool(),
+        db.as_tool(),
+    ],
+    system="Route requests to the appropriate specialist agent"
+)
+```
+
+**The LLM decides which specialist to call!**
+
+---
+
+## Slide 25: A2A Architecture
+
+```
+┌────────────────────────────────────────────────────────────┐
+│                    Multi-Agent System                       │
+└────────────────────────────────────────────────────────────┘
+
+┌──────────────┐                          ┌──────────────┐
+│ Orchestrator │                          │ K8s Agent    │
+│   (Port 8000)│    /.well-known/agent    │ (Port 8001)  │
+│              │──────────────────────────►│              │
+│  Tools:      │    /a2a/tasks/send       │  Tools:      │
+│  - k8s       │◄──────────────────────────│  - list_pods │
+│  - aws       │                          │  - delete_pod│
+│  - db        │                          └──────────────┘
+└──────┬───────┘
+       │                                   ┌──────────────┐
+       │                                   │ AWS Agent    │
+       │    /.well-known/agent             │ (Port 8002)  │
+       │──────────────────────────────────►│              │
+       │    /a2a/tasks/send                │  Tools:      │
+       │◄──────────────────────────────────│  - list_ec2  │
+       │                                   │  - get_costs │
+       │                                   └──────────────┘
+       │
+       ▼
+    User Query: "What's my infrastructure status?"
+```
+
+---
+
+## Slide 26: A2A Example - Complete System
+
+### Kubernetes Specialist
+
+```python
+# k8s_agent.py
+from dcaf.core import Agent, serve
+
+agent = Agent(
+    name="k8s-assistant",
+    description="Manages Kubernetes clusters",
+    tools=[list_pods, delete_pod],
+)
+serve(agent, port=8001, a2a=True)
+```
+
+### AWS Specialist
+
+```python
+# aws_agent.py
+from dcaf.core import Agent, serve
+
+agent = Agent(
+    name="aws-assistant",
+    description="Manages AWS resources",
+    tools=[list_ec2, get_costs],
+)
+serve(agent, port=8002, a2a=True)
+```
+
+---
+
+## Slide 27: A2A Orchestrator
+
+```python
+# orchestrator.py
+from dcaf.core import Agent, serve
+from dcaf.core.a2a import RemoteAgent
+
+# Connect to specialists
+k8s = RemoteAgent(url="http://localhost:8001")
+aws = RemoteAgent(url="http://localhost:8002")
+
+# Create orchestrator
+orchestrator = Agent(
+    name="orchestrator",
+    tools=[k8s.as_tool(), aws.as_tool()],
+    system="""You route requests to specialist agents.
+    Use k8s_assistant for Kubernetes questions.
+    Use aws_assistant for AWS questions."""
+)
+
+serve(orchestrator, port=8000, a2a=True)
+```
+
+**Usage:**
+```python
+result = orchestrator.send("How many pods and EC2 instances?")
+# Orchestrator calls both specialists automatically!
+```
+
+---
+
+## Slide 28: A2A Benefits
+
+| Benefit | Description |
+|---------|-------------|
+| **Specialization** | Each agent focuses on one domain |
+| **Composability** | Build complex systems from simple agents |
+| **Scalability** | Distribute work across multiple agents |
+| **Interoperability** | Works with other A2A-compatible frameworks |
+| **No Agno Lock-in** | Clean abstraction, swappable adapters |
+
+### Design Principles
+
+✅ **Simple**: One line to enable (`a2a=True`)
+✅ **Flexible**: Use as tool or call directly
+✅ **Standard**: Google's A2A protocol
+✅ **Extensible**: Adapter pattern for future implementations
+
+---
+
+## Slide 29: Updated Feature Matrix
+
+| Feature | Status | Example |
+|---------|--------|---------|
+| **Simple Agent** | ✅ | `Agent(tools=[...])` |
+| **Tool Calling** | ✅ | `@tool(description="...")` |
+| **Human Approval** | ✅ | `requires_approval=True` |
+| **Interceptors** | ✅ | `request_interceptors=[...]` |
+| **Streaming** | ✅ | `agent.run_stream(...)` |
+| **REST Server** | ✅ | `serve(agent, port=8000)` |
+| **A2A Protocol** | ✅ **NEW!** | `serve(agent, a2a=True)` |
+| **Multi-Agent** | ✅ **NEW!** | `RemoteAgent(url=...).as_tool()` |
+
+---
+
+## Slide 30: Q&A
 
 # Questions?
 
 ### Key Takeaways
 
 1. **Simple API** - `Agent` + `serve()` is all you need
-2. **Tool calling** - Decorator-based with auto-generated schemas
+2. **Flexible tool schemas** - Auto-generate, dict, or Pydantic models
 3. **Human-in-the-loop** - Built-in approval for sensitive operations
 4. **Production-ready** - Workers, keep-alive, health checks included
 5. **Flexible** - Use classes or functions, your choice
+6. **Multi-Agent** - **NEW!** A2A protocol for agent-to-agent communication
 
 ---
 
 *Presentation created January 2026*
 *DCAF Core - vnext branch*
+*Updated with A2A support*

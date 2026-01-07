@@ -40,7 +40,7 @@ curl -X POST http://localhost:8000/api/chat \
 
 | Feature | Description |
 |---------|-------------|
-| 🛠️ **Tool Calling** | Easy decorator-based tool definitions |
+| 🛠️ **Tool Calling** | Easy decorator-based tool definitions with auto-generated, dict, or Pydantic schemas |
 | ✅ **Human-in-the-Loop** | Built-in approval flow for dangerous operations |
 | 🔌 **Interceptors** | Hook into request/response for validation, context, security |
 | 🔄 **Framework Adapters** | Swap LLM frameworks (Agno, Strands, LangChain) with one parameter |

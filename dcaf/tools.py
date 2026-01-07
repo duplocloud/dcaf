@@ -1,7 +1,7 @@
 """
 Tool system for creating LLM-powered agents with approval workflows.
 
-Supports two usage patterns:
+Supports three usage patterns:
 
 1. Simple (auto-schema from function signature):
    
@@ -9,7 +9,7 @@ Supports two usage patterns:
    def get_weather(city: str, units: str = "celsius") -> str:
        return f"Weather in {city}: 72°F"
 
-2. Explicit schema (for complex cases):
+2. Dict schema (for full JSON Schema control):
    
    @tool(
        schema={
@@ -23,9 +23,21 @@ Supports two usage patterns:
    )
    def get_weather(city: str) -> str:
        return f"Weather in {city}: 72°F"
+
+3. Pydantic model (for type-safe schema with IDE support):
+   
+   from pydantic import BaseModel, Field
+   from typing import Literal
+   
+   class WeatherInput(BaseModel):
+       city: Literal["NYC", "LA", "CHI"] = Field(..., description="City")
+   
+   @tool(schema=WeatherInput, description="Get weather")
+   def get_weather(city: str) -> str:
+       return f"Weather in {city}: 72°F"
 """
 from pydantic import BaseModel, ConfigDict
-from typing import Callable, Dict, Any, Optional, Union, get_type_hints, get_origin, get_args
+from typing import Callable, Dict, Any, Optional, Union, get_type_hints, get_origin, get_args, Type
 import inspect
 import json
 
@@ -40,6 +52,65 @@ PYTHON_TO_JSON_TYPE = {
     dict: "object",
     type(None): "null",
 }
+
+
+def _normalize_schema(schema: Any) -> Dict[str, Any]:
+    """
+    Normalize a schema to a JSON Schema dict.
+    
+    Accepts:
+    - Dict: returned as-is
+    - Pydantic model class: converted via model_json_schema()
+    - Pydantic model instance: converted via model_json_schema()
+    
+    This allows agent authors to use whichever approach they prefer:
+    
+        # Dict (explicit control)
+        @tool(schema={"type": "object", "properties": {...}})
+        def my_tool(): ...
+        
+        # Pydantic model (type-safe, IDE support)
+        @tool(schema=MyInputModel)
+        def my_tool(): ...
+    
+    Args:
+        schema: A dict, Pydantic model class, or Pydantic model instance
+        
+    Returns:
+        JSON Schema as a dict
+        
+    Raises:
+        TypeError: If schema is not a supported type
+    """
+    if schema is None:
+        return None
+    
+    # Already a dict - return as-is
+    if isinstance(schema, dict):
+        return schema
+    
+    # Check if it's a Pydantic model class or instance
+    # Pydantic v2: has model_json_schema (class method)
+    if hasattr(schema, 'model_json_schema'):
+        # It's a Pydantic v2 model class
+        return schema.model_json_schema()
+    
+    # Check if it's a Pydantic model instance
+    if hasattr(schema, '__class__') and hasattr(schema.__class__, 'model_json_schema'):
+        # It's a Pydantic v2 model instance - get schema from class
+        return schema.__class__.model_json_schema()
+    
+    # Pydantic v1 fallback: has .schema() class method
+    if hasattr(schema, 'schema') and callable(getattr(schema, 'schema')):
+        return schema.schema()
+    
+    # Unknown type
+    raise TypeError(
+        f"schema must be a dict or Pydantic model, got {type(schema).__name__}. "
+        f"Examples:\n"
+        f"  @tool(schema={{'type': 'object', ...}})\n"
+        f"  @tool(schema=MyPydanticModel)"
+    )
 
 
 def _get_json_type(python_type: type) -> str:
@@ -198,21 +269,21 @@ def tool(
     description: Optional[str] = None,
     name: Optional[str] = None,
     requires_approval: bool = False,
-    schema: Optional[Dict[str, Any]] = None,
+    schema: Optional[Union[Dict[str, Any], Type[BaseModel], Any]] = None,
 ):
     """
     Decorator to create a tool from a function.
     
-    Supports two usage patterns:
+    Supports three usage patterns:
     
-    1. Simple (recommended) - auto-generates schema from function signature:
+    1. Simple (auto-schema) - auto-generates schema from function signature:
     
         @tool(description="Get weather for a city")
         def get_weather(city: str, units: str = "celsius") -> str:
             '''Get current weather.'''
             return f"Weather in {city}"
     
-    2. Explicit schema - for complex validation or enums:
+    2. Dict schema - for full control over JSON Schema:
     
         @tool(
             description="Get weather",
@@ -227,12 +298,26 @@ def tool(
         def get_weather(city: str) -> str:
             return f"Weather in {city}"
     
+    3. Pydantic model - for type-safe schema with IDE support:
+    
+        from pydantic import BaseModel, Field
+        from typing import Literal
+        
+        class WeatherInput(BaseModel):
+            city: Literal["NYC", "LA"] = Field(..., description="City name")
+            units: str = Field(default="celsius")
+        
+        @tool(description="Get weather", schema=WeatherInput)
+        def get_weather(city: str, units: str = "celsius") -> str:
+            return f"Weather in {city}"
+    
     Args:
         func: The function to wrap (auto-provided when used as @tool without parens)
         description: Description shown to the LLM. Defaults to function docstring.
         name: Tool name. Defaults to function name.
         requires_approval: If True, tool execution requires user approval.
-        schema: Explicit JSON schema. If not provided, auto-generated from signature.
+        schema: Input schema - can be a JSON Schema dict OR a Pydantic model class.
+                If not provided, auto-generated from function signature.
     
     Returns:
         Tool: A Tool object that wraps the function
@@ -266,11 +351,13 @@ def tool(
             # Use first line of docstring, or generate default
             tool_description = func_doc.split('\n')[0].strip() or f"Execute {func_name}"
         
-        # Determine schema
-        tool_schema = schema
-        if tool_schema is None:
+        # Determine schema - supports dict OR Pydantic model
+        if schema is None:
             # Auto-generate from function signature
             tool_schema = _generate_schema_from_function(fn)
+        else:
+            # Normalize: convert Pydantic model to dict if needed
+            tool_schema = _normalize_schema(schema)
         
         # Check if function has platform_context parameter
         sig = inspect.signature(fn)
@@ -300,7 +387,7 @@ def create_tool(
     description: Optional[str] = None,
     name: Optional[str] = None,
     requires_approval: bool = False,
-    schema: Optional[Dict[str, Any]] = None,
+    schema: Optional[Union[Dict[str, Any], Any]] = None,
 ) -> Tool:
     """
     Create a tool programmatically without decorator.
@@ -310,7 +397,8 @@ def create_tool(
         description: Tool description (defaults to function docstring)
         name: Tool name (defaults to function name)
         requires_approval: Whether tool needs user approval
-        schema: JSON schema for input. If None, auto-generated from signature.
+        schema: Input schema - can be a JSON Schema dict OR a Pydantic model.
+                If None, auto-generated from function signature.
     
     Example:
         def add(x: int, y: int) -> str:
@@ -319,7 +407,7 @@ def create_tool(
         
         my_tool = create_tool(add, description="Add numbers")
         
-        # Or with explicit schema
+        # With explicit dict schema
         my_tool = create_tool(
             add,
             schema={
@@ -331,6 +419,13 @@ def create_tool(
                 "required": ["x", "y"]
             }
         )
+        
+        # With Pydantic model
+        class AddInput(BaseModel):
+            x: int = Field(..., ge=0)
+            y: int = Field(..., ge=0)
+        
+        my_tool = create_tool(add, schema=AddInput)
     """
     func_name = func.__name__
     func_doc = func.__doc__ or ""
@@ -340,10 +435,12 @@ def create_tool(
     if tool_description is None:
         tool_description = func_doc.split('\n')[0].strip() or f"Execute {func_name}"
     
-    # Determine schema
-    tool_schema = schema
-    if tool_schema is None:
+    # Determine schema - supports dict OR Pydantic model
+    if schema is None:
         tool_schema = _generate_schema_from_function(func)
+    else:
+        # Normalize: convert Pydantic model to dict if needed
+        tool_schema = _normalize_schema(schema)
     
     # Check if function has platform_context parameter
     sig = inspect.signature(func)

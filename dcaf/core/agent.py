@@ -310,6 +310,16 @@ class Agent:
                 - ANTHROPIC_API_KEY for provider="anthropic"
                 - OPENAI_API_KEY for provider="openai"
                 - GOOGLE_API_KEY for provider="google"
+        
+        name: Agent name for A2A (Agent-to-Agent) protocol.
+             Used as the agent's identity when exposed via A2A.
+             Default: "dcaf-agent"
+             Example: name="k8s-assistant"
+        
+        description: Agent description for A2A protocol.
+                    Human-readable description of what the agent does.
+                    Falls back to system_prompt if not provided.
+                    Example: description="Manages Kubernetes clusters"
     
     PROVIDER EXAMPLES:
     ==================
@@ -363,6 +373,9 @@ class Agent:
         aws_secret_key: str | None = None,
         # API key (for provider="anthropic", "openai", etc.)
         api_key: str | None = None,
+        # A2A configuration
+        name: str | None = None,
+        description: str | None = None,
     ) -> None:
         """
         Create a new Agent.
@@ -376,6 +389,10 @@ class Agent:
         self.framework = framework
         self.system_prompt = system_prompt
         self.high_risk_tools = set(high_risk_tools or [])
+        
+        # A2A identity
+        self.name = name or "dcaf-agent"
+        self.description = description or system_prompt or "A DCAF agent"
         
         # Store provider-specific configuration
         self._aws_profile = aws_profile
@@ -684,17 +701,35 @@ class Agent:
         except RuntimeError:
             return asyncio.run(response_pipeline.run(llm_response))
     
-    def continue_(self, conversation_id: str) -> AgentResponse:
+    def resume(self, conversation_id: str) -> AgentResponse:
         """
-        Continue a conversation after approving tool calls.
+        Resume a conversation after approving/rejecting tool calls.
+        
+        Use this method after manually handling tool approvals to continue
+        the agent's execution with the approved tools.
         
         Args:
-            conversation_id: The conversation to continue
+            conversation_id: The conversation to resume
             
         Returns:
             AgentResponse with the continued result
+            
+        Example:
+            response = agent.run(messages)
+            
+            if response.needs_approval:
+                for tool in response.pending_tools:
+                    if should_approve(tool):
+                        tool.approve()
+                    else:
+                        tool.reject("Not allowed")
+                
+                # Resume execution with the approval decisions
+                response = agent.resume(response.conversation_id)
+            
+            print(response.text)
         """
-        internal_response = self._agent_service.continue_after_approval(
+        internal_response = self._agent_service.resume(
             conversation_id=conversation_id,
             tools=self.tools,
         )
@@ -886,7 +921,7 @@ class Agent:
     def _approve_all_and_continue(self, conversation_id: str) -> AgentResponse:
         """Approve all pending and continue."""
         self._approval_service.approve_all(conversation_id)
-        return self.continue_(conversation_id)
+        return self.resume(conversation_id)
     
     def _reject_all(self, conversation_id: str, reason: str) -> AgentResponse:
         """Reject all pending tool calls."""

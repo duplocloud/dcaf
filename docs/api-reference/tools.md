@@ -10,7 +10,7 @@ The Tools module provides a powerful system for creating callable functions that
 2. [Class: Tool](#class-tool)
 3. [Decorator: @tool](#decorator-tool)
 4. [Function: create_tool](#function-create_tool)
-5. [Schema Format](#schema-format)
+5. [Schema Definition Options](#schema-definition-options)
 6. [Platform Context](#platform-context)
 7. [Approval Workflows](#approval-workflows)
 8. [Examples](#examples)
@@ -25,6 +25,12 @@ The Tools module provides two ways to create tools:
 1. **`@tool` decorator** - Transform a function into a Tool object
 2. **`create_tool()` function** - Programmatically create tools
 
+And three ways to define tool schemas:
+
+1. **Auto-generate** - Schema is inferred from function signature (simplest)
+2. **Dict schema** - Pass a JSON Schema dict (full control)
+3. **Pydantic model** - Pass a Pydantic model class (type-safe with IDE support)
+
 ### Import
 
 ```python
@@ -33,6 +39,7 @@ from dcaf.tools import tool, create_tool, Tool
 
 ### Key Features
 
+- **Flexible schema definition** - Auto-generate, dict, or Pydantic model
 - **JSON Schema validation** for tool inputs
 - **Automatic platform context detection**
 - **Approval workflow support**
@@ -128,44 +135,124 @@ Transform a function into a Tool object.
 
 ```python
 def tool(
-    schema: Dict[str, Any],
-    requires_approval: bool = True,
+    func: Optional[Callable] = None,
+    *,
+    description: Optional[str] = None,
     name: Optional[str] = None,
-    description: Optional[str] = None
-) -> Callable[[Callable], Tool]
+    requires_approval: bool = False,
+    schema: Optional[Union[Dict[str, Any], Type[BaseModel]]] = None,
+) -> Tool
 ```
 
 ### Parameters
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `schema` | `Dict` | Required | JSON schema for tool inputs |
-| `requires_approval` | `bool` | `True` | Require user approval before execution |
+| `description` | `str` | Docstring | Tool description shown to LLM |
 | `name` | `str` | Function name | Override the tool name |
-| `description` | `str` | Docstring | Override the description |
+| `requires_approval` | `bool` | `False` | Require user approval before execution |
+| `schema` | `Dict` or `BaseModel` | Auto-generated | JSON schema dict OR Pydantic model class |
+
+### Schema Options
+
+The `@tool` decorator supports three ways to define the input schema:
+
+#### Option 1: Auto-Generate (Simplest)
+
+Let DCAF generate the schema from your function signature:
+
+```python
+from dcaf.tools import tool
+
+@tool(description="Generate a personalized greeting")
+def greet(name: str, language: str = "english") -> str:
+    """Generate a greeting."""
+    greetings = {"english": "Hello", "spanish": "Hola", "french": "Bonjour"}
+    return f"{greetings.get(language, 'Hello')}, {name}!"
+
+# Schema is auto-generated from function signature
+print(greet.input_schema)
+# {
+#     "type": "object",
+#     "properties": {
+#         "name": {"type": "string"},
+#         "language": {"type": "string", "default": "english"}
+#     },
+#     "required": ["name"]
+# }
+```
+
+#### Option 2: Dict Schema (Full Control)
+
+Pass an explicit JSON Schema dict:
+
+```python
+@tool(
+    description="Generate a greeting message",
+    schema={
+        "type": "object",
+        "properties": {
+            "name": {
+                "type": "string",
+                "description": "Name of the person to greet",
+                "minLength": 1,
+                "maxLength": 100
+            },
+            "language": {
+                "type": "string",
+                "enum": ["english", "spanish", "french"],
+                "description": "Language for the greeting",
+                "default": "english"
+            }
+        },
+        "required": ["name"]
+    },
+    requires_approval=False
+)
+def greet(name: str, language: str = "english") -> str:
+    """Generate a greeting."""
+    greetings = {"english": "Hello", "spanish": "Hola", "french": "Bonjour"}
+    return f"{greetings.get(language, 'Hello')}, {name}!"
+```
+
+#### Option 3: Pydantic Model (Type-Safe)
+
+Pass a Pydantic model class for type-safe schemas with IDE support:
+
+```python
+from pydantic import BaseModel, Field
+from typing import Literal
+
+class GreetInput(BaseModel):
+    """Input schema for the greet tool."""
+    name: str = Field(..., description="Name of the person to greet", min_length=1, max_length=100)
+    language: Literal["english", "spanish", "french"] = Field(
+        default="english",
+        description="Language for the greeting"
+    )
+
+@tool(description="Generate a greeting message", schema=GreetInput)
+def greet(name: str, language: str = "english") -> str:
+    """Generate a greeting."""
+    greetings = {"english": "Hello", "spanish": "Hola", "french": "Bonjour"}
+    return f"{greetings.get(language, 'Hello')}, {name}!"
+```
+
+!!! tip "Pydantic Benefits"
+    Using Pydantic models gives you:
+    
+    - **IDE autocomplete** when defining the schema
+    - **Type checking** at development time
+    - **Reusable schemas** across multiple tools
+    - **Built-in validation** if you want to validate inputs in your tool
 
 ### Basic Usage
 
 ```python
 from dcaf.tools import tool
 
-@tool(
-    schema={
-        "name": "greet",
-        "description": "Generate a greeting message",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "name": {
-                    "type": "string",
-                    "description": "Name of the person to greet"
-                }
-            },
-            "required": ["name"]
-        }
-    },
-    requires_approval=False
-)
+# Simplest - auto-generate schema
+@tool(description="Generate a greeting")
 def greet(name: str) -> str:
     """Generate a greeting."""
     return f"Hello, {name}!"
@@ -282,10 +369,10 @@ Create a tool programmatically without using a decorator.
 ```python
 def create_tool(
     func: Callable,
-    schema: Dict[str, Any],
-    name: Optional[str] = None,
     description: Optional[str] = None,
-    requires_approval: bool = False
+    name: Optional[str] = None,
+    requires_approval: bool = False,
+    schema: Optional[Union[Dict[str, Any], Type[BaseModel]]] = None,
 ) -> Tool
 ```
 
@@ -294,10 +381,10 @@ def create_tool(
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `func` | `Callable` | Required | Function to wrap |
-| `schema` | `Dict` | Required | JSON schema for inputs |
-| `name` | `str` | Function name | Tool name |
 | `description` | `str` | Docstring | Tool description |
+| `name` | `str` | Function name | Tool name |
 | `requires_approval` | `bool` | `False` | Require approval |
+| `schema` | `Dict` or `BaseModel` | Auto-generated | JSON schema dict OR Pydantic model class |
 
 ### Usage
 
@@ -309,21 +396,34 @@ def multiply(a: int, b: int) -> str:
     """Multiply two numbers."""
     return f"{a} × {b} = {a * b}"
 
-# Create the tool
+# Option 1: Auto-generate schema
+multiply_tool = create_tool(multiply, description="Multiply two integers")
+
+# Option 2: With explicit dict schema
 multiply_tool = create_tool(
     func=multiply,
+    description="Multiply two integers",
     schema={
-        "name": "multiply",
-        "description": "Multiply two integers",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "a": {"type": "integer", "description": "First number"},
-                "b": {"type": "integer", "description": "Second number"}
-            },
-            "required": ["a", "b"]
-        }
+        "type": "object",
+        "properties": {
+            "a": {"type": "integer", "description": "First number", "minimum": 0},
+            "b": {"type": "integer", "description": "Second number", "minimum": 0}
+        },
+        "required": ["a", "b"]
     }
+)
+
+# Option 3: With Pydantic model
+from pydantic import BaseModel, Field
+
+class MultiplyInput(BaseModel):
+    a: int = Field(..., ge=0, description="First number")
+    b: int = Field(..., ge=0, description="Second number")
+
+multiply_tool = create_tool(
+    func=multiply,
+    description="Multiply two integers",
+    schema=MultiplyInput
 )
 
 # Use the tool
@@ -340,23 +440,99 @@ print(result)  # "6 × 7 = 42"
 
 ---
 
-## Schema Format
+## Schema Definition Options
 
-Tools use JSON Schema to define their input parameters.
+DCAF supports three ways to define tool input schemas, giving you flexibility based on your needs.
 
-### Required Structure
+### Comparison
+
+| Approach | Best For | Pros | Cons |
+|----------|----------|------|------|
+| **Auto-generate** | Simple tools | Zero config, fast | Limited validation |
+| **Dict schema** | Full control | Any JSON Schema feature | Verbose, no IDE help |
+| **Pydantic model** | Production tools | Type-safe, IDE support, reusable | Extra class definition |
+
+### Option 1: Auto-Generated Schema
+
+When you don't provide a schema, DCAF generates one from your function signature:
+
+```python
+@tool(description="Search for users")
+def search_users(query: str, limit: int = 10, active_only: bool = True) -> str:
+    ...
+
+# Auto-generates:
+# {
+#     "type": "object",
+#     "properties": {
+#         "query": {"type": "string"},
+#         "limit": {"type": "integer", "default": 10},
+#         "active_only": {"type": "boolean", "default": true}
+#     },
+#     "required": ["query"]
+# }
+```
+
+### Option 2: Dict Schema
+
+For full control over the JSON Schema:
 
 ```python
 schema = {
-    "name": "tool_name",              # Required: Unique identifier
-    "description": "What it does",     # Required: LLM-readable description
-    "input_schema": {                  # Required: Parameter schema
-        "type": "object",              # Must be "object"
-        "properties": {...},           # Parameter definitions
-        "required": [...]              # Required parameters
-    }
+    "type": "object",
+    "properties": {
+        "query": {
+            "type": "string",
+            "description": "Search query",
+            "minLength": 1,
+            "maxLength": 100
+        },
+        "limit": {
+            "type": "integer",
+            "description": "Max results",
+            "minimum": 1,
+            "maximum": 100,
+            "default": 10
+        },
+        "active_only": {
+            "type": "boolean",
+            "description": "Only return active users",
+            "default": True
+        }
+    },
+    "required": ["query"]
 }
+
+@tool(description="Search for users", schema=schema)
+def search_users(query: str, limit: int = 10, active_only: bool = True) -> str:
+    ...
 ```
+
+### Option 3: Pydantic Model
+
+For type-safe schemas with IDE support and validation:
+
+```python
+from pydantic import BaseModel, Field
+
+class SearchUsersInput(BaseModel):
+    """Input schema for user search."""
+    query: str = Field(..., description="Search query", min_length=1, max_length=100)
+    limit: int = Field(default=10, ge=1, le=100, description="Max results")
+    active_only: bool = Field(default=True, description="Only return active users")
+
+@tool(description="Search for users", schema=SearchUsersInput)
+def search_users(query: str, limit: int = 10, active_only: bool = True) -> str:
+    ...
+```
+
+!!! note "How It Works"
+    When you pass a Pydantic model, DCAF automatically calls `model.model_json_schema()` 
+    to convert it to a JSON Schema dict. You don't need to do anything special.
+
+### JSON Schema Structure
+
+Regardless of how you define it, the final schema follows JSON Schema format:
 
 ### Parameter Types
 
@@ -861,4 +1037,5 @@ def my_tool(param: str) -> str:
 - [Agents API Reference](./agents.md)
 - [Building Tools Guide](../guides/building-tools.md)
 - [Examples](../examples/examples.md)
+
 

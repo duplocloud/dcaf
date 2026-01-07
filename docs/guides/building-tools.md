@@ -8,7 +8,7 @@ This guide covers everything you need to know about creating tools for DCAF agen
 
 1. [Introduction](#introduction)
 2. [Your First Tool](#your-first-tool)
-3. [Tool Schema Design](#tool-schema-design)
+3. [Schema Definition Options](#schema-definition-options)
 4. [Platform Context](#platform-context)
 5. [Approval Workflows](#approval-workflows)
 6. [Advanced Patterns](#advanced-patterns)
@@ -21,6 +21,7 @@ This guide covers everything you need to know about creating tools for DCAF agen
 
 Tools are functions that LLM agents can call to interact with external systems, perform calculations, or execute operations. In DCAF, tools are:
 
+- **Flexibly defined**: Auto-generate schema, use dict, or use Pydantic models
 - **Type-safe**: JSON Schema validates inputs
 - **Context-aware**: Can access platform context
 - **Approval-enabled**: Support human-in-the-loop workflows
@@ -50,35 +51,12 @@ Tools are functions that LLM agents can call to interact with external systems, 
 from dcaf.tools import tool
 ```
 
-### Step 2: Define the Schema
+### Step 2: Create the Tool
+
+The simplest approach is to let DCAF auto-generate the schema from your function signature:
 
 ```python
-schema = {
-    "name": "greet_user",
-    "description": "Generate a personalized greeting for a user",
-    "input_schema": {
-        "type": "object",
-        "properties": {
-            "name": {
-                "type": "string",
-                "description": "The name of the user to greet"
-            },
-            "language": {
-                "type": "string",
-                "enum": ["english", "spanish", "french"],
-                "description": "Language for the greeting",
-                "default": "english"
-            }
-        },
-        "required": ["name"]
-    }
-}
-```
-
-### Step 3: Create the Tool
-
-```python
-@tool(schema=schema, requires_approval=False)
+@tool(description="Generate a personalized greeting for a user")
 def greet_user(name: str, language: str = "english") -> str:
     """Generate a personalized greeting."""
     greetings = {
@@ -89,7 +67,9 @@ def greet_user(name: str, language: str = "english") -> str:
     return greetings.get(language, greetings["english"])
 ```
 
-### Step 4: Use the Tool
+That's it! DCAF automatically creates the JSON schema from the function parameters.
+
+### Step 3: Use the Tool
 
 ```python
 # Test directly
@@ -97,12 +77,9 @@ result = greet_user.execute({"name": "Alice", "language": "spanish"})
 print(result)  # ¡Hola, Alice! ¡Bienvenido!
 
 # Add to agent
-from dcaf.agents import ToolCallingAgent
-from dcaf.llm import BedrockLLM
+from dcaf.core import Agent
 
-llm = BedrockLLM()
-agent = ToolCallingAgent(
-    llm=llm,
+agent = Agent(
     tools=[greet_user],
     system_prompt="You are a friendly greeter."
 )
@@ -110,191 +87,224 @@ agent = ToolCallingAgent(
 
 ---
 
-## Tool Schema Design
+## Schema Definition Options
 
-### Schema Structure
+DCAF supports three ways to define tool input schemas, giving you flexibility based on your needs.
 
-Every tool schema must have:
+### Option 1: Auto-Generate (Recommended for Simple Tools)
+
+Let DCAF infer the schema from your function signature:
 
 ```python
+@tool(description="Create a new Kubernetes deployment")
+def create_deployment(
+    name: str,
+    image: str,
+    replicas: int = 1,
+    force: bool = False
+) -> str:
+    """Create a Kubernetes deployment."""
+    return f"Created {name} with image {image}, {replicas} replicas"
+```
+
+DCAF automatically generates:
+
+```json
 {
-    "name": "tool_name",           # Unique identifier
-    "description": "What it does", # For LLM understanding
-    "input_schema": {              # Parameter definitions
-        "type": "object",          # Always "object"
-        "properties": {...},       # Parameter specs
-        "required": [...]          # Required params
-    }
-}
-```
-
-### Parameter Types
-
-#### String Parameters
-
-```python
-"username": {
-    "type": "string",
-    "description": "The username to look up",
-    "minLength": 1,
-    "maxLength": 50
-}
-```
-
-#### Numeric Parameters
-
-```python
-# Integer
-"count": {
-    "type": "integer",
-    "description": "Number of items",
-    "minimum": 1,
-    "maximum": 100
-}
-
-# Float/Decimal
-"temperature": {
-    "type": "number",
-    "description": "Temperature value",
-    "minimum": -273.15
-}
-```
-
-#### Boolean Parameters
-
-```python
-"verbose": {
-    "type": "boolean",
-    "description": "Enable verbose output",
-    "default": False
-}
-```
-
-#### Enum Parameters
-
-```python
-"priority": {
-    "type": "string",
-    "enum": ["low", "medium", "high", "critical"],
-    "description": "Task priority level"
-}
-```
-
-#### Array Parameters
-
-```python
-# Simple array
-"tags": {
-    "type": "array",
-    "items": {"type": "string"},
-    "description": "List of tags"
-}
-
-# Array with constraints
-"scores": {
-    "type": "array",
-    "items": {
-        "type": "integer",
-        "minimum": 0,
-        "maximum": 100
-    },
-    "minItems": 1,
-    "maxItems": 10,
-    "description": "List of scores (1-10 items, each 0-100)"
-}
-```
-
-#### Object Parameters
-
-```python
-"config": {
     "type": "object",
-    "description": "Configuration options",
     "properties": {
-        "timeout": {
-            "type": "integer",
-            "description": "Timeout in seconds"
-        },
-        "retries": {
-            "type": "integer",
-            "description": "Number of retries"
-        }
+        "name": {"type": "string"},
+        "image": {"type": "string"},
+        "replicas": {"type": "integer", "default": 1},
+        "force": {"type": "boolean", "default": false}
     },
-    "required": ["timeout"]
+    "required": ["name", "image"]
 }
 ```
 
-### Complete Schema Example
+### Option 2: Dict Schema (Full JSON Schema Control)
+
+For advanced validation (enums, patterns, min/max values):
 
 ```python
 @tool(
+    description="Create a new Kubernetes deployment",
+    requires_approval=True,
     schema={
-        "name": "create_deployment",
-        "description": "Create a new Kubernetes deployment",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "name": {
-                    "type": "string",
-                    "description": "Deployment name",
-                    "minLength": 1,
-                    "maxLength": 63,
-                    "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
-                },
-                "image": {
-                    "type": "string",
-                    "description": "Docker image (e.g., nginx:latest)"
-                },
-                "replicas": {
-                    "type": "integer",
-                    "description": "Number of replicas",
-                    "minimum": 1,
-                    "maximum": 10,
-                    "default": 1
-                },
-                "resources": {
-                    "type": "object",
-                    "description": "Resource limits",
-                    "properties": {
-                        "cpu": {"type": "string", "default": "100m"},
-                        "memory": {"type": "string", "default": "128Mi"}
-                    }
-                },
-                "environment": {
-                    "type": "array",
-                    "description": "Environment variables",
-                    "items": {
-                        "type": "object",
-                        "properties": {
-                            "name": {"type": "string"},
-                            "value": {"type": "string"}
-                        },
-                        "required": ["name", "value"]
-                    }
-                },
-                "expose_port": {
-                    "type": "integer",
-                    "description": "Port to expose (optional)",
-                    "minimum": 1,
-                    "maximum": 65535
-                }
+        "type": "object",
+        "properties": {
+            "name": {
+                "type": "string",
+                "description": "Deployment name",
+                "minLength": 1,
+                "maxLength": 63,
+                "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
             },
-            "required": ["name", "image"]
-        }
-    },
-    requires_approval=True
+            "image": {
+                "type": "string",
+                "description": "Docker image (e.g., nginx:latest)"
+            },
+            "replicas": {
+                "type": "integer",
+                "description": "Number of replicas",
+                "minimum": 1,
+                "maximum": 10,
+                "default": 1
+            },
+            "namespace": {
+                "type": "string",
+                "enum": ["default", "production", "staging"],
+                "description": "Target namespace"
+            }
+        },
+        "required": ["name", "image"]
+    }
 )
 def create_deployment(
     name: str,
     image: str,
     replicas: int = 1,
-    resources: dict = None,
-    environment: list = None,
-    expose_port: int = None
+    namespace: str = "default"
 ) -> str:
     """Create a Kubernetes deployment."""
-    # Implementation
-    pass
+    return f"Created {name} in {namespace}"
+```
+
+### Option 3: Pydantic Model (Type-Safe with IDE Support)
+
+For production tools with complex schemas, use Pydantic models:
+
+```python
+from pydantic import BaseModel, Field
+from typing import Literal, Optional
+
+class CreateDeploymentInput(BaseModel):
+    """Input schema for deployment creation."""
+    
+    name: str = Field(
+        ...,
+        description="Deployment name",
+        min_length=1,
+        max_length=63,
+        pattern="^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+    )
+    image: str = Field(
+        ...,
+        description="Docker image (e.g., nginx:latest)"
+    )
+    replicas: int = Field(
+        default=1,
+        ge=1,
+        le=10,
+        description="Number of replicas"
+    )
+    namespace: Literal["default", "production", "staging"] = Field(
+        default="default",
+        description="Target namespace"
+    )
+
+@tool(
+    description="Create a new Kubernetes deployment",
+    requires_approval=True,
+    schema=CreateDeploymentInput  # Just pass the model class!
+)
+def create_deployment(
+    name: str,
+    image: str,
+    replicas: int = 1,
+    namespace: str = "default"
+) -> str:
+    """Create a Kubernetes deployment."""
+    return f"Created {name} in {namespace}"
+```
+
+!!! tip "Why Pydantic?"
+    Pydantic models give you:
+    
+    - **IDE autocomplete** when defining the schema
+    - **Type checking** at development time
+    - **Reusable schemas** across multiple tools
+    - **Input validation** - you can validate inputs in your tool:
+      ```python
+      def create_deployment(name: str, image: str, ...) -> str:
+          # Optional: validate inputs
+          validated = CreateDeploymentInput(name=name, image=image, ...)
+          # Now you have type-safe access with IDE support
+      ```
+
+### Choosing the Right Approach
+
+| Use Case | Recommended Approach |
+|----------|---------------------|
+| Quick prototyping | Auto-generate |
+| Simple tools (few params) | Auto-generate |
+| Need enums/constraints | Dict or Pydantic |
+| Production tools | Pydantic model |
+| Sharing schemas across tools | Pydantic model |
+| Dynamic schema generation | Dict schema |
+
+### JSON Schema Reference
+
+When using dict schemas, these are the common JSON Schema features:
+
+#### String Constraints
+
+```python
+"username": {
+    "type": "string",
+    "description": "The username",
+    "minLength": 3,
+    "maxLength": 50,
+    "pattern": "^[a-z0-9_]+$"
+}
+```
+
+#### Numeric Constraints
+
+```python
+"count": {
+    "type": "integer",
+    "minimum": 1,
+    "maximum": 100
+}
+
+"temperature": {
+    "type": "number",
+    "minimum": -273.15
+}
+```
+
+#### Enums
+
+```python
+"priority": {
+    "type": "string",
+    "enum": ["low", "medium", "high", "critical"]
+}
+```
+
+#### Arrays
+
+```python
+"tags": {
+    "type": "array",
+    "items": {"type": "string"},
+    "minItems": 1,
+    "maxItems": 10
+}
+```
+
+#### Nested Objects
+
+```python
+"config": {
+    "type": "object",
+    "properties": {
+        "timeout": {"type": "integer"},
+        "retries": {"type": "integer"}
+    },
+    "required": ["timeout"]
+}
 ```
 
 ---
@@ -986,4 +996,5 @@ def tenant_specific_action(data: str, platform_context: dict) -> str:
 - [Agents API Reference](../api-reference/agents.md)
 - [Creating Custom Agents](./creating-custom-agents.md)
 - [Examples](../examples/examples.md)
+
 

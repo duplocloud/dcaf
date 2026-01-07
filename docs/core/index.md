@@ -129,27 +129,57 @@ if response.needs_approval:
             tool.approve()
         else:
             tool.reject("User declined")
-    response = agent.continue_(response.conversation_id)
+    response = agent.resume(response.conversation_id)
 ```
 
 ---
 
 ## Defining Tools
 
-Use the `@tool` decorator:
+Use the `@tool` decorator with one of three schema approaches:
+
+### Option 1: Auto-Generate (Simplest)
 
 ```python
 from dcaf.tools import tool
 
 @tool(description="Get current weather")
-def get_weather(city: str) -> str:
+def get_weather(city: str, units: str = "celsius") -> str:
     """Get weather for a city."""
-    return weather_api.get(city)
+    return weather_api.get(city, units)
+```
 
-@tool(requires_approval=True, description="Send an email")
-def send_email(to: str, subject: str, body: str) -> str:
-    """Send an email. Requires approval."""
-    return email_service.send(to, subject, body)
+### Option 2: Dict Schema (Full Control)
+
+```python
+@tool(
+    description="Get current weather",
+    schema={
+        "type": "object",
+        "properties": {
+            "city": {"type": "string", "description": "City name"},
+            "units": {"type": "string", "enum": ["celsius", "fahrenheit"]}
+        },
+        "required": ["city"]
+    }
+)
+def get_weather(city: str, units: str = "celsius") -> str:
+    return weather_api.get(city, units)
+```
+
+### Option 3: Pydantic Model (Type-Safe)
+
+```python
+from pydantic import BaseModel, Field
+from typing import Literal
+
+class WeatherInput(BaseModel):
+    city: str = Field(..., description="City name")
+    units: Literal["celsius", "fahrenheit"] = Field(default="celsius")
+
+@tool(description="Get current weather", schema=WeatherInput)
+def get_weather(city: str, units: str = "celsius") -> str:
+    return weather_api.get(city, units)
 ```
 
 ### Tool Options
@@ -158,7 +188,7 @@ def send_email(to: str, subject: str, body: str) -> str:
 |--------|---------|-------------|
 | `description` | Docstring | What the tool does (shown to LLM) |
 | `requires_approval` | `False` | Whether to require human approval |
-| `requires_platform_context` | `False` | Whether tool needs tenant/namespace info |
+| `schema` | Auto-generated | Dict schema OR Pydantic model class |
 
 ---
 
@@ -271,6 +301,61 @@ See the [Interceptors Guide](../guides/interceptors.md) for comprehensive docume
 
 ---
 
+## Session Management
+
+Sessions persist state across conversation turns for multi-step workflows. They support typed storage with Pydantic models and dataclasses:
+
+```python
+from pydantic import BaseModel, Field
+from dcaf.core import Session
+from dcaf.tools import tool
+
+class CartItem(BaseModel):
+    name: str
+    quantity: int
+    price: float
+
+class ShoppingCart(BaseModel):
+    items: list[CartItem] = Field(default_factory=list)
+
+@tool(description="Add item to cart")
+def add_to_cart(name: str, quantity: int, price: float, session: Session) -> str:
+    # Get as typed model (auto-deserializes)
+    cart = session.get("cart", as_type=ShoppingCart) or ShoppingCart()
+    
+    cart.items.append(CartItem(name=name, quantity=quantity, price=price))
+    
+    # Store typed model (auto-serializes)
+    session.set("cart", cart)
+    return f"Added {quantity}x {name}. {len(cart.items)} items in cart."
+
+@tool(description="Checkout")
+def checkout(session: Session) -> str:
+    cart = session.get("cart", as_type=ShoppingCart)
+    if not cart:
+        return "Cart is empty"
+    
+    total = sum(item.price * item.quantity for item in cart.items)
+    session.delete("cart")
+    return f"Checked out ${total:.2f}!"
+```
+
+Session data travels with the protocol in `data.session`:
+
+```json
+{
+  "role": "assistant",
+  "content": "Added 2x Widget.",
+  "data": {
+    "session": {"cart": {"items": [{"name": "Widget", "quantity": 2, "price": 9.99}]}}
+  }
+}
+```
+
+See the [Session Management Guide](../guides/session-management.md) for comprehensive documentation.
+
+---
+
 ## Streaming
 
 For real-time token-by-token responses:
@@ -308,6 +393,72 @@ Endpoints:
 - `POST /api/chat-stream` - Streaming (NDJSON)
 
 See [Server Documentation](./server.md) for full details.
+
+---
+
+## A2A (Agent-to-Agent)
+
+DCAF supports the **A2A protocol** for agent-to-agent communication, enabling agents to discover and call each other.
+
+### Server: Expose an Agent
+
+```python
+from dcaf.core import Agent, serve
+
+agent = Agent(
+    name="k8s-assistant",              # A2A identity
+    description="Kubernetes helper",   # A2A description
+    tools=[list_pods, delete_pod],
+)
+
+# Enable A2A protocol
+serve(agent, port=8000, a2a=True)
+```
+
+This adds A2A endpoints:
+- `GET /.well-known/agent.json` - Agent card (discovery)
+- `POST /a2a/tasks/send` - Receive tasks
+- `GET /a2a/tasks/{id}` - Task status
+
+### Client: Call Remote Agents
+
+```python
+from dcaf.core.a2a import RemoteAgent
+
+# Connect to remote agent
+k8s = RemoteAgent(url="http://k8s-agent:8000")
+
+# Send a task
+result = k8s.send("List failing pods in production")
+print(result.text)
+```
+
+### Multi-Agent Orchestration
+
+Remote agents can be used as tools for other agents:
+
+```python
+from dcaf.core import Agent
+from dcaf.core.a2a import RemoteAgent
+
+# Connect to specialist agents
+k8s = RemoteAgent(url="http://k8s-agent:8000")
+aws = RemoteAgent(url="http://aws-agent:8000")
+
+# Orchestrator routes to specialists
+orchestrator = Agent(
+    name="orchestrator",
+    tools=[k8s.as_tool(), aws.as_tool()],
+    system="Route requests to the appropriate specialist agent"
+)
+
+# LLM decides which specialist to call
+response = orchestrator.run([
+    {"role": "user", "content": "What's the status of my infrastructure?"}
+])
+```
+
+**Learn more:** See the complete [A2A Guide](./a2a.md) for patterns, examples, and best practices.
 
 ---
 

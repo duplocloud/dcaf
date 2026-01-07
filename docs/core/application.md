@@ -159,11 +159,11 @@ for event in service.execute_stream(request):
         final_response = event.data["response"]
 ```
 
-**Continue After Approval:**
+**Resume After Approval:**
 
 ```python
 # After user approves tool calls
-response = service.continue_after_approval(
+response = service.resume(
     conversation_id="conv-123",
     tools=[kubectl_tool],
 )
