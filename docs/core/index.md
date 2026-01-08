@@ -63,11 +63,41 @@ The `Agent` class is the main entry point:
 agent = Agent(
     tools=[...],                    # List of tools the agent can use
     model="anthropic.claude-3-sonnet",  # LLM model (optional)
-    system_prompt="You are...",     # System prompt (optional)
+    system_prompt="You are...",     # Static system prompt (optional)
+    system_context="Dynamic context",   # Dynamic context (optional, for caching)
+    model_config={...},             # Model configuration (optional, e.g., caching)
     high_risk_tools=["rm", "delete"],   # Extra approval requirements (optional)
     on_event=my_handler,            # Event handler(s) (optional)
 )
 ```
+
+### Prompt Caching (Bedrock Only)
+
+Reduce costs by up to 90% and latency by up to 85% with prompt caching. Separate static instructions from dynamic context:
+
+```python
+agent = Agent(
+    # Static part - cached (same for all requests)
+    system_prompt="""
+    You are a Kubernetes expert. Your role is to help users manage clusters.
+    [Add detailed guidelines here - aim for 1024+ tokens for caching]
+    """,
+    
+    # Dynamic part - NOT cached (changes per request)
+    system_context=lambda ctx: f"""
+    Tenant: {ctx.get('tenant_name')}
+    Namespace: {ctx.get('k8s_namespace')}
+    User: {ctx.get('user_email')}
+    """,
+    
+    # Enable caching
+    model_config={"cache_system_prompt": True},
+    
+    tools=[...],
+)
+```
+
+See [Prompt Caching Guide](../guides/prompt-caching.md) for details.
 
 ### Running the Agent
 

@@ -38,6 +38,8 @@ class AgentRequest:
         context: Platform context for tool execution
         tools: List of tools available to the agent
         system_prompt: Optional system prompt
+        static_system: Static portion of system prompt (for caching)
+        dynamic_system: Dynamic portion of system prompt (not cached)
         stream: Whether to stream the response
         
     Example with message history:
@@ -57,6 +59,8 @@ class AgentRequest:
     context: Optional[Dict[str, Any]] = None
     tools: List[Any] = field(default_factory=list)  # List[Tool]
     system_prompt: Optional[str] = None
+    static_system: Optional[str] = None  # Static system prompt (cached)
+    dynamic_system: Optional[str] = None  # Dynamic system prompt (not cached)
     stream: bool = False
     
     def get_conversation_id(self) -> Optional[ConversationId]:

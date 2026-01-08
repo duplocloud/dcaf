@@ -746,10 +746,148 @@ def execute_deploy(session: Session) -> str:
 
 
 # ============================================================================
-# SECTION 7: ADVANCED TOPICS
+# SECTION 7: PROMPT CACHING (NEW)
 # ============================================================================
 
-add_section_slide("Advanced Topics", "Platform context and more")
+add_section_slide("Prompt Caching", "Reduce costs by up to 90%")
+
+add_content_slide(
+    "What is Prompt Caching?",
+    [
+        "AWS Bedrock feature that caches static prompt content:",
+        "",
+        "Benefits:",
+        "• Up to 90% cost reduction on cached tokens",
+        "• Up to 85% latency reduction",
+        "• 5-minute cache TTL (resets on each cache hit)",
+        "",
+        "Key Insight:",
+        "Separate static instructions (cached) from dynamic context (fresh)",
+        "",
+        "Status: Experimental v1 - Temporary until Agno adds native support"
+    ]
+)
+
+add_content_slide(
+    "How It Works",
+    ["DCAF places a cache checkpoint between static and dynamic parts:"],
+    code="""[Static Instructions]  ← CACHED (same for all requests)
+         ↓
+[Cache Checkpoint]
+         ↓
+[Dynamic Context]      ← NOT cached (fresh each time)
+
+Example:
+• Static: "You are a K8s expert. [detailed guidelines]" ← CACHED
+• Dynamic: "Tenant: acme-corp, User: alice" ← FRESH""")
+
+add_content_slide(
+    "Basic Usage",
+    ["Enable caching with one parameter:"],
+    code="""from dcaf.core import Agent
+
+agent = Agent(
+    system_prompt='''You are a Kubernetes expert.
+    
+    [Add detailed guidelines here - aim for 1024+ tokens]
+    
+    Guidelines:
+    - Always verify namespace before operations
+    - Explain what each command does
+    - Ask for confirmation on destructive operations
+    [... more detailed instructions ...]
+    ''',
+    
+    tools=[list_pods, delete_pod],
+    
+    model_config={
+        "cache_system_prompt": True  # Enable caching
+    }
+)""")
+
+add_content_slide(
+    "Static + Dynamic Pattern",
+    ["The recommended pattern for maximum savings:"],
+    code="""agent = Agent(
+    # Static part - cached (same for all requests)
+    system_prompt='''You are a Kubernetes expert for a multi-tenant platform.
+    
+    [Detailed guidelines, examples, best practices...]
+    - Verify tenant context before operations
+    - Follow security best practices
+    - Provide clear explanations
+    ''',
+    
+    # Dynamic part - NOT cached (changes per request)
+    system_context=lambda ctx: f'''
+    === CURRENT CONTEXT ===
+    Tenant: {ctx.get('tenant_name')}
+    Namespace: {ctx.get('k8s_namespace')}
+    User: {ctx.get('user_email')}
+    ''',
+    
+    model_config={"cache_system_prompt": True}
+)""")
+
+add_content_slide(
+    "Requirements & Best Practices",
+    [
+        "Minimum Token Count:",
+        "• Claude 3.7 Sonnet: 1024 tokens",
+        "• Claude 3.5 Haiku: 2048 tokens",
+        "• ~4 characters = 1 token (aim for 4000+ chars)",
+        "",
+        "Best Practices:",
+        "1. Make static content detailed and comprehensive",
+        "2. Put all variable data in system_context",
+        "3. Monitor logs for cache HIT/MISS indicators",
+        "4. Ensure high request volume (>1 per 5 minutes)",
+    ]
+)
+
+add_content_slide(
+    "Cost Savings Example",
+    [
+        "Scenario: 100 requests with 1500-token static prompt + 100-token dynamic",
+        "",
+        "Without caching:",
+        "• 100 × 1600 tokens = 160,000 tokens",
+        "• Cost: ~$0.48",
+        "",
+        "With caching:",
+        "• First request: 1600 tokens (MISS)",
+        "• Next 99 requests: 100 tokens each (HIT)",
+        "• Total: 11,500 tokens",
+        "• Cost: ~$0.035",
+        "",
+        "Savings: ~93% 💰"
+    ]
+)
+
+add_content_slide(
+    "Monitoring Cache Performance",
+    ["DCAF logs cache metrics automatically:"],
+    code="""# Console logs show cache status:
+
+INFO: ✅ Cache HIT: 950 tokens reused (~90% cost reduction)
+INFO: 📝 Cache MISS: 950 tokens cached for next request
+
+# First request is always a MISS (creates cache)
+Request 1: MISS (creates cache)  → Full cost
+Request 2: HIT  (uses cache)     → 10% cost
+Request 3: HIT  (uses cache)     → 10% cost
+...
+Request N: MISS (cache expired after 5 min) → Full cost
+
+# Warnings if misconfigured:
+WARNING: System prompt (~500 tokens) below minimum threshold""")
+
+
+# ============================================================================
+# SECTION 8: PLATFORM CONTEXT
+# ============================================================================
+
+add_section_slide("Platform Context", "Runtime environment data")
 
 add_content_slide(
     "Platform Context",
@@ -788,7 +926,7 @@ def my_agent(messages: list, context: dict) -> AgentResult:
 
 
 # ============================================================================
-# SECTION 8: SUMMARY
+# SECTION 9: SUMMARY
 # ============================================================================
 
 add_section_slide("Summary", "Getting started with DCAF Core")

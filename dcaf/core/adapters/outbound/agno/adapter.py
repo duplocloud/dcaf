@@ -29,6 +29,7 @@ from agno.run.agent import RunStatus
 from .tool_converter import AgnoToolConverter
 from .message_converter import AgnoMessageConverter
 from .types import DEFAULT_MODEL_ID, DEFAULT_PROVIDER, DEFAULT_MAX_TOKENS
+from .caching_bedrock import CachingAwsBedrock
 from ....domain.entities import Message
 from ....application.dto.responses import AgentResponse, ToolCallDTO, StreamEvent, DataDTO
 
@@ -105,6 +106,8 @@ class AgnoAdapter:
         aws_secret_key: Optional[str] = None,
         # Generic API key (for non-AWS providers)
         api_key: Optional[str] = None,
+        # Model configuration (for caching, etc.)
+        model_config: Optional[Dict[str, Any]] = None,
         # Behavior flags
         tool_call_limit: Optional[int] = None,
         disable_history: bool = False,
@@ -137,6 +140,7 @@ class AgnoAdapter:
             
             api_key: API key for non-AWS providers
             
+            model_config: Configuration dict for model features (e.g., caching)
             tool_call_limit: Max concurrent tool calls (default 1 to avoid bug)
             disable_history: If True, don't pass message history
             disable_tool_filtering: If True, skip tool message filtering
@@ -147,6 +151,7 @@ class AgnoAdapter:
         self._provider = provider.lower()
         self._max_tokens = max_tokens
         self._temperature = temperature
+        self._model_config = model_config or {}
         
         # AWS configuration
         self._aws_profile = aws_profile
@@ -178,9 +183,14 @@ class AgnoAdapter:
         self._model = None
         self._async_session = None
         
+        # System prompt parts for caching
+        self._static_system = None
+        self._dynamic_system = None
+        
         logger.info(
             f"AgnoAdapter initialized: model={model_id}, provider={provider}, "
-            f"region={self._aws_region}, tool_limit={self._tool_call_limit}"
+            f"region={self._aws_region}, tool_limit={self._tool_call_limit}, "
+            f"cache_enabled={self._model_config.get('cache_system_prompt', False)}"
         )
     
     # =========================================================================
@@ -192,6 +202,8 @@ class AgnoAdapter:
         messages: List[Any],
         tools: List[Any],
         system_prompt: Optional[str] = None,
+        static_system: Optional[str] = None,
+        dynamic_system: Optional[str] = None,
         platform_context: Optional[Dict[str, Any]] = None,
     ) -> AgentResponse:
         """
@@ -203,6 +215,8 @@ class AgnoAdapter:
             messages: List of message objects (domain Message or dicts)
             tools: List of dcaf Tool objects
             system_prompt: Optional system prompt
+            static_system: Static portion of system prompt (for caching)
+            dynamic_system: Dynamic portion of system prompt (not cached)
             platform_context: Optional platform context to inject into tools
             
         Returns:
@@ -220,22 +234,24 @@ class AgnoAdapter:
                 with concurrent.futures.ThreadPoolExecutor() as pool:
                     future = pool.submit(
                         asyncio.run,
-                        self.ainvoke(messages, tools, system_prompt, platform_context)
+                        self.ainvoke(messages, tools, system_prompt, static_system, dynamic_system, platform_context)
                     )
                     return future.result()
             else:
                 return loop.run_until_complete(
-                    self.ainvoke(messages, tools, system_prompt, platform_context)
+                    self.ainvoke(messages, tools, system_prompt, static_system, dynamic_system, platform_context)
                 )
         except RuntimeError:
             # No event loop - create one
-            return asyncio.run(self.ainvoke(messages, tools, system_prompt, platform_context))
+            return asyncio.run(self.ainvoke(messages, tools, system_prompt, static_system, dynamic_system, platform_context))
     
     def invoke_stream(
         self,
         messages: List[Any],
         tools: List[Any],
         system_prompt: Optional[str] = None,
+        static_system: Optional[str] = None,
+        dynamic_system: Optional[str] = None,
         platform_context: Optional[Dict[str, Any]] = None,
     ) -> Iterator[StreamEvent]:
         """
@@ -247,6 +263,8 @@ class AgnoAdapter:
             messages: List of message objects
             tools: List of dcaf Tool objects
             system_prompt: Optional system prompt
+            static_system: Static portion of system prompt (for caching)
+            dynamic_system: Dynamic portion of system prompt (not cached)
             platform_context: Optional platform context to inject into tools
             
         Yields:
@@ -256,7 +274,7 @@ class AgnoAdapter:
         
         async def collect_events():
             events = []
-            async for event in self.ainvoke_stream(messages, tools, system_prompt, platform_context):
+            async for event in self.ainvoke_stream(messages, tools, system_prompt, static_system, dynamic_system, platform_context):
                 events.append(event)
             return events
         
@@ -278,6 +296,8 @@ class AgnoAdapter:
         messages: List[Any],
         tools: List[Any],
         system_prompt: Optional[str] = None,
+        static_system: Optional[str] = None,
+        dynamic_system: Optional[str] = None,
         platform_context: Optional[Dict[str, Any]] = None,
     ) -> AgentResponse:
         """
@@ -290,11 +310,17 @@ class AgnoAdapter:
             messages: List of message objects (domain Message or dicts)
             tools: List of dcaf Tool objects
             system_prompt: Optional system prompt
+            static_system: Static portion of system prompt (for caching)
+            dynamic_system: Dynamic portion of system prompt (not cached)
             platform_context: Optional platform context to inject into tools
             
         Returns:
             AgentResponse with the result
         """
+        # Store system prompt parts for model creation (if using caching)
+        self._static_system = static_system
+        self._dynamic_system = dynamic_system
+        
         # Create the Agno agent with tools (context injected into tool wrappers)
         agno_agent = await self._create_agent_async(tools, system_prompt, platform_context=platform_context)
         
@@ -335,6 +361,8 @@ class AgnoAdapter:
         messages: List[Any],
         tools: List[Any],
         system_prompt: Optional[str] = None,
+        static_system: Optional[str] = None,
+        dynamic_system: Optional[str] = None,
         platform_context: Optional[Dict[str, Any]] = None,
     ) -> AsyncIterator[StreamEvent]:
         """
@@ -344,11 +372,17 @@ class AgnoAdapter:
             messages: List of message objects
             tools: List of dcaf Tool objects
             system_prompt: Optional system prompt
+            static_system: Static portion of system prompt (for caching)
+            dynamic_system: Dynamic portion of system prompt (not cached)
             platform_context: Optional platform context to inject into tools
             
         Yields:
             StreamEvent objects for real-time updates
         """
+        # Store system prompt parts for model creation (if using caching)
+        self._static_system = static_system
+        self._dynamic_system = dynamic_system
+        
         # Create the Agno agent with tools and streaming enabled (context injected)
         agno_agent = await self._create_agent_async(tools, system_prompt, stream=True, platform_context=platform_context)
         
@@ -654,19 +688,37 @@ class AgnoAdapter:
         # Cache the session
         self._async_session = async_session
         
-        # Create the model
+        # Check if caching is enabled via model_config
+        cache_enabled = self._model_config.get("cache_system_prompt", False)
+        
+        # Log configuration
         logger.info(
             f"Agno: Initialized Bedrock model {self._model_id} "
-            f"(temperature={self._temperature}, max_tokens={self._max_tokens})"
+            f"(temperature={self._temperature}, max_tokens={self._max_tokens}, "
+            f"cache_system_prompt={cache_enabled})"
         )
         
-        return AwsBedrock(
-            id=self._model_id,
-            aws_region=region,
-            async_session=async_session,
-            temperature=self._temperature,
-            max_tokens=self._max_tokens,
-        )
+        # Create the appropriate model
+        if cache_enabled:
+            logger.info("Using CachingAwsBedrock (temporary until Agno adds native support)")
+            return CachingAwsBedrock(
+                id=self._model_id,
+                aws_region=region,
+                async_session=async_session,
+                temperature=self._temperature,
+                max_tokens=self._max_tokens,
+                cache_system_prompt=True,
+                static_system=self._static_system,
+                dynamic_system=self._dynamic_system,
+            )
+        else:
+            return AwsBedrock(
+                id=self._model_id,
+                aws_region=region,
+                async_session=async_session,
+                temperature=self._temperature,
+                max_tokens=self._max_tokens,
+            )
     
     @staticmethod
     def _infer_region_from_model_id(model_id: str, fallback_region: str) -> str:

@@ -39,7 +39,7 @@ Example with Interceptors:
 """
 
 from dataclasses import dataclass, field
-from typing import Callable, Any, Iterator
+from typing import Callable, Any, Iterator, Union, Optional
 import asyncio
 import logging
 
@@ -267,6 +267,25 @@ class Agent:
         
         system_prompt: Instructions for how the AI should behave.
                       Example: "You are a helpful Kubernetes assistant."
+                      
+                      Note: When using prompt caching (model_config={'cache_system_prompt': True}),
+                      this static system prompt is cached for reuse across requests.
+        
+        system_context: Dynamic context appended to system prompt. Can be:
+                       - A string: Used as-is
+                       - A callable: Called with platform_context dict, returns string
+                       
+                       This content is NOT cached and is evaluated fresh each request.
+                       This is useful for separating static instructions from runtime context
+                       (tenant, namespace, user, etc.) when using prompt caching.
+                       
+                       Example:
+                           system_context=lambda ctx: f"Tenant: {ctx.get('tenant_name')}"
+        
+        model_config: Configuration passed to the model adapter. Options:
+                     - cache_system_prompt (bool): Enable Bedrock prompt caching.
+                       Requires static system prompt ≥1024 tokens.
+                       Example: model_config={'cache_system_prompt': True}
         
         high_risk_tools: Names of tools that always require approval, even if
                         the tool itself doesn't have requires_approval=True.
@@ -360,6 +379,8 @@ class Agent:
         provider: str = "bedrock",
         framework: str = "agno",  # LLM framework: "agno", "strands", "langchain"
         system_prompt: str | None = None,
+        system_context: Union[str, Callable[[dict], str]] | None = None,
+        model_config: dict | None = None,
         high_risk_tools: list[str] | None = None,
         on_event: EventHandler | list[EventHandler] | None = None,
         # Interceptor configuration
@@ -388,6 +409,8 @@ class Agent:
         self.provider = provider
         self.framework = framework
         self.system_prompt = system_prompt
+        self._system_context = system_context
+        self._model_config = model_config or {}
         self.high_risk_tools = set(high_risk_tools or [])
         
         # A2A identity
@@ -445,6 +468,7 @@ class Agent:
             aws_access_key=aws_access_key,
             aws_secret_key=aws_secret_key,
             api_key=api_key,
+            model_config=self._model_config,
         )
         self._conversations = InMemoryConversationRepository()
         self._agent_service = AgentService(
@@ -456,6 +480,33 @@ class Agent:
             conversations=self._conversations,
             events=self._create_event_publisher(),
         )
+    
+    def _build_system_parts(self, platform_context: dict | None = None) -> tuple[str | None, str | None]:
+        """
+        Build static and dynamic system prompt parts separately.
+        
+        This separation is useful even without caching - it keeps static
+        instructions separate from runtime context. When caching is enabled,
+        adapters can place a cache checkpoint between these parts.
+        
+        Args:
+            platform_context: Runtime context (tenant, namespace, etc.)
+            
+        Returns:
+            (static_part, dynamic_part) where either can be None
+        """
+        static = self.system_prompt
+        
+        dynamic = None
+        if self._system_context:
+            if callable(self._system_context):
+                # Call the function with platform_context
+                dynamic = self._system_context(platform_context or {})
+            else:
+                # Use the string directly
+                dynamic = self._system_context
+        
+        return static, dynamic
     
     def run(
         self, 
@@ -566,12 +617,23 @@ class Agent:
         
         # === CALL THE LLM ===
         
+        # Build system prompt parts for caching
+        static_system, dynamic_system = self._build_system_parts(effective_context)
+        
+        # If we have separate parts, use them; otherwise use effective_system_prompt
+        if static_system or dynamic_system:
+            final_system_prompt = None  # Will be built by adapter from parts
+        else:
+            final_system_prompt = effective_system_prompt
+        
         # Create the internal request
         internal_request = AgentRequest(
             content=current_user_message,
             messages=messages_as_dicts,
             tools=self.tools,
-            system_prompt=effective_system_prompt,
+            system_prompt=final_system_prompt,
+            static_system=static_system,
+            dynamic_system=dynamic_system,
             context=effective_context,
         )
         

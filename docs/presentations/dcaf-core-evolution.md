@@ -577,7 +577,159 @@ serve(agent)
 
 ---
 
-## Slide 21: A2A (Agent-to-Agent) Protocol
+## Slide 21: Prompt Caching
+
+### Reduce Costs by up to 90%
+
+**What is Prompt Caching?**
+
+AWS Bedrock feature that caches static prompt content.
+
+**Benefits:**
+- Up to 90% cost reduction on cached tokens
+- Up to 85% latency reduction
+- 5-minute cache TTL (resets on each cache hit)
+
+**Key Insight:**
+Separate static instructions (cached) from dynamic context (fresh)
+
+**Status:** Experimental v1 - Temporary until Agno adds native support
+
+---
+
+## Slide 22: How Prompt Caching Works
+
+### DCAF places a cache checkpoint between static and dynamic parts:
+
+```
+[Static Instructions]  ← CACHED (same for all requests)
+         ↓
+[Cache Checkpoint]
+         ↓
+[Dynamic Context]      ← NOT cached (fresh each time)
+```
+
+**Example:**
+- Static: "You are a K8s expert. [detailed guidelines]" ← CACHED
+- Dynamic: "Tenant: acme-corp, User: alice" ← FRESH
+
+---
+
+## Slide 23: Basic Prompt Caching Usage
+
+### Enable caching with one parameter:
+
+```python
+from dcaf.core import Agent
+
+agent = Agent(
+    system_prompt='''You are a Kubernetes expert.
+    
+    [Add detailed guidelines here - aim for 1024+ tokens]
+    
+    Guidelines:
+    - Always verify namespace before operations
+    - Explain what each command does
+    - Ask for confirmation on destructive operations
+    [... more detailed instructions ...]
+    ''',
+    
+    tools=[list_pods, delete_pod],
+    
+    model_config={
+        "cache_system_prompt": True  # Enable caching
+    }
+)
+```
+
+---
+
+## Slide 24: Static + Dynamic Pattern
+
+### The recommended pattern for maximum savings:
+
+```python
+agent = Agent(
+    # Static part - cached (same for all requests)
+    system_prompt='''You are a Kubernetes expert for a multi-tenant platform.
+    
+    [Detailed guidelines, examples, best practices...]
+    - Verify tenant context before operations
+    - Follow security best practices
+    - Provide clear explanations
+    ''',
+    
+    # Dynamic part - NOT cached (changes per request)
+    system_context=lambda ctx: f'''
+    === CURRENT CONTEXT ===
+    Tenant: {ctx.get('tenant_name')}
+    Namespace: {ctx.get('k8s_namespace')}
+    User: {ctx.get('user_email')}
+    ''',
+    
+    model_config={"cache_system_prompt": True}
+)
+```
+
+---
+
+## Slide 25: Requirements & Best Practices
+
+### Minimum Token Count:
+- **Claude 3.7 Sonnet:** 1024 tokens
+- **Claude 3.5 Haiku:** 2048 tokens
+- ~4 characters = 1 token (aim for 4000+ chars)
+
+### Best Practices:
+1. Make static content detailed and comprehensive
+2. Put all variable data in `system_context`
+3. Monitor logs for cache HIT/MISS indicators
+4. Ensure high request volume (>1 per 5 minutes)
+
+---
+
+## Slide 26: Cost Savings Example
+
+### Scenario: 100 requests with 1500-token static prompt + 100-token dynamic
+
+**Without caching:**
+- 100 × 1600 tokens = 160,000 tokens
+- Cost: ~$0.48
+
+**With caching:**
+- First request: 1600 tokens (MISS)
+- Next 99 requests: 100 tokens each (HIT)
+- Total: 11,500 tokens
+- Cost: ~$0.035
+
+**Savings: ~93%** 💰
+
+---
+
+## Slide 27: Monitoring Cache Performance
+
+### DCAF logs cache metrics automatically:
+
+```
+# Console logs show cache status:
+
+INFO: ✅ Cache HIT: 950 tokens reused (~90% cost reduction)
+INFO: 📝 Cache MISS: 950 tokens cached for next request
+
+# First request is always a MISS (creates cache)
+Request 1: MISS (creates cache)  → Full cost
+Request 2: HIT  (uses cache)     → 10% cost
+Request 3: HIT  (uses cache)     → 10% cost
+...
+Request N: MISS (cache expired after 5 min) → Full cost
+
+# Warnings if misconfigured:
+WARNING: System prompt (~500 tokens) below minimum threshold
+```
+
+---
+
+## Slide 28: A2A (Agent-to-Agent) Protocol
 
 ### Multi-Agent Systems Made Easy
 
@@ -596,7 +748,7 @@ DCAF now supports **Google's A2A protocol** for agent-to-agent communication.
 
 ---
 
-## Slide 22: A2A Server - Expose Your Agent
+## Slide 29: A2A Server - Expose Your Agent
 
 ### Make Your Agent Discoverable
 
@@ -623,7 +775,7 @@ serve(agent, port=8000, a2a=True)
 
 ---
 
-## Slide 23: A2A Client - Call Remote Agents
+## Slide 30: A2A Client - Call Remote Agents
 
 ### Connect and Call
 
@@ -654,7 +806,7 @@ print(f"Skills: {k8s.skills}")        # ["list_pods", "delete_pod", ...]
 
 ---
 
-## Slide 24: Multi-Agent Orchestration
+## Slide 31: Multi-Agent Orchestration
 
 ### Pattern: Orchestrator + Specialists
 
@@ -683,7 +835,7 @@ orchestrator = Agent(
 
 ---
 
-## Slide 25: A2A Architecture
+## Slide 32: A2A Architecture
 
 ```
 ┌────────────────────────────────────────────────────────────┐
@@ -714,7 +866,7 @@ orchestrator = Agent(
 
 ---
 
-## Slide 26: A2A Example - Complete System
+## Slide 33: A2A Example - Complete System
 
 ### Kubernetes Specialist
 
@@ -746,7 +898,7 @@ serve(agent, port=8002, a2a=True)
 
 ---
 
-## Slide 27: A2A Orchestrator
+## Slide 34: A2A Orchestrator
 
 ```python
 # orchestrator.py
@@ -777,7 +929,7 @@ result = orchestrator.send("How many pods and EC2 instances?")
 
 ---
 
-## Slide 28: A2A Benefits
+## Slide 35: A2A Benefits
 
 | Benefit | Description |
 |---------|-------------|
@@ -796,7 +948,7 @@ result = orchestrator.send("How many pods and EC2 instances?")
 
 ---
 
-## Slide 29: Updated Feature Matrix
+## Slide 36: Updated Feature Matrix
 
 | Feature | Status | Example |
 |---------|--------|---------|
@@ -806,12 +958,13 @@ result = orchestrator.send("How many pods and EC2 instances?")
 | **Interceptors** | ✅ | `request_interceptors=[...]` |
 | **Streaming** | ✅ | `agent.run_stream(...)` |
 | **REST Server** | ✅ | `serve(agent, port=8000)` |
+| **Prompt Caching** | ✅ **NEW!** | `model_config={"cache_system_prompt": True}` |
 | **A2A Protocol** | ✅ **NEW!** | `serve(agent, a2a=True)` |
 | **Multi-Agent** | ✅ **NEW!** | `RemoteAgent(url=...).as_tool()` |
 
 ---
 
-## Slide 30: Q&A
+## Slide 37: Q&A
 
 # Questions?
 
@@ -821,7 +974,7 @@ result = orchestrator.send("How many pods and EC2 instances?")
 2. **Flexible tool schemas** - Auto-generate, dict, or Pydantic models
 3. **Human-in-the-loop** - Built-in approval for sensitive operations
 4. **Production-ready** - Workers, keep-alive, health checks included
-5. **Flexible** - Use classes or functions, your choice
+5. **Cost Optimization** - **NEW!** Prompt caching reduces costs by up to 90%
 6. **Multi-Agent** - **NEW!** A2A protocol for agent-to-agent communication
 
 ---

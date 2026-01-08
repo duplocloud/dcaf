@@ -1,11 +1,12 @@
-# Bedrock Prompt Caching Implementation Plan
+# Bedrock Prompt Caching Implementation Plan (Revised)
 
 ## Overview
 
 **Feature**: Add AWS Bedrock prompt caching support to DCAF agents  
 **Priority**: Performance optimization  
-**Estimated Effort**: 2-3 days  
+**Estimated Effort**: 3-4 days (including testing and examples)  
 **Target Engineer Level**: Junior  
+**Status**: Experimental (v1) - Temporary implementation until Agno adds native support
 
 ---
 
@@ -46,23 +47,29 @@ DCAF agents typically have:
 
 By caching the static parts, we can make agents faster and cheaper to run.
 
+### Important Note
+
+**This is a temporary implementation.** Agno is expected to add native prompt caching support in a future release. Once that's available, we'll remove this custom implementation and use Agno's built-in support.
+
 ---
 
 ## Requirements
 
 ### Functional Requirements
 
-1. **FR-1**: Developers can enable prompt caching on an Agent with a simple flag
+1. **FR-1**: Developers can enable prompt caching on an Agent via `model_config`
 2. **FR-2**: Developers can provide a static system prompt (cached) and dynamic context (not cached)
-3. **FR-3**: DCAF combines static and dynamic parts with a cache checkpoint between them
+3. **FR-3**: DCAF places a cache checkpoint between static and dynamic parts
 4. **FR-4**: Caching works with AWS Bedrock Claude models (3.5 Haiku, 3.7 Sonnet, etc.)
 5. **FR-5**: Existing agents without caching continue to work unchanged (backward compatible)
+6. **FR-6**: Cache performance metrics are logged when available
 
 ### Non-Functional Requirements
 
 1. **NFR-1**: No breaking changes to existing Agent API
 2. **NFR-2**: Clear error messages if caching is misconfigured
-3. **NFR-3**: Logging of cache-related information for debugging
+3. **NFR-3**: Extensive logging of cache-related information for debugging
+4. **NFR-4**: All caching logic stays within adapter implementation (not exposed in public API)
 
 ---
 
@@ -76,159 +83,94 @@ from dcaf.core import Agent
 agent = Agent(
     system="You are a Kubernetes expert...",  # This gets cached
     tools=[list_pods, delete_pod],
-    cache=True,  # Enable caching
+    model_config={
+        "cache_system_prompt": True  # Enable caching
+    }
 )
 ```
 
-### Advanced Usage (Static + Dynamic)
+### Separating Static and Dynamic Prompts
+
+This is the **key pattern** for effective caching:
 
 ```python
 from dcaf.core import Agent
 
 agent = Agent(
-    # Static part - gets cached
+    # Static part - gets cached (same for every request)
     system="You are a Kubernetes expert. Your job is to help users manage their clusters...",
     
-    # Dynamic part - appended AFTER cache checkpoint (not cached)
-    system_context="Current tenant: acme-corp\nNamespace: production",
+    # Dynamic part - NOT cached (changes per request)
+    system_context=lambda ctx: f"""
+    Current tenant: {ctx.get('tenant_name', 'unknown')}
+    Namespace: {ctx.get('k8s_namespace', 'default')}
+    User: {ctx.get('user_email', 'anonymous')}
+    """,
     
     tools=[list_pods, delete_pod],
-    cache=True,
+    model_config={
+        "cache_system_prompt": True
+    }
 )
 ```
 
-### With Callable Context (Most Flexible)
+**Why separate them?**
+- Even without caching, this is good design (separates static instructions from runtime context)
+- With caching, DCAF places a cache checkpoint between them automatically
+- Works gracefully with non-caching providers (they just concatenate)
+
+### How platform_context Flows
 
 ```python
-from dcaf.core import Agent
+# User request includes platform_context
+{
+  "messages": [...],
+  "platform_context": {
+    "tenant_name": "acme-corp",
+    "k8s_namespace": "production"
+  }
+}
 
-def build_context(platform_context: dict) -> str:
-    return f"""
-    Tenant: {platform_context.get('tenant_name', 'unknown')}
-    Namespace: {platform_context.get('k8s_namespace', 'default')}
-    User: {platform_context.get('user_email', 'anonymous')}
-    """
+# Agent receives it and passes to system_context callable
+result = agent.run(messages, context=platform_context)
 
-agent = Agent(
-    system="You are a Kubernetes expert...",
-    system_context=build_context,  # Called at runtime with platform_context
-    tools=[list_pods, delete_pod],
-    cache=True,
-)
+# system_context function is called with platform_context
+# Result is appended AFTER cache checkpoint
 ```
 
 ---
 
 ## Implementation Tasks
 
-### Task 1: Create CacheConfig Class
-
-**File**: `dcaf/core/domain/value_objects/cache_config.py` (new file)
-
-**Purpose**: Define the configuration options for caching.
-
-```python
-"""Cache configuration for Bedrock prompt caching."""
-
-from dataclasses import dataclass
-from typing import Optional
-
-
-@dataclass(frozen=True)
-class CacheConfig:
-    """
-    Configuration for AWS Bedrock prompt caching.
-    
-    Prompt caching reduces latency and cost by caching static portions
-    of your prompts. Cached content must meet minimum token requirements
-    (varies by model, typically 1024-2048 tokens).
-    
-    Attributes:
-        enabled: Whether caching is enabled
-        system_prompt: Whether to cache the system prompt
-        tools: Whether to cache tool definitions (future enhancement)
-        
-    Example:
-        # Simple: just enable with defaults
-        cache=True
-        
-        # Explicit configuration
-        cache=CacheConfig(system_prompt=True, tools=True)
-    """
-    
-    enabled: bool = True
-    system_prompt: bool = True
-    tools: bool = False  # Future enhancement
-    
-    @classmethod
-    def from_value(cls, value) -> Optional["CacheConfig"]:
-        """
-        Create CacheConfig from various input types.
-        
-        Args:
-            value: Can be:
-                - None: Returns None (caching disabled)
-                - False: Returns None (caching disabled)
-                - True: Returns default CacheConfig
-                - CacheConfig: Returns as-is
-                
-        Returns:
-            CacheConfig or None
-            
-        Example:
-            CacheConfig.from_value(True)  # Returns CacheConfig(enabled=True, ...)
-            CacheConfig.from_value(False)  # Returns None
-        """
-        if value is None or value is False:
-            return None
-        if value is True:
-            return cls()
-        if isinstance(value, cls):
-            return value
-        raise TypeError(
-            f"cache must be bool or CacheConfig, got {type(value).__name__}"
-        )
-```
-
-**Acceptance Criteria**:
-- [ ] `CacheConfig.from_value(True)` returns a default CacheConfig
-- [ ] `CacheConfig.from_value(False)` returns None
-- [ ] `CacheConfig.from_value(None)` returns None
-- [ ] `CacheConfig.from_value(CacheConfig(...))` returns the same instance
-- [ ] Invalid types raise TypeError with clear message
-
----
-
-### Task 2: Update Agent Class to Accept Cache Parameters
+### Task 1: Update Agent Class to Accept system_context
 
 **File**: `dcaf/core/agent.py`
 
-**Purpose**: Add `cache` and `system_context` parameters to the Agent class.
+**Purpose**: Add `system_context` parameter to separate static and dynamic prompt parts.
 
 **Changes Required**:
 
-1. **Add imports** at top of file:
+1. **Add import** at top of file:
 ```python
-from dcaf.core.domain.value_objects.cache_config import CacheConfig
 from typing import Union, Callable
 ```
 
-2. **Update Agent.__init__** signature to add new parameters:
+2. **Update Agent.__init__** signature:
 ```python
 def __init__(
     self,
     # ... existing parameters ...
     system: Optional[str] = None,
     
-    # NEW PARAMETERS:
+    # NEW PARAMETER:
     system_context: Optional[Union[str, Callable[[dict], str]]] = None,
-    cache: Optional[Union[bool, CacheConfig]] = None,
     
     # ... rest of existing parameters ...
+    model_config: Optional[dict] = None,  # Ensure this exists
 ):
 ```
 
-3. **Add docstring for new parameters**:
+3. **Add docstring for new parameter**:
 ```python
 """
 Args:
@@ -240,89 +182,101 @@ Args:
             - A callable: Called with platform_context dict, returns string
             This content is NOT cached and is evaluated fresh each request.
             
-    cache: Enable Bedrock prompt caching. Can be:
-            - True: Enable with default settings
-            - False/None: Disable caching
-            - CacheConfig: Custom cache configuration
+    model_config: Configuration passed to the model adapter. For caching:
+            {"cache_system_prompt": True}
 """
 ```
 
-4. **Store the new attributes**:
+4. **Store the attributes**:
 ```python
 self._system = system
 self._system_context = system_context
-self._cache_config = CacheConfig.from_value(cache)
+self._model_config = model_config or {}
 ```
 
-5. **Add a method to build the complete system prompt**:
+5. **Add method to build system prompt parts separately**:
 ```python
-def _build_system_prompt(self, platform_context: Optional[dict] = None) -> str:
+def _build_system_parts(self, platform_context: Optional[dict] = None) -> tuple[Optional[str], Optional[str]]:
     """
-    Build the complete system prompt from static and dynamic parts.
+    Build static and dynamic system prompt parts separately.
+    
+    This separation is useful even without caching - it keeps static
+    instructions separate from runtime context. When caching is enabled,
+    adapters can place a cache checkpoint between these parts.
     
     Args:
         platform_context: Runtime context (tenant, namespace, etc.)
         
     Returns:
-        Complete system prompt string
+        (static_part, dynamic_part) where either can be None
     """
-    parts = []
+    static = self._system
     
-    # Add static system prompt
-    if self._system:
-        parts.append(self._system)
-    
-    # Add dynamic context
+    dynamic = None
     if self._system_context:
         if callable(self._system_context):
             # Call the function with platform_context
-            context = self._system_context(platform_context or {})
+            dynamic = self._system_context(platform_context or {})
         else:
-            # Use the string directly (could add template formatting here)
-            context = self._system_context
-        
-        if context:
-            parts.append(context)
+            # Use the string directly
+            dynamic = self._system_context
     
-    return "\n\n".join(parts)
+    return static, dynamic
 ```
 
-6. **Add properties for external access**:
+6. **Update the agent execution flow** to pass system parts to adapter:
+
+Find the method where the agent invokes the runtime (likely `run()` or similar) and update it to pass the system parts:
+
 ```python
-@property
-def cache_config(self) -> Optional[CacheConfig]:
-    """Get the cache configuration."""
-    return self._cache_config
-
-@property
-def has_caching_enabled(self) -> bool:
-    """Check if caching is enabled."""
-    return self._cache_config is not None and self._cache_config.enabled
+def run(self, messages: list, context: dict = None) -> AgentResult:
+    """Execute the agent with the given messages."""
+    platform_context = context or {}
+    
+    # Build system prompt parts
+    static_system, dynamic_system = self._build_system_parts(platform_context)
+    
+    # Pass to adapter with both parts
+    response = self._runtime.invoke(
+        messages=messages,
+        static_system=static_system,
+        dynamic_system=dynamic_system,
+        tools=self._tools,
+        # ... other params
+    )
+    
+    return response
 ```
+
+**Note**: The exact location will depend on current Agent implementation. Look for where `self._runtime` or the adapter is called.
 
 **Acceptance Criteria**:
-- [ ] `Agent(system="...", cache=True)` creates an agent with caching enabled
-- [ ] `Agent(system="...", cache=False)` creates an agent with caching disabled
 - [ ] `Agent(system="...", system_context="...")` stores both parts
 - [ ] `Agent(system="...", system_context=lambda ctx: "...")` accepts callable
-- [ ] `agent.has_caching_enabled` returns correct boolean
-- [ ] `agent._build_system_prompt({})` combines static and dynamic parts
-- [ ] Existing agents without `cache` parameter continue to work
+- [ ] `agent._build_system_parts({})` returns tuple of (static, dynamic)
+- [ ] Callable context receives platform_context dict
+- [ ] Existing agents without `system_context` continue to work
+- [ ] `model_config` is stored and accessible
 
 ---
 
-### Task 3: Create CachingAwsBedrock Model Class
+### Task 2: Create CachingAwsBedrock Model Class
 
 **File**: `dcaf/core/adapters/outbound/agno/caching_bedrock.py` (new file)
 
 **Purpose**: Extend Agno's AwsBedrock to add cache checkpoints to requests.
 
+**Important**: This is a **temporary workaround** until Agno adds native caching support. Once Agno implements caching, we'll remove this class and use their implementation.
+
 ```python
 """
 AWS Bedrock model with prompt caching support.
 
-This module extends Agno's AwsBedrock class to add cache checkpoints
-to system prompts, enabling Bedrock's prompt caching feature.
+TEMPORARY IMPLEMENTATION: This module extends Agno's AwsBedrock class to add 
+cache checkpoints to system prompts. This is a workaround until Agno adds 
+native prompt caching support (expected in future release).
+
+Once Agno supports caching natively, this module should be removed.
 """
 
 from typing import Any, Dict, List, Optional, Tuple
@@ -342,17 +296,19 @@ class CachingAwsBedrock(AwsBedrock):
     prompt, enabling Bedrock's prompt caching feature for reduced latency
     and cost.
     
-    The cache checkpoint is placed AFTER the static system prompt content,
-    so that the static portion is cached and any dynamic content appended
-    afterward is processed fresh.
+    TEMPORARY: Remove once Agno adds native caching support.
     
     Attributes:
         cache_system_prompt: Whether to add cache checkpoint to system prompt
+        static_system: Static portion of system prompt (cached)
+        dynamic_system: Dynamic portion of system prompt (not cached)
         
     Example:
         model = CachingAwsBedrock(
             id="anthropic.claude-3-7-sonnet-20250219-v1:0",
             cache_system_prompt=True,
+            static_system="You are a helpful assistant...",
+            dynamic_system="Tenant: acme-corp",
         )
     """
     
@@ -363,6 +319,8 @@ class CachingAwsBedrock(AwsBedrock):
     def __init__(
         self,
         cache_system_prompt: bool = False,
+        static_system: Optional[str] = None,
+        dynamic_system: Optional[str] = None,
         **kwargs: Any,
     ) -> None:
         """
@@ -370,10 +328,14 @@ class CachingAwsBedrock(AwsBedrock):
         
         Args:
             cache_system_prompt: Whether to add cache checkpoint to system prompt
+            static_system: Static portion (cached)
+            dynamic_system: Dynamic portion (not cached)
             **kwargs: Passed to parent AwsBedrock class
         """
         super().__init__(**kwargs)
         self._cache_system_prompt = cache_system_prompt
+        self._static_system = static_system
+        self._dynamic_system = dynamic_system
         
         if cache_system_prompt:
             logger.info(
@@ -391,6 +353,9 @@ class CachingAwsBedrock(AwsBedrock):
         This overrides the parent method to add a cachePoint to the
         system message when caching is enabled.
         
+        Note: This override may be fragile if Agno updates their implementation.
+        Last verified compatible with: agno==0.6.x
+        
         Args:
             messages: List of messages to format
             compress_tool_results: Whether to compress tool results
@@ -403,11 +368,62 @@ class CachingAwsBedrock(AwsBedrock):
             messages, compress_tool_results
         )
         
-        # Add cache checkpoint to system message if enabled
-        if self._cache_system_prompt and system_message:
+        # If we have static/dynamic parts, build custom system message
+        if self._static_system or self._dynamic_system:
+            system_message = self._build_cached_system_message()
+        elif self._cache_system_prompt and system_message:
+            # Just add checkpoint to existing system message
             system_message = self._add_cache_checkpoint(system_message)
         
         return formatted_messages, system_message
+    
+    def _build_cached_system_message(self) -> Optional[List[Dict[str, Any]]]:
+        """
+        Build system message with cache checkpoint between static and dynamic parts.
+        
+        Structure:
+        [
+            {"text": "static content..."},
+            {"cachePoint": {"type": "default"}},  # ← Cache everything above
+            {"text": "dynamic content..."}
+        ]
+        
+        Returns:
+            System message content blocks, or None if no content
+        """
+        parts = []
+        
+        # Add static part
+        if self._static_system:
+            # Check if it meets minimum token threshold
+            if self._cache_system_prompt and not self._check_token_threshold(self._static_system):
+                logger.warning(
+                    "Static system prompt below minimum token threshold for caching. "
+                    "Caching disabled for this request."
+                )
+                # Disable caching for this request, just concatenate
+                combined = "\n\n".join([p for p in [self._static_system, self._dynamic_system] if p])
+                return [{"text": combined}] if combined else None
+            
+            parts.append({"text": self._static_system})
+        
+        # Add cache checkpoint (only if we have static content to cache)
+        if self._static_system and self._cache_system_prompt:
+            parts.append({"cachePoint": {"type": "default"}})
+            logger.debug(
+                f"Added cache checkpoint after static system prompt "
+                f"(~{len(self._static_system)//4} tokens)"
+            )
+        
+        # Add dynamic part
+        if self._dynamic_system:
+            parts.append({"text": self._dynamic_system})
+            logger.debug(
+                f"Added dynamic system context "
+                f"(~{len(self._dynamic_system)//4} tokens)"
+            )
+        
+        return parts if parts else None
     
     def _add_cache_checkpoint(
         self, 
@@ -446,45 +462,82 @@ class CachingAwsBedrock(AwsBedrock):
         )
         
         return cached_system
-
-
-def create_caching_model(
-    model_id: str,
-    cache_system_prompt: bool = False,
-    **kwargs: Any,
-) -> AwsBedrock:
-    """
-    Factory function to create a Bedrock model with optional caching.
     
-    Args:
-        model_id: The Bedrock model ID
-        cache_system_prompt: Whether to enable system prompt caching
-        **kwargs: Additional arguments for the model
+    def _check_token_threshold(self, text: str) -> bool:
+        """
+        Check if text meets minimum caching threshold.
         
-    Returns:
-        AwsBedrock or CachingAwsBedrock instance
-    """
-    if cache_system_prompt:
-        return CachingAwsBedrock(
-            id=model_id,
-            cache_system_prompt=True,
-            **kwargs,
+        Args:
+            text: The text to check
+            
+        Returns:
+            True if text is long enough to cache, False otherwise
+        """
+        # Rough estimate: 4 chars ≈ 1 token
+        estimated_tokens = len(text) // 4
+        
+        if estimated_tokens < self.MIN_CACHE_TOKENS:
+            logger.warning(
+                f"System prompt (~{estimated_tokens} tokens) below minimum "
+                f"threshold ({self.MIN_CACHE_TOKENS} tokens). "
+                f"Consider longer instructions or disable caching."
+            )
+            return False
+        
+        logger.info(
+            f"System prompt (~{estimated_tokens} tokens) meets caching threshold"
         )
-    else:
-        return AwsBedrock(id=model_id, **kwargs)
+        return True
+    
+    def _log_cache_metrics(self, response: Dict[str, Any]) -> None:
+        """
+        Log cache performance metrics from Bedrock response.
+        
+        Bedrock returns cache metrics in the response under 'usage':
+        - cacheReadInputTokens: Tokens retrieved from cache (cache HIT)
+        - cacheCreationInputTokens: Tokens cached for first time (cache MISS)
+        
+        Args:
+            response: The Bedrock API response
+        """
+        usage = response.get("usage", {})
+        cache_hit = usage.get("cacheReadInputTokens", 0)
+        cache_miss = usage.get("cacheCreationInputTokens", 0)
+        
+        if cache_hit > 0:
+            logger.info(
+                f"✅ Cache HIT: {cache_hit} tokens reused "
+                f"(~{cache_hit * 0.9:.0f}% cost reduction)"
+            )
+        elif cache_miss > 0:
+            logger.info(
+                f"📝 Cache MISS: {cache_miss} tokens cached for next request "
+                f"(cache created)"
+            )
+        elif self._cache_system_prompt:
+            logger.warning(
+                "⚠️ Caching enabled but no cache metrics in response. "
+                "Possible reasons: system prompt too short, caching not supported "
+                "by this model, or Bedrock API change."
+            )
+
+
+# Note: We intentionally don't export a create_caching_model() factory
+# to keep the public API simple. Adapter handles instantiation.
 ```
 
 **Acceptance Criteria**:
 - [ ] `CachingAwsBedrock` extends `AwsBedrock` without breaking existing functionality
-- [ ] When `cache_system_prompt=True`, system message includes `cachePoint`
-- [ ] When `cache_system_prompt=False`, system message is unchanged
-- [ ] Cache checkpoint is added at the END of system message content
+- [ ] When `cache_system_prompt=True` and static_system provided, cache checkpoint is added
+- [ ] Cache checkpoint is placed BETWEEN static and dynamic parts
 - [ ] Original system message is not mutated (copy is made)
-- [ ] Logging indicates when caching is enabled
+- [ ] Token threshold is checked before enabling caching
+- [ ] Logging indicates when caching is enabled/disabled
+- [ ] Cache metrics are logged when available in response
 
 ---
 
-### Task 4: Update AgnoAdapter to Use Caching
+### Task 3: Update AgnoAdapter to Use Caching
 
 **File**: `dcaf/core/adapters/outbound/agno/adapter.py`
 
@@ -494,42 +547,39 @@ def create_caching_model(
 
 1. **Add import** at top of file:
 ```python
-from .caching_bedrock import CachingAwsBedrock, create_caching_model
+from .caching_bedrock import CachingAwsBedrock
 ```
 
-2. **Update `__init__`** to accept cache configuration:
-```python
-def __init__(
-    self,
-    # ... existing parameters ...
-    
-    # NEW PARAMETER:
-    cache_system_prompt: bool = False,
-    
-    # ... rest of parameters ...
-):
-    # ... existing init code ...
-    
-    # Store cache setting
-    self._cache_system_prompt = cache_system_prompt
-```
+2. **Update the method that creates the Bedrock model** to check for caching config:
 
-3. **Update `_create_bedrock_model_async`** to use caching model:
+Find the method that creates the AwsBedrock instance (likely `_create_bedrock_model_async` or similar). Update it to conditionally use `CachingAwsBedrock`:
+
 ```python
-async def _create_bedrock_model_async(self):
-    """Create an AWS Bedrock model with async session."""
+async def _create_bedrock_model_async(self, static_system=None, dynamic_system=None):
+    """
+    Create an AWS Bedrock model with async session.
+    
+    Args:
+        static_system: Static portion of system prompt (for caching)
+        dynamic_system: Dynamic portion of system prompt (for caching)
+    """
     import aioboto3
     
     # ... existing session setup code ...
     
-    # Create the model (with or without caching)
+    # Check if caching is enabled via model_config
+    cache_enabled = self._model_config.get("cache_system_prompt", False)
+    
+    # Log configuration
     logger.info(
         f"Agno: Initialized Bedrock model {self._model_id} "
         f"(temperature={self._temperature}, max_tokens={self._max_tokens}, "
-        f"cache_system_prompt={self._cache_system_prompt})"
+        f"cache_system_prompt={cache_enabled})"
     )
     
-    if self._cache_system_prompt:
+    # Create the appropriate model
+    if cache_enabled:
+        logger.info("Using CachingAwsBedrock (temporary until Agno adds native support)")
         return CachingAwsBedrock(
             id=self._model_id,
             aws_region=region,
@@ -537,6 +587,8 @@ async def _create_bedrock_model_async(self):
             temperature=self._temperature,
             max_tokens=self._max_tokens,
             cache_system_prompt=True,
+            static_system=static_system,
+            dynamic_system=dynamic_system,
         )
     else:
         return AwsBedrock(
@@ -548,119 +600,90 @@ async def _create_bedrock_model_async(self):
         )
 ```
 
+3. **Update the `invoke` method** to accept and pass through system parts:
+
+```python
+def invoke(
+    self, 
+    messages: List[Message],
+    static_system: Optional[str] = None,
+    dynamic_system: Optional[str] = None,
+    **kwargs
+) -> AgentResponse:
+    """
+    Invoke the model with messages.
+    
+    Args:
+        messages: Conversation messages
+        static_system: Static portion of system prompt (cached)
+        dynamic_system: Dynamic portion of system prompt (not cached)
+        **kwargs: Additional arguments
+    """
+    # If we need to recreate the model with new system parts
+    # (for caching), do so here
+    if static_system or dynamic_system:
+        # Store for model creation
+        self._static_system = static_system
+        self._dynamic_system = dynamic_system
+    
+    # ... rest of invoke logic ...
+```
+
+**Note**: The exact implementation depends on how AgnoAdapter currently handles system prompts. You may need to:
+- Store static/dynamic parts as instance variables
+- Pass them when creating the model
+- Or handle them in the message formatting step
+
 **Acceptance Criteria**:
-- [ ] `AgnoAdapter(cache_system_prompt=True)` uses `CachingAwsBedrock`
-- [ ] `AgnoAdapter(cache_system_prompt=False)` uses regular `AwsBedrock`
+- [ ] `AgnoAdapter` with `model_config={"cache_system_prompt": True}` uses `CachingAwsBedrock`
+- [ ] `AgnoAdapter` without cache config uses regular `AwsBedrock`
+- [ ] Static and dynamic system parts are passed to the model
 - [ ] Logging shows whether caching is enabled
 - [ ] All existing tests continue to pass
 
 ---
 
-### Task 5: Wire Up Agent to Adapter
+### Task 4: Add Cache Metrics Logging to Response Handling
 
-**File**: `dcaf/core/agent.py` (or wherever Agent creates the adapter)
+**File**: `dcaf/core/adapters/outbound/agno/caching_bedrock.py` (update)
 
-**Purpose**: Pass cache configuration from Agent to AgnoAdapter.
+**Purpose**: Extract and log cache metrics from Bedrock responses.
 
-Find where the Agent creates or configures the AgnoAdapter and update it to pass the cache setting:
+**Changes Required**:
+
+In the `CachingAwsBedrock` class, find where Bedrock responses are processed and add cache metrics logging:
 
 ```python
-# When creating the adapter
-adapter = AgnoAdapter(
-    model_id=self._model_id,
-    provider="bedrock",
-    # ... other params ...
-    cache_system_prompt=self.has_caching_enabled,
-)
+# In whatever method processes the Bedrock response
+def _process_response(self, response: Dict[str, Any]) -> Any:
+    """Process Bedrock response."""
+    
+    # Log cache metrics if caching is enabled
+    if self._cache_system_prompt:
+        self._log_cache_metrics(response)
+    
+    # ... rest of response processing ...
+```
+
+**Note**: The exact location depends on Agno's response handling flow. Look for where the raw Bedrock API response is received.
+
+If Agno doesn't expose the raw response with usage metrics, add a comment:
+
+```python
+# TODO: Cache metrics logging currently not available through Agno API
+# Once Agno exposes usage metrics, add logging here
+# Expected format: response['usage']['cacheReadInputTokens']
 ```
 
 **Acceptance Criteria**:
-- [ ] Agent with `cache=True` creates adapter with `cache_system_prompt=True`
-- [ ] Agent without cache setting creates adapter with `cache_system_prompt=False`
+- [ ] Cache HIT is logged when tokens are reused
+- [ ] Cache MISS is logged when cache is created
+- [ ] Warning is logged if caching is enabled but no metrics returned
+- [ ] Logging includes token counts and cost savings estimate
 
 ---
 
-### Task 6: Handle Static + Dynamic System Prompt
-
-**File**: `dcaf/core/adapters/outbound/agno/caching_bedrock.py`
-
-**Purpose**: Support separate static (cached) and dynamic (not cached) system prompt parts.
-
-**Update the model to accept both parts**:
-
-```python
-class CachingAwsBedrock(AwsBedrock):
-    
-    def __init__(
-        self,
-        cache_system_prompt: bool = False,
-        static_system: Optional[str] = None,   # Cached part
-        dynamic_system: Optional[str] = None,  # Not cached part
-        **kwargs: Any,
-    ) -> None:
-        super().__init__(**kwargs)
-        self._cache_system_prompt = cache_system_prompt
-        self._static_system = static_system
-        self._dynamic_system = dynamic_system
-    
-    def _format_messages(
-        self, 
-        messages: List[Message], 
-        compress_tool_results: bool = False
-    ) -> Tuple[List[Dict[str, Any]], Optional[List[Dict[str, Any]]]]:
-        """Format messages with static/dynamic system prompt handling."""
-        
-        formatted_messages, system_message = super()._format_messages(
-            messages, compress_tool_results
-        )
-        
-        # If we have static/dynamic parts, build the system message ourselves
-        if self._static_system or self._dynamic_system:
-            system_message = self._build_cached_system_message()
-        elif self._cache_system_prompt and system_message:
-            # Just add checkpoint to existing system message
-            system_message = self._add_cache_checkpoint(system_message)
-        
-        return formatted_messages, system_message
-    
-    def _build_cached_system_message(self) -> List[Dict[str, Any]]:
-        """
-        Build system message with cache checkpoint between static and dynamic parts.
-        
-        Structure:
-        [
-            {"text": "static content..."},
-            {"cachePoint": {"type": "default"}},
-            {"text": "dynamic content..."}
-        ]
-        """
-        parts = []
-        
-        # Add static part
-        if self._static_system:
-            parts.append({"text": self._static_system})
-        
-        # Add cache checkpoint (only if we have static content to cache)
-        if self._static_system and self._cache_system_prompt:
-            parts.append({"cachePoint": {"type": "default"}})
-        
-        # Add dynamic part
-        if self._dynamic_system:
-            parts.append({"text": self._dynamic_system})
-        
-        return parts if parts else None
-```
-
-**Acceptance Criteria**:
-- [ ] Static + dynamic parts are correctly combined
-- [ ] Cache checkpoint is placed BETWEEN static and dynamic parts
-- [ ] If only static part exists, checkpoint is at the end
-- [ ] If only dynamic part exists, no checkpoint is added
-- [ ] Empty parts are handled gracefully
-
----
-
-### Task 7: Add Unit Tests
+### Task 5: Add Unit Tests
 
 **File**: `tests/test_prompt_caching.py` (new file)
 
@@ -668,85 +691,24 @@ class CachingAwsBedrock(AwsBedrock):
 """Tests for Bedrock prompt caching functionality."""
 
 import pytest
-from dcaf.core.domain.value_objects.cache_config import CacheConfig
 from dcaf.core.adapters.outbound.agno.caching_bedrock import CachingAwsBedrock
-
-
-class TestCacheConfig:
-    """Tests for CacheConfig class."""
-    
-    def test_from_value_true(self):
-        """True returns default CacheConfig."""
-        config = CacheConfig.from_value(True)
-        assert config is not None
-        assert config.enabled is True
-        assert config.system_prompt is True
-    
-    def test_from_value_false(self):
-        """False returns None."""
-        config = CacheConfig.from_value(False)
-        assert config is None
-    
-    def test_from_value_none(self):
-        """None returns None."""
-        config = CacheConfig.from_value(None)
-        assert config is None
-    
-    def test_from_value_config_instance(self):
-        """CacheConfig instance is returned as-is."""
-        original = CacheConfig(enabled=True, system_prompt=False)
-        config = CacheConfig.from_value(original)
-        assert config is original
-    
-    def test_from_value_invalid_type(self):
-        """Invalid type raises TypeError."""
-        with pytest.raises(TypeError, match="cache must be bool or CacheConfig"):
-            CacheConfig.from_value("invalid")
 
 
 class TestCachingAwsBedrock:
     """Tests for CachingAwsBedrock class."""
-    
-    def test_add_cache_checkpoint(self):
-        """Cache checkpoint is added to system message."""
-        model = CachingAwsBedrock(
-            id="anthropic.claude-3-7-sonnet-20250219-v1:0",
-            cache_system_prompt=True,
-        )
-        
-        system_message = [{"text": "You are a helpful assistant."}]
-        result = model._add_cache_checkpoint(system_message)
-        
-        assert len(result) == 2
-        assert result[0] == {"text": "You are a helpful assistant."}
-        assert result[1] == {"cachePoint": {"type": "default"}}
-    
-    def test_add_cache_checkpoint_does_not_mutate_original(self):
-        """Original system message is not modified."""
-        model = CachingAwsBedrock(
-            id="anthropic.claude-3-7-sonnet-20250219-v1:0",
-            cache_system_prompt=True,
-        )
-        
-        original = [{"text": "You are a helpful assistant."}]
-        original_copy = list(original)
-        
-        model._add_cache_checkpoint(original)
-        
-        assert original == original_copy  # Original unchanged
     
     def test_build_cached_system_message_static_only(self):
         """Static-only system message has checkpoint at end."""
         model = CachingAwsBedrock(
             id="anthropic.claude-3-7-sonnet-20250219-v1:0",
             cache_system_prompt=True,
-            static_system="Static instructions here.",
+            static_system="Static instructions here." * 300,  # Make it long enough
         )
         
         result = model._build_cached_system_message()
         
         assert len(result) == 2
-        assert result[0] == {"text": "Static instructions here."}
+        assert result[0]["text"].startswith("Static instructions")
         assert result[1] == {"cachePoint": {"type": "default"}}
     
     def test_build_cached_system_message_static_and_dynamic(self):
@@ -754,14 +716,14 @@ class TestCachingAwsBedrock:
         model = CachingAwsBedrock(
             id="anthropic.claude-3-7-sonnet-20250219-v1:0",
             cache_system_prompt=True,
-            static_system="Static instructions.",
+            static_system="Static instructions." * 300,
             dynamic_system="Dynamic context.",
         )
         
         result = model._build_cached_system_message()
         
         assert len(result) == 3
-        assert result[0] == {"text": "Static instructions."}
+        assert result[0]["text"].startswith("Static instructions")
         assert result[1] == {"cachePoint": {"type": "default"}}
         assert result[2] == {"text": "Dynamic context."}
     
@@ -778,52 +740,117 @@ class TestCachingAwsBedrock:
         assert len(result) == 1
         assert result[0] == {"text": "Dynamic context only."}
         # No cache checkpoint - nothing static to cache
+    
+    def test_add_cache_checkpoint(self):
+        """Cache checkpoint is added to system message."""
+        model = CachingAwsBedrock(
+            id="anthropic.claude-3-7-sonnet-20250219-v1:0",
+            cache_system_prompt=True,
+        )
+        
+        system_message = [{"text": "You are a helpful assistant." * 300}]
+        result = model._add_cache_checkpoint(system_message)
+        
+        assert len(result) == 2
+        assert result[0]["text"].startswith("You are a helpful assistant")
+        assert result[1] == {"cachePoint": {"type": "default"}}
+    
+    def test_add_cache_checkpoint_does_not_mutate_original(self):
+        """Original system message is not modified."""
+        model = CachingAwsBedrock(
+            id="anthropic.claude-3-7-sonnet-20250219-v1:0",
+            cache_system_prompt=True,
+        )
+        
+        original = [{"text": "You are a helpful assistant."}]
+        original_copy = list(original)
+        
+        model._add_cache_checkpoint(original)
+        
+        assert original == original_copy  # Original unchanged
+    
+    def test_check_token_threshold_below_minimum(self):
+        """Short text below threshold returns False."""
+        model = CachingAwsBedrock(
+            id="anthropic.claude-3-7-sonnet-20250219-v1:0",
+            cache_system_prompt=True,
+        )
+        
+        short_text = "Too short"
+        result = model._check_token_threshold(short_text)
+        
+        assert result is False
+    
+    def test_check_token_threshold_above_minimum(self):
+        """Long text above threshold returns True."""
+        model = CachingAwsBedrock(
+            id="anthropic.claude-3-7-sonnet-20250219-v1:0",
+            cache_system_prompt=True,
+        )
+        
+        # Create text with ~2000 tokens (8000 chars)
+        long_text = "This is a long system prompt. " * 270
+        result = model._check_token_threshold(long_text)
+        
+        assert result is True
+    
+    def test_log_cache_metrics_cache_hit(self, caplog):
+        """Cache HIT is logged correctly."""
+        model = CachingAwsBedrock(
+            id="anthropic.claude-3-7-sonnet-20250219-v1:0",
+            cache_system_prompt=True,
+        )
+        
+        response = {
+            "usage": {
+                "inputTokens": 100,
+                "outputTokens": 50,
+                "cacheReadInputTokens": 950,
+            }
+        }
+        
+        model._log_cache_metrics(response)
+        
+        assert "Cache HIT" in caplog.text
+        assert "950 tokens" in caplog.text
+    
+    def test_log_cache_metrics_cache_miss(self, caplog):
+        """Cache MISS is logged correctly."""
+        model = CachingAwsBedrock(
+            id="anthropic.claude-3-7-sonnet-20250219-v1:0",
+            cache_system_prompt=True,
+        )
+        
+        response = {
+            "usage": {
+                "inputTokens": 1000,
+                "outputTokens": 50,
+                "cacheCreationInputTokens": 950,
+            }
+        }
+        
+        model._log_cache_metrics(response)
+        
+        assert "Cache MISS" in caplog.text
+        assert "950 tokens" in caplog.text
 
 
 class TestAgentWithCaching:
     """Tests for Agent class with caching enabled."""
     
-    def test_agent_cache_true(self):
-        """Agent with cache=True has caching enabled."""
-        from dcaf.core import Agent
-        
-        agent = Agent(
-            system="Test prompt",
-            cache=True,
-        )
-        
-        assert agent.has_caching_enabled is True
-    
-    def test_agent_cache_false(self):
-        """Agent with cache=False has caching disabled."""
-        from dcaf.core import Agent
-        
-        agent = Agent(
-            system="Test prompt",
-            cache=False,
-        )
-        
-        assert agent.has_caching_enabled is False
-    
-    def test_agent_no_cache_param(self):
-        """Agent without cache param has caching disabled."""
-        from dcaf.core import Agent
-        
-        agent = Agent(system="Test prompt")
-        
-        assert agent.has_caching_enabled is False
-    
-    def test_agent_build_system_prompt_static_only(self):
-        """Build system prompt with static content only."""
+    def test_agent_build_system_parts_static_only(self):
+        """Build system parts with static content only."""
         from dcaf.core import Agent
         
         agent = Agent(system="Static instructions")
         
-        result = agent._build_system_prompt({})
-        assert result == "Static instructions"
+        static, dynamic = agent._build_system_parts({})
+        
+        assert static == "Static instructions"
+        assert dynamic is None
     
-    def test_agent_build_system_prompt_with_context_string(self):
-        """Build system prompt with static + string context."""
+    def test_agent_build_system_parts_with_context_string(self):
+        """Build system parts with static + string context."""
         from dcaf.core import Agent
         
         agent = Agent(
@@ -831,12 +858,13 @@ class TestAgentWithCaching:
             system_context="Dynamic context",
         )
         
-        result = agent._build_system_prompt({})
-        assert "Static instructions" in result
-        assert "Dynamic context" in result
+        static, dynamic = agent._build_system_parts({})
+        
+        assert static == "Static instructions"
+        assert dynamic == "Dynamic context"
     
-    def test_agent_build_system_prompt_with_context_callable(self):
-        """Build system prompt with static + callable context."""
+    def test_agent_build_system_parts_with_context_callable(self):
+        """Build system parts with static + callable context."""
         from dcaf.core import Agent
         
         agent = Agent(
@@ -844,93 +872,582 @@ class TestAgentWithCaching:
             system_context=lambda ctx: f"Tenant: {ctx.get('tenant', 'unknown')}",
         )
         
-        result = agent._build_system_prompt({"tenant": "acme"})
-        assert "Static instructions" in result
-        assert "Tenant: acme" in result
+        static, dynamic = agent._build_system_parts({"tenant": "acme"})
+        
+        assert static == "Static instructions"
+        assert dynamic == "Tenant: acme"
+    
+    def test_agent_with_model_config_caching(self):
+        """Agent with cache in model_config."""
+        from dcaf.core import Agent
+        
+        agent = Agent(
+            system="Test prompt",
+            model_config={"cache_system_prompt": True}
+        )
+        
+        assert agent._model_config.get("cache_system_prompt") is True
+    
+    def test_agent_without_caching(self):
+        """Agent without caching config."""
+        from dcaf.core import Agent
+        
+        agent = Agent(system="Test prompt")
+        
+        assert agent._model_config.get("cache_system_prompt", False) is False
 ```
 
 **Acceptance Criteria**:
 - [ ] All tests pass
-- [ ] Tests cover CacheConfig creation
 - [ ] Tests cover cache checkpoint placement
 - [ ] Tests cover static + dynamic prompt building
 - [ ] Tests verify original data is not mutated
+- [ ] Tests verify token threshold checking
+- [ ] Tests verify cache metrics logging
 
 ---
 
-### Task 8: Update Documentation
+### Task 6: Create Example Application
+
+**File**: `examples/prompt_caching_example.py` (new file)
+
+```python
+"""
+Example: Using Bedrock Prompt Caching with DCAF
+
+This example demonstrates how to use prompt caching to reduce costs and latency
+when working with agents that have static instructions and dynamic context.
+"""
+
+from dcaf.core import Agent, tool
+import logging
+
+# Enable detailed logging to see cache metrics
+logging.basicConfig(level=logging.INFO)
+
+# Define some example tools
+@tool(description="List all Kubernetes pods in a namespace")
+def list_pods(namespace: str = "default") -> str:
+    """List pods (simulated)."""
+    return f"Pods in {namespace}: pod-1, pod-2, pod-3"
+
+@tool(description="Get details about a specific pod")
+def get_pod(name: str, namespace: str = "default") -> str:
+    """Get pod details (simulated)."""
+    return f"Pod {name} in {namespace}: Running, 2 containers"
+
+
+# Example 1: Basic caching with static prompt only
+def example_basic_caching():
+    """Simple caching example with just a static prompt."""
+    print("\n=== Example 1: Basic Caching ===\n")
+    
+    agent = Agent(
+        system="""
+        You are a Kubernetes expert assistant. Your role is to help users
+        manage their Kubernetes clusters safely and efficiently.
+        
+        Guidelines:
+        - Always verify namespace before operations
+        - Explain what each command does
+        - Ask for confirmation on destructive operations
+        - Use kubectl best practices
+        - Provide helpful error messages
+        
+        (Add more detailed instructions here to exceed 1024 tokens for caching)
+        """ * 3,  # Repeat to exceed minimum token threshold
+        
+        tools=[list_pods, get_pod],
+        
+        model_config={
+            "cache_system_prompt": True  # Enable caching
+        }
+    )
+    
+    # First request - cache MISS (creates cache)
+    print("First request (cache MISS):")
+    result1 = agent.run([{"role": "user", "content": "List pods"}])
+    print(f"Response: {result1.text}\n")
+    
+    # Second request - cache HIT (reuses cache)
+    print("Second request (cache HIT):")
+    result2 = agent.run([{"role": "user", "content": "Get details for pod-1"}])
+    print(f"Response: {result2.text}\n")
+    
+    print("Check logs above for cache HIT/MISS indicators")
+
+
+# Example 2: Static instructions + dynamic context
+def example_static_and_dynamic():
+    """Caching with separated static and dynamic parts."""
+    print("\n=== Example 2: Static + Dynamic Context ===\n")
+    
+    agent = Agent(
+        # Static part - cached (same for all requests)
+        system="""
+        You are a Kubernetes expert assistant for a multi-tenant platform.
+        
+        Your responsibilities:
+        - Help users manage pods, services, and deployments
+        - Ensure operations are scoped to the correct tenant and namespace
+        - Follow security best practices
+        - Provide clear explanations
+        
+        Guidelines:
+        - Always check tenant context before operations
+        - Verify namespace matches tenant configuration
+        - Ask for confirmation on destructive operations
+        - Log all operations for audit trail
+        
+        (Add detailed instructions to exceed 1024 tokens)
+        """ * 3,
+        
+        # Dynamic part - NOT cached (changes per request)
+        system_context=lambda ctx: f"""
+        === CURRENT CONTEXT ===
+        Tenant: {ctx.get('tenant_name', 'unknown')}
+        Namespace: {ctx.get('k8s_namespace', 'default')}
+        User: {ctx.get('user_email', 'anonymous')}
+        Environment: {ctx.get('environment', 'production')}
+        
+        You MUST scope all operations to the above context.
+        """,
+        
+        tools=[list_pods, get_pod],
+        
+        model_config={
+            "cache_system_prompt": True
+        }
+    )
+    
+    # Request 1: Tenant A
+    print("Request for Tenant A:")
+    context_a = {
+        "tenant_name": "acme-corp",
+        "k8s_namespace": "acme-prod",
+        "user_email": "alice@acme.com",
+        "environment": "production"
+    }
+    result1 = agent.run(
+        [{"role": "user", "content": "List all pods"}],
+        context=context_a
+    )
+    print(f"Response: {result1.text}\n")
+    
+    # Request 2: Tenant B (cache HIT for static, fresh dynamic)
+    print("Request for Tenant B:")
+    context_b = {
+        "tenant_name": "widgets-inc",
+        "k8s_namespace": "widgets-dev",
+        "user_email": "bob@widgets.com",
+        "environment": "development"
+    }
+    result2 = agent.run(
+        [{"role": "user", "content": "Show pod-1 details"}],
+        context=context_b
+    )
+    print(f"Response: {result2.text}\n")
+    
+    print("Static instructions are cached, dynamic context is fresh each time")
+
+
+# Example 3: Cost comparison (conceptual)
+def example_cost_comparison():
+    """Show the cost impact of caching."""
+    print("\n=== Example 3: Cost Impact ===\n")
+    
+    # Simulated token counts
+    static_tokens = 1500  # Long system prompt
+    dynamic_tokens = 100   # Short context
+    
+    print("Without caching:")
+    print(f"  Per request: {static_tokens + dynamic_tokens} input tokens")
+    print(f"  100 requests: {(static_tokens + dynamic_tokens) * 100} tokens")
+    print(f"  Approx cost: ${((static_tokens + dynamic_tokens) * 100) * 0.000003:.4f}")
+    
+    print("\nWith caching:")
+    print(f"  First request: {static_tokens + dynamic_tokens} tokens (cache MISS)")
+    print(f"  Subsequent 99: {dynamic_tokens * 99} tokens (cache HIT)")
+    print(f"  Total: {static_tokens + dynamic_tokens + (dynamic_tokens * 99)} tokens")
+    print(f"  Approx cost: ${(static_tokens + dynamic_tokens + (dynamic_tokens * 99)) * 0.000003:.4f}")
+    
+    savings = 100 - ((static_tokens + dynamic_tokens + (dynamic_tokens * 99)) / 
+                     ((static_tokens + dynamic_tokens) * 100) * 100)
+    print(f"\n  Savings: ~{savings:.1f}%")
+
+
+if __name__ == "__main__":
+    print("Bedrock Prompt Caching Examples")
+    print("=" * 50)
+    
+    # Run examples
+    example_basic_caching()
+    example_static_and_dynamic()
+    example_cost_comparison()
+    
+    print("\n" + "=" * 50)
+    print("Examples complete!")
+    print("\nKey takeaways:")
+    print("1. Enable caching with model_config={'cache_system_prompt': True}")
+    print("2. Separate static (cached) and dynamic (fresh) content")
+    print("3. Ensure static content exceeds 1024 tokens for best results")
+    print("4. Monitor logs for cache HIT/MISS indicators")
+```
+
+**Acceptance Criteria**:
+- [ ] Example runs without errors
+- [ ] Shows basic caching usage
+- [ ] Shows static/dynamic separation
+- [ ] Demonstrates cost savings
+- [ ] Includes helpful comments and explanations
+
+---
+
+### Task 7: Update Documentation
 
 **File**: `docs/guides/prompt-caching.md` (new file)
 
-Create a user guide explaining:
-1. What prompt caching is
-2. When to use it
-3. How to enable it
-4. Static vs dynamic prompts
-5. Troubleshooting tips
+```markdown
+# Bedrock Prompt Caching Guide
 
-**File**: `docs/api-reference/agent.md`
+## Overview
 
-Update to document the new parameters:
-- `cache`: Enable/disable caching
-- `system_context`: Dynamic system prompt context
+AWS Bedrock's prompt caching feature can reduce costs by up to 90% and latency by up to 85% for agents with static instructions and dynamic context.
 
----
+**Status**: Experimental (v1) - Temporary implementation until Agno adds native support
 
-### Task 9: Export New Classes
+## How It Works
 
-**File**: `dcaf/core/__init__.py`
+When you enable caching, DCAF places a "cache checkpoint" in your system prompt. Everything before the checkpoint is cached by Bedrock for 5 minutes (TTL resets on each use).
 
-Add exports for new public classes:
+```
+[Static Instructions] ← CACHED
+      ↓
+[Cache Checkpoint]
+      ↓
+[Dynamic Context]     ← NOT cached (fresh each time)
+```
+
+## Quick Start
+
+### Basic Usage
 
 ```python
-from .domain.value_objects.cache_config import CacheConfig
+from dcaf.core import Agent
 
-__all__ = [
-    # ... existing exports ...
-    "CacheConfig",
-]
+agent = Agent(
+    system="You are a Kubernetes expert... [long instructions]",
+    tools=[list_pods, delete_pod],
+    model_config={
+        "cache_system_prompt": True
+    }
+)
 ```
+
+### Separating Static and Dynamic Content
+
+For maximum benefit, separate static instructions from dynamic context:
+
+```python
+agent = Agent(
+    # Static - cached
+    system="You are a Kubernetes expert...",
+    
+    # Dynamic - NOT cached
+    system_context=lambda ctx: f"Tenant: {ctx['tenant']}\nNamespace: {ctx['namespace']}",
+    
+    model_config={
+        "cache_system_prompt": True
+    }
+)
+```
+
+## Requirements
+
+### Minimum Token Count
+
+Your static system prompt must be at least:
+- **Claude 3.7 Sonnet**: 1024 tokens
+- **Claude 3.5 Haiku**: 2048 tokens
+
+If below threshold, caching is automatically disabled with a warning log.
+
+**Rule of thumb**: ~4 characters = 1 token, so aim for 4000+ character prompts.
+
+## Best Practices
+
+### 1. Put Static Content First
+
+✅ **Good**: Static instructions, then dynamic context
+```python
+system="You are a K8s expert. [lengthy guidelines]"
+system_context="Current tenant: acme-corp"
+```
+
+❌ **Bad**: Mixing static and dynamic
+```python
+system="You are a K8s expert for tenant: acme-corp. [guidelines]"
+```
+
+### 2. Make Static Content Detailed
+
+The more static content you cache, the bigger the savings:
+
+✅ **Good**: Detailed instructions (1500+ tokens)
+```python
+system="""
+You are a Kubernetes expert assistant.
+
+Guidelines:
+- Always verify namespace before operations
+- Explain commands clearly
+- Ask for confirmation on destructive operations
+- Follow kubectl best practices
+- Provide helpful error messages
+
+[More detailed guidelines...]
+"""
+```
+
+❌ **Bad**: Brief instructions (50 tokens)
+```python
+system="You are a helpful Kubernetes assistant."
+```
+
+### 3. Use Callable for Dynamic Context
+
+For runtime data, use a lambda or function:
+
+```python
+system_context=lambda ctx: f"""
+Tenant: {ctx.get('tenant_name')}
+Namespace: {ctx.get('k8s_namespace')}
+User: {ctx.get('user_email')}
+"""
+```
+
+## Monitoring
+
+### Cache Performance Logs
+
+DCAF logs cache performance when available:
+
+```
+INFO: ✅ Cache HIT: 950 tokens reused (~90% cost reduction)
+INFO: 📝 Cache MISS: 950 tokens cached for next request (cache created)
+```
+
+### First Request is Always a MISS
+
+The first request creates the cache (MISS). Subsequent requests within 5 minutes are HITs:
+
+```
+Request 1: MISS (creates cache)  → Full cost
+Request 2: HIT  (uses cache)     → 10% cost
+Request 3: HIT  (uses cache)     → 10% cost
+...
+Request N: MISS (cache expired)  → Full cost
+```
+
+## Troubleshooting
+
+### No Cache Metrics in Logs
+
+**Symptom**: Caching enabled but no "Cache HIT/MISS" logs
+
+**Possible causes**:
+1. System prompt below minimum token threshold
+2. Model doesn't support caching
+3. Bedrock API change
+
+**Solution**: Check logs for warnings about token threshold
+
+### Caching Not Enabled
+
+**Symptom**: No cache-related logs at all
+
+**Checklist**:
+- [ ] `model_config={"cache_system_prompt": True}` set?
+- [ ] Using Bedrock provider (not OpenAI)?
+- [ ] Using supported model (Claude 3.5/3.7)?
+
+## Cost Comparison
+
+### Example Scenario
+
+- Static prompt: 1500 tokens
+- Dynamic context: 100 tokens
+- 100 requests
+
+**Without caching:**
+- Per request: 1600 tokens
+- Total: 160,000 tokens
+- Cost: ~$0.48
+
+**With caching:**
+- First request: 1600 tokens (MISS)
+- Next 99 requests: 100 tokens each (HIT)
+- Total: 11,500 tokens
+- Cost: ~$0.035
+
+**Savings: ~93%** 💰
+
+## Supported Models
+
+Prompt caching is supported on:
+- `anthropic.claude-3-7-sonnet-20250219-v1:0`
+- `anthropic.claude-3-5-sonnet-20241022-v2:0`
+- `anthropic.claude-3-5-haiku-20241022-v1:0`
+
+## When NOT to Use Caching
+
+❌ **Don't use caching when**:
+- System prompt changes frequently
+- System prompt is very short (<1024 tokens)
+- Low request volume (cache expires between requests)
+- Using non-Bedrock providers
+
+✅ **DO use caching when**:
+- Long, static system prompts
+- High request volume (multiple requests per 5 minutes)
+- Multi-tenant scenarios (static instructions, dynamic tenant context)
+
+## Future Plans
+
+This is a temporary implementation. Once Agno adds native prompt caching support, we'll migrate to their implementation and remove the custom code.
+
+## Related Documentation
+
+- [Agent API Reference](../api-reference/agent.md)
+- [Creating Custom Agents](./custom-agents.md)
+- [AWS Bedrock Guide](./working-with-bedrock.md)
+```
+
+**File**: `docs/api-reference/agents.md` (update)
+
+Add to the Agent class documentation:
+
+```markdown
+### system_context
+
+Optional dynamic context appended to the system prompt.
+
+**Type**: `Optional[Union[str, Callable[[dict], str]]]`
+
+**Purpose**: Separate dynamic runtime data from static instructions. When caching is enabled, this content is NOT cached and is evaluated fresh each request.
+
+**Examples**:
+
+```python
+# String
+agent = Agent(
+    system="Static instructions",
+    system_context="Tenant: acme-corp"
+)
+
+# Callable
+agent = Agent(
+    system="Static instructions",
+    system_context=lambda ctx: f"Tenant: {ctx['tenant']}"
+)
+```
+
+### model_config
+
+Configuration passed to the model adapter.
+
+**Type**: `Optional[dict]`
+
+**Caching Options**:
+- `cache_system_prompt` (bool): Enable Bedrock prompt caching. Requires static system prompt ≥1024 tokens.
+
+**Example**:
+
+```python
+agent = Agent(
+    system="Long static instructions...",
+    model_config={
+        "cache_system_prompt": True
+    }
+)
+```
+```
+
+**Acceptance Criteria**:
+- [ ] Guide explains what caching is and how it works
+- [ ] Guide shows when to use and not use caching
+- [ ] Guide includes troubleshooting section
+- [ ] Guide includes cost comparison
+- [ ] API reference documents new parameters
 
 ---
 
 ## Testing Strategy
 
 ### Unit Tests
-- CacheConfig creation and validation
 - Cache checkpoint placement in system messages
 - Static + dynamic prompt combination
+- Token threshold checking
+- Cache metrics logging
 - Agent parameter handling
 
 ### Integration Tests
 - End-to-end test with mock Bedrock client
 - Verify cache checkpoint appears in actual request
+- Test with real Bedrock (optional, in dev environment)
 
 ### Manual Testing
-1. Create an agent with `cache=True`
-2. Make a request and check logs for cache info
-3. Verify the Bedrock request includes `cachePoint`
+
+1. **Create test agent**:
+```python
+agent = Agent(
+    system="..." * 300,  # Long prompt
+    system_context=lambda ctx: f"Tenant: {ctx['tenant']}",
+    model_config={"cache_system_prompt": True}
+)
+```
+
+2. **Make first request** - look for "Cache MISS" in logs
+
+3. **Make second request** - look for "Cache HIT" in logs
+
+4. **Check Bedrock console** - verify requests include `cachePoint`
 
 ---
 
 ## Rollout Plan
 
-1. **Phase 1**: Implement CacheConfig and Agent parameter changes
-2. **Phase 2**: Implement CachingAwsBedrock model
-3. **Phase 3**: Wire up Agent → Adapter → Model
-4. **Phase 4**: Add tests
-5. **Phase 5**: Documentation
-6. **Phase 6**: Code review and merge
+1. **Phase 1** (Day 1): 
+   - Task 1: Update Agent class
+   - Task 2: Create CachingAwsBedrock
+
+2. **Phase 2** (Day 2):
+   - Task 3: Update AgnoAdapter
+   - Task 4: Add cache metrics logging
+   - Task 5: Unit tests
+
+3. **Phase 3** (Day 3):
+   - Task 6: Example application
+   - Task 7: Documentation
+   - Manual testing with real Bedrock
+
+4. **Phase 4** (Day 4):
+   - Code review
+   - Integration testing
+   - Documentation review
 
 ---
 
 ## Success Criteria
 
-- [ ] `Agent(cache=True)` enables caching with no other changes required
+- [ ] `Agent(model_config={"cache_system_prompt": True})` enables caching
 - [ ] `Agent(system="...", system_context="...")` correctly separates cached/uncached content
 - [ ] Bedrock requests include `cachePoint` when caching is enabled
+- [ ] Cache metrics are logged when available in Bedrock responses
+- [ ] Token threshold is checked with appropriate warnings
 - [ ] All existing tests pass (no regressions)
 - [ ] New tests cover caching functionality
+- [ ] Example application demonstrates usage
 - [ ] Documentation is clear for new users
 
 ---
@@ -938,8 +1455,19 @@ __all__ = [
 ## Questions for Tech Lead
 
 1. Should we log cache hit/miss metrics from Bedrock responses?
+   **→ YES - if available through Agno**
+
 2. Should we warn if system prompt is below minimum token count?
+   **→ YES - warn and skip caching**
+
 3. Should we support tool definition caching in v1 or defer to v2?
+   **→ DEFER to v2 (experimental only)**
+
+4. Where exactly in Agent is the runtime called?
+   **→ Need to identify in current implementation**
+
+5. Does Agno expose Bedrock response metrics?
+   **→ Need to verify in Agno source**
 
 ---
 
@@ -947,5 +1475,15 @@ __all__ = [
 
 - [AWS Bedrock Prompt Caching Docs](https://docs.aws.amazon.com/bedrock/latest/userguide/prompt-caching.html)
 - [Agno AwsBedrock Source](https://github.com/agno-agi/agno/blob/main/agno/models/aws/bedrock.py)
-- [DCAF AgnoAdapter](dcaf/core/adapters/outbound/agno/adapter.py)
+- [DCAF Agent Class](../../dcaf/core/agent.py)
+- [DCAF AgnoAdapter](../../dcaf/core/adapters/outbound/agno/adapter.py)
 
+---
+
+## Notes
+
+- This is a **temporary implementation** until Agno adds native caching support
+- All caching logic is internal to adapters (not exposed in public API)
+- Caching is always **opt-in** via `model_config`
+- Extensive logging for debugging and monitoring
+- Token threshold checked automatically with warnings

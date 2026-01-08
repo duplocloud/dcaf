@@ -103,6 +103,8 @@ class AgentService:
             messages=conversation.messages,
             tools=request.tools,
             system_prompt=request.system_prompt,
+            static_system=request.static_system,
+            dynamic_system=request.dynamic_system,
             platform_context=context.to_dict() if context else None,
         )
         
@@ -154,6 +156,8 @@ class AgentService:
             messages=conversation.messages,
             tools=request.tools,
             system_prompt=request.system_prompt,
+            static_system=request.static_system,
+            dynamic_system=request.dynamic_system,
             platform_context=context.to_dict() if context else None,
         ):
             # Track text for final response
