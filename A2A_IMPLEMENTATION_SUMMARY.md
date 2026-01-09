@@ -154,9 +154,17 @@ This allows swapping A2A implementations without changing user code.
 
 **Required:**
 - `httpx` - For HTTP client (A2A communication)
+- `aioboto3` - For async AWS Bedrock communication
 
 **Optional:**
 - `agno` - For Agno SDK (if using Agno adapter)
+
+## Fix Applied (January 2026)
+
+Fixed httpx client configuration issue that was causing A2A integration failures:
+- Added `trust_env=False` to httpx.Client to avoid environment proxy interference
+- Added URL normalization (localhost → 127.0.0.1) to avoid httpx routing issues
+- See `A2A_FIX_SUMMARY.md` for complete details
 
 ## Testing
 

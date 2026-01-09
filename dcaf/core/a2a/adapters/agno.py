@@ -33,7 +33,8 @@ class AgnoA2AClient(A2AClientAdapter):
         # Import Agno here to avoid hard dependency
         try:
             import httpx
-            self._http_client = httpx.Client(timeout=60.0)
+            # trust_env=False to avoid proxy issues
+            self._http_client = httpx.Client(timeout=60.0, trust_env=False)
         except ImportError:
             raise RuntimeError(
                 "httpx is required for A2A client. Install with: pip install httpx"
@@ -53,13 +54,19 @@ class AgnoA2AClient(A2AClientAdapter):
             ConnectionError: If the agent cannot be reached
             ValueError: If the agent card format is invalid
         """
-        agent_card_url = f"{url}/.well-known/agent.json"
+        # Replace localhost with 127.0.0.1 to avoid IPv6/proxy issues with httpx
+        normalized_url = url.replace("localhost", "127.0.0.1")
+        agent_card_url = f"{normalized_url}/.well-known/agent.json"
         
         try:
             response = self._http_client.get(agent_card_url)
             response.raise_for_status()
             data = response.json()
-            return AgentCard.from_dict(data)
+            # Restore the original URL in the card
+            card = AgentCard.from_dict(data)
+            if card.url and "127.0.0.1" in card.url:
+                card.url = card.url.replace("127.0.0.1", "localhost")
+            return card
         except Exception as e:
             logger.error(f"Failed to fetch agent card from {url}: {e}")
             raise ConnectionError(f"Cannot reach agent at {url}") from e
@@ -80,7 +87,9 @@ class AgnoA2AClient(A2AClientAdapter):
             TimeoutError: If the task times out
             ValueError: If the task fails
         """
-        task_url = f"{url}/a2a/tasks/send"
+        # Replace localhost with 127.0.0.1 to avoid IPv6/proxy issues with httpx
+        normalized_url = url.replace("localhost", "127.0.0.1")
+        task_url = f"{normalized_url}/a2a/tasks/send"
         
         try:
             response = self._http_client.post(
@@ -108,7 +117,9 @@ class AgnoA2AClient(A2AClientAdapter):
         Raises:
             ConnectionError: If the agent cannot be reached
         """
-        task_url = f"{url}/a2a/tasks/send?async=true"
+        # Replace localhost with 127.0.0.1 to avoid IPv6/proxy issues with httpx
+        normalized_url = url.replace("localhost", "127.0.0.1")
+        task_url = f"{normalized_url}/a2a/tasks/send?async=true"
         
         try:
             response = self._http_client.post(
@@ -136,7 +147,9 @@ class AgnoA2AClient(A2AClientAdapter):
         Raises:
             ValueError: If the task ID is not found
         """
-        status_url = f"{url}/a2a/tasks/{task_id}"
+        # Replace localhost with 127.0.0.1 to avoid IPv6/proxy issues with httpx
+        normalized_url = url.replace("localhost", "127.0.0.1")
+        status_url = f"{normalized_url}/a2a/tasks/{task_id}"
         
         try:
             response = self._http_client.get(status_url)
