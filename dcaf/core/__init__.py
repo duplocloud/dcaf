@@ -74,6 +74,15 @@ from .primitives import (
     from_agent_response,
 )
 
+# Configuration API (for environment-driven setup)
+from .config import (
+    load_agent_config,
+    get_provider_from_env,
+    get_model_from_env,
+    is_provider_configured,
+    get_configured_provider,
+)
+
 # Stream event types (for type checking in streaming)
 from ..schemas.events import (
     TextDeltaEvent,
@@ -103,6 +112,12 @@ __all__ = [
     "Session",
     "serve",
     "create_app",
+    # Configuration
+    "load_agent_config",
+    "get_provider_from_env",
+    "get_model_from_env",
+    "is_provider_configured",
+    "get_configured_provider",
     # HelpDesk Protocol DTOs
     "DataDTO",
     "CommandDTO",

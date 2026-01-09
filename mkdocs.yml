@@ -139,11 +139,14 @@ nav:
   - Guides:
     - Custom Agents: guides/custom-agents.md
     - Building Tools: guides/building-tools.md
+    - Environment Configuration: guides/environment-configuration.md
     - Session Management: guides/session-management.md
     - Interceptors: guides/interceptors.md
     - Framework Adapters: guides/framework-adapters.md
     - Migration (v1 → Core): guides/migration.md
     - Working with Bedrock: guides/working-with-bedrock.md
+    - Working with Gemini: guides/working-with-gemini.md
+    - Prompt Caching: guides/prompt-caching.md
     - Message Protocol: guides/message-protocol.md
     - Streaming Responses: guides/streaming.md
     - Documentation Versioning: guides/versioning.md

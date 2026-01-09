@@ -172,24 +172,78 @@ for event in agent.run_stream(messages=[...]):
 
 ## Environment Setup
 
-Create a `.env` file:
+### Option 1: Environment-Driven (Recommended)
+
+Configure provider via environment variables:
 
 ```bash
-AWS_ACCESS_KEY_ID=your_key
-AWS_SECRET_ACCESS_KEY=your_secret
-AWS_REGION=us-east-1
-BEDROCK_MODEL_ID=anthropic.claude-3-sonnet-20240229-v1:0
+# Choose your provider
+export DCAF_PROVIDER=google
+export DCAF_MODEL=gemini-3-flash
+export GEMINI_API_KEY=your-api-key
+```
+
+Then load in code:
+
+```python
+from dcaf.core import Agent, load_agent_config
+
+config = load_agent_config()  # Loads from environment
+agent = Agent(tools=[my_tool], **config)
+```
+
+**Switch providers without code changes:**
+
+```bash
+# Switch to Bedrock
+export DCAF_PROVIDER=bedrock
+export AWS_PROFILE=my-profile
+# Code stays the same!
+```
+
+### Option 2: Hardcoded (Simple)
+
+Pass configuration directly:
+
+```python
+agent = Agent(
+    provider="bedrock",
+    model="anthropic.claude-3-sonnet-20240229-v1:0",
+    aws_profile="my-profile"
+)
 ```
 
 ---
 
+## Supported LLM Providers
+
+DCAF supports multiple LLM providers through the [Agno SDK](https://docs.agno.com/):
+
+| Provider | Models | Configuration |
+|----------|--------|---------------|
+| **AWS Bedrock** | Claude 3.x | `provider="bedrock"`, AWS credentials |
+| **Anthropic** | Claude 3.x | `provider="anthropic"`, API key |
+| **Google** | Gemini 3, 2.x, 1.5 | `provider="google"`, API key |
+| **OpenAI** | GPT-4, GPT-3.5 | `provider="openai"`, API key |
+| **Azure OpenAI** | GPT models | `provider="azure"`, API key |
+| **Ollama** | Local models | `provider="ollama"` |
+
+```python
+# AWS Bedrock (default)
+agent = Agent(provider="bedrock", aws_profile="my-profile")
+
+# Google Gemini
+agent = Agent(provider="google", model="gemini-3-flash", api_key=os.getenv("GEMINI_API_KEY"))
+
+# Anthropic Direct
+agent = Agent(provider="anthropic", model="claude-3-sonnet-20240229", api_key=os.getenv("ANTHROPIC_API_KEY"))
+```
+
 ## Requirements
 
 - **Python 3.12+**
-- **AWS credentials** with Bedrock access
-- **Dependencies**: `fastapi`, `pydantic`, `uvicorn`, `boto3`, `agno`, `anthropic`
-
-DCAF uses the [Agno SDK](https://docs.agno.com/) for agent orchestration with Claude models on AWS Bedrock.
+- **Provider credentials**: AWS (Bedrock), Anthropic, Google, OpenAI, or Azure
+- **Dependencies**: `fastapi`, `pydantic`, `uvicorn`, `boto3`, `agno`
 
 ---
 
@@ -212,6 +266,8 @@ mkdocs serve
 
 - [Getting Started](docs/getting-started.md) - Installation and first steps
 - [Core Overview](docs/core/index.md) - Agent class and API
+- [Working with Bedrock](docs/guides/working-with-bedrock.md) - AWS Bedrock setup
+- [Working with Gemini](docs/guides/working-with-gemini.md) - Google Gemini setup
 - [Interceptors Guide](docs/guides/interceptors.md) - Request/response hooks
 - [Custom Agents](docs/guides/custom-agents.md) - Building complex agents
 - [Architecture](docs/architecture.md) - How DCAF works internally
