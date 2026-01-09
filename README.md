@@ -21,8 +21,31 @@
 
 ### 1. Install
 
+#### Base Installation
 ```bash
 pip install git+https://github.com/duplocloud/service-desk-agents.git
+```
+
+#### With Provider Support
+
+```bash
+# Google Gemini
+pip install "git+https://github.com/duplocloud/service-desk-agents.git#egg=dcaf[google]"
+
+# AWS Bedrock (included by default)
+pip install "git+https://github.com/duplocloud/service-desk-agents.git#egg=dcaf[bedrock]"
+
+# Anthropic Direct
+pip install "git+https://github.com/duplocloud/service-desk-agents.git#egg=dcaf[anthropic]"
+
+# OpenAI
+pip install "git+https://github.com/duplocloud/service-desk-agents.git#egg=dcaf[openai]"
+
+# All providers
+pip install "git+https://github.com/duplocloud/service-desk-agents.git#egg=dcaf[providers]"
+
+# Everything (providers + docs + dev)
+pip install "git+https://github.com/duplocloud/service-desk-agents.git#egg=dcaf[all]"
 ```
 
 ### 2. Create an Agent
