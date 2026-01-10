@@ -34,7 +34,11 @@ dependencies = [
     "tk",
     "requests",
     "langchain_community",
-    "duplocloud-client"
+    "duplocloud-client",
+    # LLM provider dependencies
+    "aioboto3>=13.0.0",           # AWS Bedrock async support
+    "httpx>=0.27.0",              # A2A protocol, HTTP client
+    "google-generativeai>=0.8.0", # Google Gemini support
 ]
 
 [project.optional-dependencies]
