@@ -38,7 +38,7 @@ dependencies = [
     # LLM provider dependencies (all included by default)
     "aioboto3>=13.0.0",           # AWS Bedrock async support
     "httpx>=0.27.0",              # A2A protocol, HTTP client
-    "google-generativeai>=0.8.0", # Google Gemini support
+    "google-generativeai==0.8.6", # Google Gemini support (pinned)
     "anthropic>=0.40.0",          # Anthropic Direct API
     "openai>=1.0.0",              # OpenAI and Azure OpenAI
     "ollama>=0.3.0",              # Local Ollama support
