@@ -78,30 +78,34 @@ These classes serve different architectural purposes and should remain separate,
 
 ### Checklist
 
-- [ ] **FileObject** → Replace `dcaf/core/application/dto/responses.py:FileObject`
+- [x] **FileObject** → Replace `dcaf/core/application/dto/responses.py:FileObject`
   - Schema: `file_path: str`, `file_content: str`
   - Core: Identical fields
   - Action: Import from `dcaf.schemas.messages` instead of defining locally
   - Effort: Low (simple import change)
+  - **✅ COMPLETED** (2026-01-08)
 
-- [ ] **ExecutedCommand** → Replace `ExecutedCommandDTO`
+- [x] **ExecutedCommand** → Replace `ExecutedCommandDTO`
   - Schema: `command: str`, `output: str`
   - Core: Identical fields
   - Action: Replace `ExecutedCommandDTO` with `ExecutedCommand` alias or direct use
   - Effort: Low (rename references)
+  - **✅ COMPLETED** (2026-01-08)
 
-- [ ] **ExecutedToolCall** → Replace `ExecutedToolCallDTO`
+- [x] **ExecutedToolCall** → Replace `ExecutedToolCallDTO`
   - Schema: `id: str`, `name: str`, `input: Dict[str, Any]`, `output: str`
   - Core: Identical fields
   - Action: Replace `ExecutedToolCallDTO` with `ExecutedToolCall`
   - Effort: Low (rename references)
+  - **✅ COMPLETED** (2026-01-08)
 
-- [ ] **Command** → Replace `CommandDTO`
+- [x] **Command** → Replace `CommandDTO`
   - Schema: `command: str`, `execute: bool`, `rejection_reason: Optional[str]`, `files: Optional[List[FileObject]]`
   - Core: Same fields
   - Action: Replace `CommandDTO` with `Command`
-  - Note: Core's `to_dict()`/`from_dict()` methods can be added via extension or utility functions
+  - Note: Added `_to_dict()` helper to handle both Pydantic and dataclass serialization
   - Effort: Low-Medium (may need to add serialization helpers)
+  - **✅ COMPLETED** (2026-01-08)
 
 ### Migration Steps for Category 1
 
@@ -337,12 +341,14 @@ def domain_to_schema(msg: DomainMessage, include_data: bool = False) -> SchemaMe
 
 ## Implementation Priority
 
-### Phase 1: Quick Wins (Week 1)
-1. [ ] Import `FileObject` from schemas
-2. [ ] Import `ExecutedCommand` from schemas  
-3. [ ] Import `ExecutedToolCall` from schemas
-4. [ ] Create backward-compatible aliases
-5. [ ] Update tests
+### Phase 1: Quick Wins (Week 1) ✅ COMPLETED
+1. [x] Import `FileObject` from schemas
+2. [x] Import `ExecutedCommand` from schemas  
+3. [x] Import `ExecutedToolCall` from schemas
+4. [x] Import `Command` from schemas
+5. [x] Create backward-compatible aliases (`CommandDTO`, `ExecutedCommandDTO`, `ExecutedToolCallDTO`)
+6. [x] Add `_to_dict()` helper for Pydantic/dataclass compatibility
+7. [x] Update tests - all 55 tests pass
 
 ### Phase 2: Schema Enhancement (Week 2)
 1. [ ] Add missing fields to `ToolCall` in schemas
@@ -432,3 +438,4 @@ The following changes may affect external consumers:
 | Date | Author | Changes |
 |------|--------|---------|
 | 2026-01-08 | Engineering | Initial analysis |
+| 2026-01-08 | Engineering | Implemented Category 1 (FileObject, Command, ExecutedCommand, ExecutedToolCall) |

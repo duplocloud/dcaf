@@ -114,6 +114,86 @@ class UserMessage(Message):
 
 class AgentMessage(Message):
     role: Literal["assistant"] = "assistant"
+    
+    @classmethod
+    def from_agent_response(
+        cls,
+        response,  # AgentResponse from core
+        include_timestamp: bool = True,
+        agent_name: Optional[str] = None,
+        agent_id: Optional[str] = None,
+    ) -> "AgentMessage":
+        """
+        Create an AgentMessage from a core AgentResponse.
+        
+        This provides a bridge between the core's internal AgentResponse
+        (from dcaf.core.application.dto.responses) and the schema's AgentMessage
+        (wire format for HelpDesk protocol).
+        
+        Args:
+            response: AgentResponse from core (dto/responses.py)
+            include_timestamp: Whether to add a timestamp (default: True)
+            agent_name: Optional agent name for identification
+            agent_id: Optional agent ID for identification
+            
+        Returns:
+            AgentMessage suitable for serialization to JSON
+            
+        Example:
+            # Internal response from AgentService
+            core_response = agent_service.execute(request)
+            
+            # Convert to wire format
+            message = AgentMessage.from_agent_response(core_response)
+            
+            # Serialize to JSON
+            json_data = message.model_dump()
+        """
+        from datetime import datetime, timezone
+        
+        # Build the Data container from the response
+        data_dict = {}
+        if hasattr(response, 'data'):
+            # Response has DataDTO
+            data_dict = response.data.to_dict() if hasattr(response.data, 'to_dict') else {}
+        elif hasattr(response, 'tool_calls'):
+            # Response has tool_calls directly (user-facing AgentResponse from agent.py)
+            data_dict = {
+                "cmds": [],
+                "executed_cmds": [],
+                "tool_calls": [tc.to_dict() if hasattr(tc, 'to_dict') else {} for tc in getattr(response, 'tool_calls', [])],
+                "executed_tool_calls": [],
+            }
+        
+        # Create Data object
+        data = Data(**data_dict) if data_dict else Data()
+        
+        # Build meta_data
+        meta_data = {}
+        if hasattr(response, 'metadata'):
+            meta_data = response.metadata or {}
+        if hasattr(response, 'conversation_id'):
+            meta_data['conversation_id'] = response.conversation_id
+        if hasattr(response, 'has_pending_approvals'):
+            meta_data['has_pending_approvals'] = response.has_pending_approvals
+        if hasattr(response, 'is_complete'):
+            meta_data['is_complete'] = response.is_complete
+        
+        # Build Agent object if provided
+        agent_obj = None
+        if agent_name or agent_id:
+            agent_obj = Agent(
+                name=agent_name or "dcaf-agent",
+                id=agent_id or "unknown",
+            )
+        
+        return cls(
+            content=response.text or "",
+            data=data,
+            meta_data=meta_data,
+            timestamp=datetime.now(timezone.utc) if include_timestamp else None,
+            agent=agent_obj,
+        )
 
 
 class Messages(BaseModel):

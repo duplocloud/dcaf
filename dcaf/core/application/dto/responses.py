@@ -4,11 +4,38 @@ Response DTOs for application use cases.
 These DTOs are designed for full compatibility with the DuploCloud HelpDesk
 messaging protocol, supporting both tool calls and terminal commands with
 approval workflows.
+
+Schema Reuse (Category 1):
+    The following classes are imported from dcaf.schemas.messages to avoid
+    duplication. They are re-exported with DTO aliases for backward compatibility:
+    - FileObject (schema) → FileObject
+    - Command (schema) → CommandDTO (alias)
+    - ExecutedCommand (schema) → ExecutedCommandDTO (alias)
+    - ExecutedToolCall (schema) → ExecutedToolCallDTO (alias)
+    
+    See docs/plans/schema-reuse-analysis.md for details.
 """
 
 from dataclasses import dataclass, field
 from typing import List, Optional, Dict, Any, Union
 from enum import Enum
+
+# =============================================================================
+# Import reusable schema classes (Category 1 - Highly Reusable)
+# =============================================================================
+
+from dcaf.schemas.messages import (
+    FileObject,
+    Command,
+    ExecutedCommand,
+    ExecutedToolCall,
+)
+
+# Backward-compatible aliases for DTO naming convention
+# These allow existing code using CommandDTO, ExecutedCommandDTO, etc. to work
+CommandDTO = Command
+ExecutedCommandDTO = ExecutedCommand
+ExecutedToolCallDTO = ExecutedToolCall
 
 
 # =============================================================================
@@ -47,102 +74,6 @@ class StreamEventType(Enum):
     TOOL_USE_END = "tool_use_end"
     MESSAGE_START = "message_start"
     MESSAGE_END = "message_end"
-
-
-# =============================================================================
-# Command DTOs (Terminal Commands)
-# =============================================================================
-
-@dataclass
-class FileObject:
-    """
-    A file to be created before command execution.
-    
-    Used when commands need temporary files (e.g., kubectl apply -f).
-    
-    Attributes:
-        file_path: Path where file should be created
-        file_content: Content of the file
-    """
-    file_path: str
-    file_content: str
-    
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            "file_path": self.file_path,
-            "file_content": self.file_content,
-        }
-
-
-@dataclass
-class CommandDTO:
-    """
-    A terminal command for approval.
-    
-    Represents a shell command that the agent wants to execute,
-    pending user approval.
-    
-    Attributes:
-        command: The shell command string
-        execute: Whether the user has approved execution
-        rejection_reason: Why the user rejected (if rejected)
-        files: Files to create before execution
-    """
-    command: str
-    execute: bool = False
-    rejection_reason: Optional[str] = None
-    files: Optional[List[FileObject]] = None
-    
-    def to_dict(self) -> Dict[str, Any]:
-        result = {
-            "command": self.command,
-            "execute": self.execute,
-        }
-        if self.rejection_reason:
-            result["rejection_reason"] = self.rejection_reason
-        if self.files:
-            result["files"] = [f.to_dict() for f in self.files]
-        return result
-    
-    @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "CommandDTO":
-        files = None
-        if data.get("files"):
-            files = [FileObject(**f) for f in data["files"]]
-        return cls(
-            command=data["command"],
-            execute=data.get("execute", False),
-            rejection_reason=data.get("rejection_reason"),
-            files=files,
-        )
-
-
-@dataclass
-class ExecutedCommandDTO:
-    """
-    A terminal command that was executed.
-    
-    Represents a command that has been run, with its output.
-    
-    Attributes:
-        command: The shell command that was run
-        output: The stdout/stderr output
-    """
-    command: str
-    output: str
-    
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            "command": self.command,
-            "output": self.output,
-        }
-    
-    @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "ExecutedCommandDTO":
-        return cls(
-            command=data["command"],
-            output=data["output"],
-        )
 
 
 # =============================================================================
@@ -244,45 +175,27 @@ class ToolCallDTO:
         )
 
 
-@dataclass
-class ExecutedToolCallDTO:
-    """
-    A tool call that was executed.
-    
-    Represents a tool call that has been run, with its output.
-    
-    Attributes:
-        id: The tool call ID
-        name: Name of the tool
-        input: Input parameters used
-        output: The result output
-    """
-    id: str
-    name: str
-    input: Dict[str, Any]
-    output: str
-    
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            "id": self.id,
-            "name": self.name,
-            "input": self.input,
-            "output": self.output,
-        }
-    
-    @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "ExecutedToolCallDTO":
-        return cls(
-            id=data["id"],
-            name=data["name"],
-            input=data.get("input", {}),
-            output=data["output"],
-        )
-
-
 # =============================================================================
 # Data Container (HelpDesk Protocol)
 # =============================================================================
+# Note: ExecutedToolCallDTO is now imported from dcaf.schemas.messages (alias at top)
+
+
+def _to_dict(obj: Any) -> Dict[str, Any]:
+    """
+    Convert an object to a dictionary.
+    
+    Handles both Pydantic models (model_dump) and dataclasses with to_dict().
+    """
+    if hasattr(obj, 'model_dump'):
+        # Pydantic model
+        return obj.model_dump()
+    elif hasattr(obj, 'to_dict'):
+        # Dataclass with to_dict method
+        return obj.to_dict()
+    else:
+        raise TypeError(f"Cannot convert {type(obj)} to dict")
+
 
 @dataclass
 class DataDTO:
@@ -308,10 +221,10 @@ class DataDTO:
     
     def to_dict(self) -> Dict[str, Any]:
         result = {
-            "cmds": [c.to_dict() for c in self.cmds],
-            "executed_cmds": [c.to_dict() for c in self.executed_cmds],
-            "tool_calls": [t.to_dict() for t in self.tool_calls],
-            "executed_tool_calls": [t.to_dict() for t in self.executed_tool_calls],
+            "cmds": [_to_dict(c) for c in self.cmds],
+            "executed_cmds": [_to_dict(c) for c in self.executed_cmds],
+            "tool_calls": [_to_dict(t) for t in self.tool_calls],
+            "executed_tool_calls": [_to_dict(t) for t in self.executed_tool_calls],
         }
         # Only include session if it has data
         if self.session:
@@ -321,10 +234,10 @@ class DataDTO:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "DataDTO":
         return cls(
-            cmds=[CommandDTO.from_dict(c) for c in data.get("cmds", [])],
-            executed_cmds=[ExecutedCommandDTO.from_dict(c) for c in data.get("executed_cmds", [])],
+            cmds=[Command(**c) for c in data.get("cmds", [])],
+            executed_cmds=[ExecutedCommand(**c) for c in data.get("executed_cmds", [])],
             tool_calls=[ToolCallDTO.from_dict(t) for t in data.get("tool_calls", [])],
-            executed_tool_calls=[ExecutedToolCallDTO.from_dict(t) for t in data.get("executed_tool_calls", [])],
+            executed_tool_calls=[ExecutedToolCall(**t) for t in data.get("executed_tool_calls", [])],
             session=data.get("session", {}),
         )
     
@@ -479,6 +392,8 @@ class AgentResponse:
         Convert to full HelpDesk message format.
         
         Returns a message dict compatible with the HelpDesk protocol.
+        
+        Note: For a Pydantic-validated version, use to_agent_message() instead.
         """
         return {
             "role": role,
@@ -486,6 +401,39 @@ class AgentResponse:
             "data": self.data.to_dict(),
             "meta_data": self.metadata,
         }
+    
+    def to_agent_message(
+        self,
+        agent_name: Optional[str] = None,
+        agent_id: Optional[str] = None,
+        include_timestamp: bool = True,
+    ):
+        """
+        Convert to schema's AgentMessage (Pydantic model).
+        
+        This creates a validated Pydantic model that can be serialized to JSON
+        for the HelpDesk protocol.
+        
+        Args:
+            agent_name: Optional agent name for identification
+            agent_id: Optional agent ID for identification
+            include_timestamp: Whether to include timestamp (default: True)
+            
+        Returns:
+            AgentMessage from dcaf.schemas.messages
+            
+        Example:
+            response = agent_service.execute(request)
+            message = response.to_agent_message(agent_name="k8s-agent")
+            json_data = message.model_dump()  # Serialize to JSON
+        """
+        from dcaf.schemas.messages import AgentMessage
+        return AgentMessage.from_agent_response(
+            self,
+            include_timestamp=include_timestamp,
+            agent_name=agent_name,
+            agent_id=agent_id,
+        )
     
     @classmethod
     def text_only(cls, conversation_id: str, text: str) -> "AgentResponse":
@@ -593,7 +541,7 @@ class StreamEvent:
         """Create a tool_calls event for approval boxes."""
         return cls(
             event_type=StreamEventType.TOOL_CALLS,
-            data={"tool_calls": [tc.to_dict() for tc in tool_calls]},
+            data={"tool_calls": [_to_dict(tc) for tc in tool_calls]},
         )
     
     @classmethod
@@ -601,7 +549,7 @@ class StreamEvent:
         """Create a commands event for approval boxes."""
         return cls(
             event_type=StreamEventType.COMMANDS,
-            data={"commands": [c.to_dict() for c in commands]},
+            data={"commands": [_to_dict(c) for c in commands]},
         )
     
     @classmethod
@@ -612,7 +560,7 @@ class StreamEvent:
         """Create an executed_tool_calls event."""
         return cls(
             event_type=StreamEventType.EXECUTED_TOOL_CALLS,
-            data={"executed_tool_calls": [t.to_dict() for t in executed_tool_calls]},
+            data={"executed_tool_calls": [_to_dict(t) for t in executed_tool_calls]},
         )
     
     @classmethod
@@ -623,7 +571,7 @@ class StreamEvent:
         """Create an executed_commands event."""
         return cls(
             event_type=StreamEventType.EXECUTED_COMMANDS,
-            data={"executed_cmds": [c.to_dict() for c in executed_cmds]},
+            data={"executed_cmds": [_to_dict(c) for c in executed_cmds]},
         )
     
     @classmethod
