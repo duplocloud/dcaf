@@ -943,7 +943,8 @@ class AgnoAdapter:
         1. Explicit google_location parameter
         2. DCAF_GOOGLE_MODEL_LOCATION env var (override for when zone doesn't have Gemini)
         3. Auto-detected from instance zone
-        4. Default: us-central1 (always has all Gemini models)
+        
+        Raises ValueError if location cannot be determined.
         
         Note: Your cluster might be in a region (e.g., us-west2) where Gemini
         isn't available. Set DCAF_GOOGLE_MODEL_LOCATION to override.
@@ -969,7 +970,7 @@ class AgnoAdapter:
         # 1. Explicit parameter
         # 2. DCAF_GOOGLE_MODEL_LOCATION env var (override)
         # 3. Auto-detect from zone
-        # 4. Default to us-central1
+        # No fallback - fail if we can't determine location
         location = None
         location_source = None
         
@@ -985,9 +986,14 @@ class AgnoAdapter:
             if detected:
                 location = detected
                 location_source = "auto-detected from zone"
-            else:
-                location = "us-central1"
-                location_source = "default (us-central1 has all Gemini models)"
+        
+        if not location:
+            raise ValueError(
+                "Google provider requires a model location. "
+                "Set DCAF_GOOGLE_MODEL_LOCATION environment variable. "
+                "See https://cloud.google.com/vertex-ai/generative-ai/docs/learn/locations "
+                "for regions where Gemini is available (e.g., us-central1, us-west1)."
+            )
         
         logger.info(f"GCP model location: {location} ({location_source})")
         
