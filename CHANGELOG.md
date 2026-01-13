@@ -21,6 +21,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Explicit configuration always takes priority over auto-detected values
   - Fails silently when not running on GCP
 
+- **Automatic Vertex AI Mode**: When using `provider="google"` without an API key, Vertex AI mode is now automatic.
+  - No need to set `vertexai=True` or `GOOGLE_GENAI_USE_VERTEXAI=true`
+  - Just set `provider="google"` and deploy to GCP - it just works!
+  - If you provide an API key, Google AI Studio mode is used instead
+
 - **AgentMessage convenience methods**: Added methods to simplify HelpDesk and API integrations.
   - `Agent.chat()`: New method that returns `AgentMessage` directly (wire format ready for JSON serialization)
   - `AgentResponse.to_message()`: Converts an `AgentResponse` to `AgentMessage` for API responses

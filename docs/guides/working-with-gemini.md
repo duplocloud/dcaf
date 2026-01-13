@@ -303,17 +303,15 @@ response = orchestrator.run([
 
 ## Using Vertex AI (Google Cloud)
 
-For enterprise deployments on Google Cloud Platform, use Vertex AI with service account authentication:
+For deployments on Google Cloud Platform, just use `provider="google"` without an API key - **Vertex AI mode is automatic**:
 
 ```python
 from dcaf.core import Agent
 
+# On GCP - this is all you need!
 agent = Agent(
     provider="google",
     model="gemini-2.5-flash",
-    vertexai=True,
-    google_project_id="your-gcp-project-id",
-    google_location="us-central1",
 )
 
 response = agent.run([
@@ -321,25 +319,30 @@ response = agent.run([
 ])
 ```
 
+DCAF automatically:
+- Detects you're on GCP (no API key provided)
+- Enables Vertex AI mode
+- Fetches project ID and location from the metadata service
+
 ### GKE Workload Identity
 
-For Kubernetes deployments with Workload Identity, the agent automatically uses the pod's service account. **DCAF auto-detects the project ID and location from the GCP metadata service**, so you don't need to configure them explicitly:
+For Kubernetes deployments with Workload Identity, just set the provider to "google" - **Vertex AI mode is automatic when no API key is provided**, and project/location are auto-detected:
 
 ```python
-# In GKE with Workload Identity - minimal config!
+# In GKE with Workload Identity - just this!
 agent = Agent(
     provider="google",
     model="gemini-2.5-flash",
-    vertexai=True,
-    # project_id and location auto-detected from GCP metadata!
 )
+# That's it! Vertex AI mode + auto-detected project/location
 ```
 
-When running on GCP infrastructure (GKE, GCE, Cloud Run), DCAF will:
-1. Query the metadata service at `http://metadata.google.internal/`
-2. Fetch the project ID and zone
-3. Set `GOOGLE_CLOUD_PROJECT` and `GOOGLE_CLOUD_LOCATION` environment variables
-4. Use these for all subsequent Vertex AI requests
+When running on GCP infrastructure (GKE, GCE, Cloud Run) without an API key, DCAF will:
+1. Automatically use Vertex AI mode
+2. Query the metadata service at `http://metadata.google.internal/`
+3. Fetch the project ID and zone
+4. Set `GOOGLE_CLOUD_PROJECT` and `GOOGLE_CLOUD_LOCATION` environment variables
+5. Use these for all subsequent Vertex AI requests
 
 You can still override with explicit values if needed:
 
@@ -347,7 +350,6 @@ You can still override with explicit values if needed:
 agent = Agent(
     provider="google",
     model="gemini-2.5-flash",
-    vertexai=True,
     google_project_id="different-project",  # Explicit override
     google_location="europe-west1",          # Explicit override
 )

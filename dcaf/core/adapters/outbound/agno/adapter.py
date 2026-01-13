@@ -898,12 +898,19 @@ class AgnoAdapter:
         """
         Create a Google AI (Gemini) model.
         
-        Supports two authentication modes:
-        1. API Key (Google AI Studio): Set api_key parameter or GEMINI_API_KEY env var
-        2. Vertex AI (Service Account): Set vertexai=True with project_id and location
-           - Uses Application Default Credentials (ADC)
-           - Works with GKE Workload Identity
-           - Requires GOOGLE_APPLICATION_CREDENTIALS or GCE metadata
+        Mode selection (automatic):
+        - If API key is provided → Google AI Studio mode
+        - If no API key → Vertex AI mode (default for GCP deployments)
+        
+        Vertex AI mode:
+        - Uses Application Default Credentials (ADC)
+        - Works with GKE Workload Identity
+        - Auto-detects project_id and location from GCP metadata service
+        - No configuration needed when running on GCP!
+        
+        Google AI Studio mode:
+        - Set api_key parameter or GEMINI_API_KEY env var
+        - For local development or non-GCP deployments
         """
         try:
             from agno.models.google import Gemini
@@ -919,8 +926,12 @@ class AgnoAdapter:
             "temperature": self._temperature,
         }
         
-        # Vertex AI configuration (for service account / GKE Workload Identity)
-        if self._vertexai:
+        # Determine mode: API key → Google AI Studio, otherwise → Vertex AI
+        # This allows simple config: just set provider="google" and it works on GCP
+        use_vertexai = self._vertexai or not self._api_key
+        
+        if use_vertexai:
+            # Vertex AI mode (service account / GKE Workload Identity)
             model_kwargs["vertexai"] = True
             
             # Try to auto-detect GCP metadata if not explicitly configured
@@ -943,9 +954,7 @@ class AgnoAdapter:
             )
         else:
             # Google AI Studio mode - use API key
-            if self._api_key:
-                model_kwargs["api_key"] = self._api_key
-            
+            model_kwargs["api_key"] = self._api_key
             logger.info(f"Creating Google AI model: {self._model_id}")
         
         return Gemini(**model_kwargs)
