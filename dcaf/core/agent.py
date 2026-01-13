@@ -380,8 +380,10 @@ class Agent:
         google_project_id: Google Cloud project ID (auto-detected on GCP).
                           Falls back to GOOGLE_CLOUD_PROJECT env var.
         
-        google_location: Google Cloud region (auto-detected, defaults to us-central1).
-                        Falls back to GOOGLE_CLOUD_LOCATION env var.
+        google_location: Region where Gemini models run (default: us-central1).
+                        Falls back to DCAF_GOOGLE_MODEL_LOCATION env var.
+                        Note: This is separate from your cluster's region because
+                        Gemini is only available in specific regions.
         
         name: Agent name for A2A (Agent-to-Agent) protocol.
              Used as the agent's identity when exposed via A2A.

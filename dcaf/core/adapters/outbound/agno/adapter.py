@@ -39,129 +39,120 @@ logger = logging.getLogger(__name__)
 _GCP_METADATA_FETCH_ATTEMPTED = False
 
 
-def _fetch_and_set_gcp_metadata() -> None:
+def _detect_gcp_project() -> Optional[str]:
     """
-    Auto-detect GCP project ID and location for Vertex AI.
+    Auto-detect GCP project ID for Vertex AI.
     
     Detection methods (in order):
-    1. Existing env vars (GOOGLE_CLOUD_PROJECT, GOOGLE_CLOUD_LOCATION)
+    1. Existing GOOGLE_CLOUD_PROJECT env var
     2. google.auth.default() - works with ADC, Workload Identity
     3. GCP metadata service - works on GCE, GKE
-    4. Default location to us-central1 if project found but not location
     
-    Sets environment variables:
-    - GOOGLE_CLOUD_PROJECT: The GCP project ID
-    - GOOGLE_CLOUD_LOCATION: The region (defaults to us-central1)
+    Returns:
+        The detected project ID, or None if not found.
+        Also sets GOOGLE_CLOUD_PROJECT env var if detected.
     """
     global _GCP_METADATA_FETCH_ATTEMPTED
     
-    # Only attempt once per process
+    # Check if already set
+    existing_project = os.environ.get("GOOGLE_CLOUD_PROJECT")
+    if existing_project:
+        logger.info(f"GCP auto-detect: Using existing GOOGLE_CLOUD_PROJECT={existing_project}")
+        return existing_project
+    
+    # Only attempt detection once per process
     if _GCP_METADATA_FETCH_ATTEMPTED:
         logger.debug("GCP auto-detect: Already attempted, skipping")
-        return
+        return os.environ.get("GOOGLE_CLOUD_PROJECT")
     
     _GCP_METADATA_FETCH_ATTEMPTED = True
-    logger.info("GCP auto-detect: Starting GCP environment detection for Vertex AI")
+    logger.info("GCP auto-detect: Starting project ID detection for Vertex AI")
     
-    # Check existing env vars
-    existing_project = os.environ.get("GOOGLE_CLOUD_PROJECT")
-    existing_location = os.environ.get("GOOGLE_CLOUD_LOCATION")
-    
-    if existing_project:
-        logger.info(f"GCP auto-detect: Found existing GOOGLE_CLOUD_PROJECT={existing_project}")
-    if existing_location:
-        logger.info(f"GCP auto-detect: Found existing GOOGLE_CLOUD_LOCATION={existing_location}")
-    
-    # Skip if both are already set (explicit config takes priority)
-    if existing_project and existing_location:
-        logger.info("GCP auto-detect: Using existing env vars, skipping detection")
-        return
-    
-    project_id = existing_project
-    location = existing_location
+    project_id = None
     
     # Method 1: Try google.auth.default() - most reliable for Workload Identity
-    if not project_id:
-        logger.info("GCP auto-detect: Attempting google.auth.default() for project ID...")
+    logger.info("GCP auto-detect: Attempting google.auth.default() for project ID...")
+    try:
+        import google.auth
+        credentials, detected_project = google.auth.default()
+        logger.info(f"GCP auto-detect: google.auth.default() returned project={detected_project}, credentials={type(credentials).__name__}")
+        if detected_project:
+            project_id = detected_project
+            os.environ["GOOGLE_CLOUD_PROJECT"] = project_id
+            logger.info(f"GCP auto-detect: SUCCESS - Set GOOGLE_CLOUD_PROJECT={project_id} (from ADC)")
+            return project_id
+        else:
+            logger.warning("GCP auto-detect: google.auth.default() returned credentials but no project ID")
+    except ImportError:
+        logger.warning("GCP auto-detect: google-auth package not installed, skipping ADC detection")
+    except Exception as e:
+        logger.warning(f"GCP auto-detect: google.auth.default() failed: {type(e).__name__}: {e}")
+    
+    # Method 2: Try metadata service for project
+    logger.info("GCP auto-detect: Attempting GCP metadata service...")
+    try:
+        import requests
+        headers = {"Metadata-Flavor": "Google"}
+        timeout = 2
+        url = "http://metadata.google.internal/computeMetadata/v1/project/project-id"
+        
+        logger.info(f"GCP auto-detect: Fetching project ID from {url}")
         try:
-            import google.auth
-            credentials, detected_project = google.auth.default()
-            logger.info(f"GCP auto-detect: google.auth.default() returned project={detected_project}, credentials={type(credentials).__name__}")
-            if detected_project:
-                project_id = detected_project
+            resp = requests.get(url, headers=headers, timeout=timeout)
+            logger.info(f"GCP auto-detect: Metadata response status={resp.status_code}")
+            if resp.ok:
+                project_id = resp.text.strip()
                 os.environ["GOOGLE_CLOUD_PROJECT"] = project_id
-                logger.info(f"GCP auto-detect: SUCCESS - Set GOOGLE_CLOUD_PROJECT={project_id} (from ADC)")
+                logger.info(f"GCP auto-detect: SUCCESS - Set GOOGLE_CLOUD_PROJECT={project_id} (from metadata)")
+                return project_id
             else:
-                logger.warning("GCP auto-detect: google.auth.default() returned credentials but no project ID")
-        except ImportError:
-            logger.warning("GCP auto-detect: google-auth package not installed, skipping ADC detection")
-        except Exception as e:
-            logger.warning(f"GCP auto-detect: google.auth.default() failed: {type(e).__name__}: {e}")
-    
-    # Method 2: Try metadata service for project and zone
-    if not project_id or not location:
-        logger.info("GCP auto-detect: Attempting GCP metadata service...")
-        try:
-            import requests
-            headers = {"Metadata-Flavor": "Google"}
-            timeout = 2
-            base_url = "http://metadata.google.internal/computeMetadata/v1"
-            
-            if not project_id:
-                url = f"{base_url}/project/project-id"
-                logger.info(f"GCP auto-detect: Fetching project ID from {url}")
-                try:
-                    resp = requests.get(url, headers=headers, timeout=timeout)
-                    logger.info(f"GCP auto-detect: Metadata response status={resp.status_code}")
-                    if resp.ok:
-                        project_id = resp.text.strip()
-                        os.environ["GOOGLE_CLOUD_PROJECT"] = project_id
-                        logger.info(f"GCP auto-detect: SUCCESS - Set GOOGLE_CLOUD_PROJECT={project_id} (from metadata)")
-                    else:
-                        logger.warning(f"GCP auto-detect: Metadata service returned {resp.status_code}: {resp.text[:100]}")
-                except requests.exceptions.ConnectionError as e:
-                    logger.warning(f"GCP auto-detect: Cannot connect to metadata service (not on GCP?): {e}")
-                except requests.exceptions.Timeout:
-                    logger.warning("GCP auto-detect: Metadata service timed out")
-            
-            if not location:
-                url = f"{base_url}/instance/zone"
-                logger.info(f"GCP auto-detect: Fetching zone from {url}")
-                try:
-                    resp = requests.get(url, headers=headers, timeout=timeout)
-                    logger.info(f"GCP auto-detect: Metadata response status={resp.status_code}")
-                    if resp.ok:
-                        # Zone format: "projects/123456/zones/us-central1-a"
-                        zone_raw = resp.text.strip()
-                        zone = zone_raw.split("/")[-1]
-                        location = "-".join(zone.split("-")[:-1])
-                        os.environ["GOOGLE_CLOUD_LOCATION"] = location
-                        logger.info(f"GCP auto-detect: SUCCESS - Set GOOGLE_CLOUD_LOCATION={location} (from zone={zone})")
-                    else:
-                        logger.warning(f"GCP auto-detect: Metadata service returned {resp.status_code}: {resp.text[:100]}")
-                except requests.exceptions.ConnectionError as e:
-                    logger.warning(f"GCP auto-detect: Cannot connect to metadata service (not on GCP?): {e}")
-                except requests.exceptions.Timeout:
-                    logger.warning("GCP auto-detect: Metadata service timed out")
+                logger.warning(f"GCP auto-detect: Metadata service returned {resp.status_code}: {resp.text[:100]}")
+        except requests.exceptions.ConnectionError as e:
+            logger.warning(f"GCP auto-detect: Cannot connect to metadata service (not on GCP?): {e}")
+        except requests.exceptions.Timeout:
+            logger.warning("GCP auto-detect: Metadata service timed out")
                     
-        except ImportError:
-            logger.warning("GCP auto-detect: requests package not installed, skipping metadata detection")
-        except Exception as e:
-            logger.warning(f"GCP auto-detect: Metadata service error: {type(e).__name__}: {e}")
+    except ImportError:
+        logger.warning("GCP auto-detect: requests package not installed, skipping metadata detection")
+    except Exception as e:
+        logger.warning(f"GCP auto-detect: Metadata service error: {type(e).__name__}: {e}")
     
-    # Method 3: Default location if we have project but no location
-    if project_id and not location:
-        location = "us-central1"
-        os.environ["GOOGLE_CLOUD_LOCATION"] = location
-        logger.info(f"GCP auto-detect: Using default GOOGLE_CLOUD_LOCATION={location}")
+    logger.error("GCP auto-detect: FAILED - Could not detect project ID. Set GOOGLE_CLOUD_PROJECT env var.")
+    return None
+
+
+def _detect_gcp_location() -> Optional[str]:
+    """
+    Auto-detect GCP location from metadata service.
     
-    # Final summary
-    if project_id and location:
-        logger.info(f"GCP auto-detect: Complete - project={project_id}, location={location}")
-    elif project_id:
-        logger.warning(f"GCP auto-detect: Partial - project={project_id}, location=NOT FOUND")
-    else:
-        logger.error("GCP auto-detect: FAILED - Could not detect project ID. Set GOOGLE_CLOUD_PROJECT env var.")
+    Returns the region extracted from the instance zone (e.g., us-west2 from us-west2-b).
+    Returns None if not running on GCP or metadata service is unavailable.
+    
+    Note: This may return a region where Gemini models are NOT available.
+    Use DCAF_GOOGLE_MODEL_LOCATION to override if needed.
+    """
+    logger.info("GCP auto-detect: Attempting to detect location from metadata service...")
+    try:
+        import requests
+        headers = {"Metadata-Flavor": "Google"}
+        timeout = 2
+        url = "http://metadata.google.internal/computeMetadata/v1/instance/zone"
+        
+        resp = requests.get(url, headers=headers, timeout=timeout)
+        logger.info(f"GCP auto-detect: Zone metadata response status={resp.status_code}")
+        if resp.ok:
+            # Zone format: "projects/123456/zones/us-central1-a"
+            zone_raw = resp.text.strip()
+            zone = zone_raw.split("/")[-1]
+            location = "-".join(zone.split("-")[:-1])
+            logger.info(f"GCP auto-detect: Detected location={location} (from zone={zone})")
+            return location
+        else:
+            logger.warning(f"GCP auto-detect: Zone metadata returned {resp.status_code}")
+    except Exception as e:
+        logger.debug(f"GCP auto-detect: Zone detection failed: {type(e).__name__}: {e}")
+    
+    return None
 
 
 @dataclass
@@ -945,8 +936,17 @@ class AgnoAdapter:
         
         Always uses Vertex AI with Application Default Credentials (ADC):
         - Works with GKE Workload Identity
-        - Auto-detects project_id and location
-        - No configuration needed when running on GCP!
+        - Auto-detects project_id from ADC or metadata service
+        - Auto-detects location from zone, with override option
+        
+        Location priority:
+        1. Explicit google_location parameter
+        2. DCAF_GOOGLE_MODEL_LOCATION env var (override for when zone doesn't have Gemini)
+        3. Auto-detected from instance zone
+        4. Default: us-central1 (always has all Gemini models)
+        
+        Note: Your cluster might be in a region (e.g., us-west2) where Gemini
+        isn't available. Set DCAF_GOOGLE_MODEL_LOCATION to override.
         """
         try:
             from agno.models.google import Gemini
@@ -956,24 +956,40 @@ class AgnoAdapter:
                 "Install it with: pip install google-generativeai"
             ) from e
         
-        # Auto-detect GCP project and location
-        _fetch_and_set_gcp_metadata()
+        # Auto-detect GCP project
+        project_id = self._google_project_id or _detect_gcp_project()
         
-        # Use explicit config, fall back to env vars (which may have been set above)
-        project_id = self._google_project_id or os.environ.get("GOOGLE_CLOUD_PROJECT")
-        location = self._google_location or os.environ.get("GOOGLE_CLOUD_LOCATION")
-        
-        # Vertex AI requires project and location
-        if not project_id or not location:
-            missing = []
-            if not project_id:
-                missing.append("GOOGLE_CLOUD_PROJECT")
-            if not location:
-                missing.append("GOOGLE_CLOUD_LOCATION")
+        if not project_id:
             raise ValueError(
-                f"Google provider requires project and location. "
-                f"Set environment variables: {', '.join(missing)}"
+                "Google provider requires a project ID. "
+                "Set GOOGLE_CLOUD_PROJECT environment variable."
             )
+        
+        # Location priority:
+        # 1. Explicit parameter
+        # 2. DCAF_GOOGLE_MODEL_LOCATION env var (override)
+        # 3. Auto-detect from zone
+        # 4. Default to us-central1
+        location = None
+        location_source = None
+        
+        if self._google_location:
+            location = self._google_location
+            location_source = "explicit parameter"
+        elif os.environ.get("DCAF_GOOGLE_MODEL_LOCATION"):
+            location = os.environ.get("DCAF_GOOGLE_MODEL_LOCATION")
+            location_source = "DCAF_GOOGLE_MODEL_LOCATION env var"
+        else:
+            # Try auto-detect from zone
+            detected = _detect_gcp_location()
+            if detected:
+                location = detected
+                location_source = "auto-detected from zone"
+            else:
+                location = "us-central1"
+                location_source = "default (us-central1 has all Gemini models)"
+        
+        logger.info(f"GCP model location: {location} ({location_source})")
         
         model_kwargs = {
             "id": self._model_id,

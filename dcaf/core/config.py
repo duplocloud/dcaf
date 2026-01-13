@@ -75,9 +75,9 @@ class EnvVars:
     OPENAI_API_KEY = "OPENAI_API_KEY"
     AZURE_OPENAI_API_KEY = "AZURE_OPENAI_API_KEY"
     
-    # Google Vertex AI (auto-detected on GCP)
-    GOOGLE_PROJECT_ID = "GOOGLE_CLOUD_PROJECT"
-    GOOGLE_LOCATION = "GOOGLE_CLOUD_LOCATION"  # e.g., "us-central1"
+    # Google Vertex AI
+    GOOGLE_PROJECT_ID = "GOOGLE_CLOUD_PROJECT"  # Auto-detected on GCP
+    GOOGLE_MODEL_LOCATION = "DCAF_GOOGLE_MODEL_LOCATION"  # Where Gemini models run (default: us-central1)
     
     # A2A Identity
     AGENT_NAME = "DCAF_AGENT_NAME"
@@ -170,9 +170,9 @@ def load_agent_config(
             OPENAI_API_KEY - For provider=openai
             AZURE_OPENAI_API_KEY - For provider=azure
             
-        Google Vertex AI (auto-detected on GCP):
-            GOOGLE_CLOUD_PROJECT - Google Cloud project ID (auto-detected)
-            GOOGLE_CLOUD_LOCATION - Region (auto-detected, defaults to us-central1)
+        Google Vertex AI:
+            GOOGLE_CLOUD_PROJECT - Google Cloud project ID (auto-detected on GCP)
+            DCAF_GOOGLE_MODEL_LOCATION - Region for Gemini models (default: us-central1)
             
         A2A:
             DCAF_AGENT_NAME - Agent name for A2A protocol
@@ -228,7 +228,7 @@ def load_agent_config(
             # Google always uses Vertex AI (auto-detects project/location on GCP)
             if project_id := get_env(EnvVars.GOOGLE_PROJECT_ID):
                 config["google_project_id"] = project_id
-            if location := get_env(EnvVars.GOOGLE_LOCATION):
+            if location := get_env(EnvVars.GOOGLE_MODEL_LOCATION):
                 config["google_location"] = location
                 
         elif config["provider"] == "openai":

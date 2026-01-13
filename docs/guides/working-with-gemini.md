@@ -44,7 +44,7 @@ Override auto-detected values if needed:
 
 ```bash
 export GOOGLE_CLOUD_PROJECT="your-project-id"
-export GOOGLE_CLOUD_LOCATION="us-central1"
+export DCAF_GOOGLE_MODEL_LOCATION="us-central1"  # Optional, defaults to us-central1
 ```
 
 ## Quick Start
