@@ -942,11 +942,21 @@ class AgnoAdapter:
             project_id = self._google_project_id or os.environ.get("GOOGLE_CLOUD_PROJECT")
             location = self._google_location or os.environ.get("GOOGLE_CLOUD_LOCATION")
             
-            if project_id:
-                model_kwargs["project_id"] = project_id
+            # Vertex AI requires project and location
+            if not project_id or not location:
+                missing = []
+                if not project_id:
+                    missing.append("GOOGLE_CLOUD_PROJECT")
+                if not location:
+                    missing.append("GOOGLE_CLOUD_LOCATION")
+                raise ValueError(
+                    f"Vertex AI mode requires project and location. "
+                    f"Set environment variables: {', '.join(missing)}. "
+                    f"Or provide an API key (GEMINI_API_KEY) to use Google AI Studio instead."
+                )
             
-            if location:
-                model_kwargs["location"] = location
+            model_kwargs["project_id"] = project_id
+            model_kwargs["location"] = location
             
             logger.info(
                 f"Creating Vertex AI Gemini model: {self._model_id} "
