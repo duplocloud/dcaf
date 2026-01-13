@@ -315,9 +315,7 @@ conversations = InMemoryConversationRepository()
 events = FakeEventPublisher()  # Or a real implementation
 
 # Create policy
-policy = ApprovalPolicy(
-    high_risk_tools=["kubectl_delete", "aws_terminate"],
-)
+policy = ApprovalPolicy()
 
 # Create use cases
 execute_agent = AgentService(

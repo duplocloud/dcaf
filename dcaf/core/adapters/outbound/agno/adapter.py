@@ -106,6 +106,10 @@ class AgnoAdapter:
         aws_secret_key: Optional[str] = None,
         # Generic API key (for non-AWS providers)
         api_key: Optional[str] = None,
+        # Google Vertex AI configuration (for service account auth)
+        vertexai: bool = False,
+        google_project_id: Optional[str] = None,
+        google_location: Optional[str] = None,
         # Model configuration (for caching, etc.)
         model_config: Optional[Dict[str, Any]] = None,
         # Behavior flags
@@ -140,6 +144,12 @@ class AgnoAdapter:
             
             api_key: API key for non-AWS providers
             
+            vertexai: Use Google Vertex AI instead of Google AI Studio.
+                     When True, uses service account/ADC auth instead of API key.
+                     Required for GKE Workload Identity authentication.
+            google_project_id: Google Cloud project ID (required for Vertex AI)
+            google_location: Google Cloud region (e.g., "us-central1")
+            
             model_config: Configuration dict for model features (e.g., caching)
             tool_call_limit: Max concurrent tool calls (default 1 to avoid bug)
             disable_history: If True, don't pass message history
@@ -161,6 +171,11 @@ class AgnoAdapter:
         
         # Generic API key
         self._api_key = api_key
+        
+        # Google Vertex AI configuration
+        self._vertexai = vertexai
+        self._google_project_id = google_project_id
+        self._google_location = google_location
         
         # Behavior flags (can also be set via env vars)
         self._tool_call_limit = tool_call_limit or int(
@@ -802,7 +817,16 @@ class AgnoAdapter:
         return AzureOpenAI(**model_kwargs)
     
     def _create_google_model(self):
-        """Create a Google AI (Gemini) model."""
+        """
+        Create a Google AI (Gemini) model.
+        
+        Supports two authentication modes:
+        1. API Key (Google AI Studio): Set api_key parameter or GEMINI_API_KEY env var
+        2. Vertex AI (Service Account): Set vertexai=True with project_id and location
+           - Uses Application Default Credentials (ADC)
+           - Works with GKE Workload Identity
+           - Requires GOOGLE_APPLICATION_CREDENTIALS or GCE metadata
+        """
         try:
             from agno.models.google import Gemini
         except ImportError as e:
@@ -817,10 +841,27 @@ class AgnoAdapter:
             "temperature": self._temperature,
         }
         
-        if self._api_key:
-            model_kwargs["api_key"] = self._api_key
+        # Vertex AI configuration (for service account / GKE Workload Identity)
+        if self._vertexai:
+            model_kwargs["vertexai"] = True
+            
+            if self._google_project_id:
+                model_kwargs["project_id"] = self._google_project_id
+            
+            if self._google_location:
+                model_kwargs["location"] = self._google_location
+            
+            logger.info(
+                f"Creating Vertex AI Gemini model: {self._model_id} "
+                f"(project={self._google_project_id}, location={self._google_location})"
+            )
+        else:
+            # Google AI Studio mode - use API key
+            if self._api_key:
+                model_kwargs["api_key"] = self._api_key
+            
+            logger.info(f"Creating Google AI model: {self._model_id}")
         
-        logger.info(f"Creating Google AI model: {self._model_id}")
         return Gemini(**model_kwargs)
     
     def _create_ollama_model(self):

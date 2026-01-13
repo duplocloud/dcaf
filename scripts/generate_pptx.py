@@ -266,7 +266,6 @@ add_content_slide(
         "• system - System prompt for the LLM",
         "• model - LLM model ID (default: Claude 3 Sonnet)",
         "• provider - LLM provider (bedrock, anthropic, openai)",
-        "• high_risk_tools - Tool names that always need approval",
         "• on_event - Event handlers for logging/notifications",
         "• request_interceptors - Modify requests before LLM",
         "• response_interceptors - Modify responses after LLM",

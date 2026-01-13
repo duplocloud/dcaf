@@ -303,7 +303,7 @@ response = orchestrator.run([
 
 ## Using Vertex AI (Google Cloud)
 
-For enterprise deployments on Google Cloud Platform:
+For enterprise deployments on Google Cloud Platform, use Vertex AI with service account authentication:
 
 ```python
 from dcaf.core import Agent
@@ -311,11 +311,9 @@ from dcaf.core import Agent
 agent = Agent(
     provider="google",
     model="gemini-2.5-flash",
-    model_config={
-        "vertexai": True,
-        "project_id": "your-gcp-project-id",
-        "location": "us-central1",
-    }
+    vertexai=True,
+    google_project_id="your-gcp-project-id",
+    google_location="us-central1",
 )
 
 response = agent.run([
@@ -323,10 +321,49 @@ response = agent.run([
 ])
 ```
 
-**Note:** This requires:
+### GKE Workload Identity
+
+For Kubernetes deployments with Workload Identity, the agent automatically uses the pod's service account:
+
+```python
+# In GKE with Workload Identity - no API key needed!
+agent = Agent(
+    provider="google",
+    model="gemini-2.5-flash",
+    vertexai=True,
+    google_project_id="your-gcp-project-id",
+    google_location="us-central1",
+)
+```
+
+### Environment Variables
+
+You can also configure Vertex AI via environment variables:
+
+```bash
+export GOOGLE_GENAI_USE_VERTEXAI=true
+export GOOGLE_CLOUD_PROJECT=your-gcp-project-id
+export GOOGLE_CLOUD_LOCATION=us-central1
+```
+
+Then simply:
+
+```python
+from dcaf.core import Agent
+from dcaf.core.config import load_agent_config
+
+# Automatically picks up Vertex AI config from environment
+config = load_agent_config(provider="google", model="gemini-2.5-flash")
+agent = Agent(**config)
+```
+
+**Requirements:**
 1. GCP project with Vertex AI API enabled
-2. Application Default Credentials configured (`gcloud auth application-default login`)
-3. Proper IAM permissions for Vertex AI
+2. Application Default Credentials configured:
+   - **Local dev**: `gcloud auth application-default login`
+   - **GKE**: Workload Identity with appropriate IAM bindings
+   - **GCE/Cloud Run**: Attached service account
+3. IAM role: `roles/aiplatform.user` on the service account
 
 ## Model Selection Guide
 

@@ -46,10 +46,13 @@ def create_adapter(**kwargs) -> AgnoAdapter:
     Args:
         **kwargs: Passed directly to AgnoAdapter constructor:
             - model_id: Model identifier (e.g., "anthropic.claude-3-sonnet...")
-            - provider: Provider name ("bedrock", "anthropic", "openai", etc.)
+            - provider: Provider name ("bedrock", "anthropic", "openai", "google", etc.)
             - aws_profile: AWS profile name (for Bedrock)
             - aws_region: AWS region (for Bedrock)
             - api_key: API key (for non-AWS providers)
+            - vertexai: Use Google Vertex AI (for service account auth)
+            - google_project_id: Google Cloud project ID (for Vertex AI)
+            - google_location: Google Cloud region (for Vertex AI)
             - max_tokens: Maximum response tokens
             - temperature: Sampling temperature
             

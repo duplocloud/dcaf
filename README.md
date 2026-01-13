@@ -246,7 +246,7 @@ DCAF supports multiple LLM providers through the [Agno SDK](https://docs.agno.co
 |----------|--------|---------------|
 | **AWS Bedrock** | Claude 3.x | `provider="bedrock"`, AWS credentials |
 | **Anthropic** | Claude 3.x | `provider="anthropic"`, API key |
-| **Google** | Gemini 3, 2.x, 1.5 | `provider="google"`, API key |
+| **Google** | Gemini 3, 2.x, 1.5 | `provider="google"`, API key or Vertex AI |
 | **OpenAI** | GPT-4, GPT-3.5 | `provider="openai"`, API key |
 | **Azure OpenAI** | GPT models | `provider="azure"`, API key |
 | **Ollama** | Local models | `provider="ollama"` |
@@ -255,8 +255,11 @@ DCAF supports multiple LLM providers through the [Agno SDK](https://docs.agno.co
 # AWS Bedrock (default)
 agent = Agent(provider="bedrock", aws_profile="my-profile")
 
-# Google Gemini
+# Google Gemini (API key)
 agent = Agent(provider="google", model="gemini-3-flash", api_key=os.getenv("GEMINI_API_KEY"))
+
+# Google Vertex AI (service account / GKE Workload Identity)
+agent = Agent(provider="google", model="gemini-2.5-flash", vertexai=True, google_project_id="my-project")
 
 # Anthropic Direct
 agent = Agent(provider="anthropic", model="claude-3-sonnet-20240229", api_key=os.getenv("ANTHROPIC_API_KEY"))

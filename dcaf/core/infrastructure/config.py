@@ -18,7 +18,6 @@ class CoreConfig:
         provider: The default LLM provider
         max_tokens: Default maximum tokens in responses
         temperature: Default sampling temperature
-        high_risk_tools: List of tool names that always require approval
         enable_streaming: Whether streaming is enabled by default
         log_level: Logging level
         
@@ -43,7 +42,6 @@ class CoreConfig:
     temperature: float = 0.7
     
     # Approval Configuration
-    high_risk_tools: List[str] = field(default_factory=list)
     always_require_approval: bool = False
     
     # Runtime Configuration
@@ -105,18 +103,11 @@ class CoreConfig:
             except ValueError:
                 return default
         
-        def get_list(key: str, default: List[str] = None) -> List[str]:
-            value = get_env(key)
-            if value is None:
-                return default or []
-            return [item.strip() for item in value.split(",") if item.strip()]
-        
         return cls(
             model_id=get_env("MODEL_ID", cls.model_id),
             provider=get_env("PROVIDER", cls.provider),
             max_tokens=get_int("MAX_TOKENS", cls.max_tokens),
             temperature=get_float("TEMPERATURE", cls.temperature),
-            high_risk_tools=get_list("HIGH_RISK_TOOLS", []),
             always_require_approval=get_bool("ALWAYS_REQUIRE_APPROVAL", False),
             enable_streaming=get_bool("ENABLE_STREAMING", True),
             conversation_ttl_seconds=get_int("CONVERSATION_TTL", 3600),
@@ -138,7 +129,6 @@ class CoreConfig:
             provider=kwargs.get("provider", self.provider),
             max_tokens=kwargs.get("max_tokens", self.max_tokens),
             temperature=kwargs.get("temperature", self.temperature),
-            high_risk_tools=kwargs.get("high_risk_tools", self.high_risk_tools),
             always_require_approval=kwargs.get("always_require_approval", self.always_require_approval),
             enable_streaming=kwargs.get("enable_streaming", self.enable_streaming),
             conversation_ttl_seconds=kwargs.get("conversation_ttl_seconds", self.conversation_ttl_seconds),

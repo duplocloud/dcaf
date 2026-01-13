@@ -66,7 +66,6 @@ agent = Agent(
     system_prompt="You are...",     # Static system prompt (optional)
     system_context="Dynamic context",   # Dynamic context (optional, for caching)
     model_config={...},             # Model configuration (optional, e.g., caching)
-    high_risk_tools=["rm", "delete"],   # Extra approval requirements (optional)
     on_event=my_handler,            # Event handler(s) (optional)
 )
 ```
@@ -224,13 +223,14 @@ def get_weather(city: str, units: str = "celsius") -> str:
 
 ## Approval Rules
 
-**Simple rule**: If EITHER the tool OR the policy says it's risky, require approval.
+**Simple rule**: Tools with `requires_approval=True` need human approval before execution.
 
-| Tool `requires_approval` | In `high_risk_tools` | Result |
-|--------------------------|----------------------|--------|
-| `True` | (any) | Requires approval |
-| `False` | No | Auto-executes |
-| `False` | Yes | Requires approval |
+```python
+@tool(requires_approval=True)
+def delete_pod(name: str) -> str:
+    """Delete a pod - requires approval."""
+    return kubectl(f"delete pod {name}")
+```
 
 ---
 

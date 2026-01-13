@@ -169,19 +169,6 @@ def list_pods() -> str:
     return kubectl("get pods")
 ```
 
-### Adding Runtime Restrictions
-
-For additional restrictions at runtime:
-
-```python
-from dcaf.core import Agent
-
-agent = Agent(
-    tools=[list_pods, delete_pod],
-    high_risk_tools=["list_pods"],  # Also require approval for list_pods
-)
-```
-
 ---
 
 ## Domain Events

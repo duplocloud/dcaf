@@ -580,19 +580,13 @@ print(response.text)
 
 ### Approval Rules
 
-**Simple rule**: If EITHER the tool OR the policy says it's risky, require approval.
-
-| Tool `requires_approval` | In `high_risk_tools` | Result |
-|--------------------------|----------------------|--------|
-| `True` | (any) | Requires approval |
-| `False` | No | Auto-executes |
-| `False` | Yes | Requires approval |
+**Simple rule**: Tools with `requires_approval=True` need human approval before execution.
 
 ```python
-agent = Agent(
-    tools=[list_pods, delete_pod, restart_service],
-    high_risk_tools=["restart_service"],  # Additional approval requirement
-)
+@tool(requires_approval=True)
+def restart_service(name: str) -> str:
+    """Restart a service - requires approval."""
+    return kubectl(f"rollout restart deployment {name}")
 ```
 
 ---

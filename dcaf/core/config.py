@@ -77,6 +77,11 @@ class EnvVars:
     OPENAI_API_KEY = "OPENAI_API_KEY"
     AZURE_OPENAI_API_KEY = "AZURE_OPENAI_API_KEY"
     
+    # Google Vertex AI (for service account auth)
+    GOOGLE_VERTEXAI = "GOOGLE_GENAI_USE_VERTEXAI"  # "true" to enable Vertex AI
+    GOOGLE_PROJECT_ID = "GOOGLE_CLOUD_PROJECT"
+    GOOGLE_LOCATION = "GOOGLE_CLOUD_LOCATION"  # e.g., "us-central1"
+    
     # A2A Identity
     AGENT_NAME = "DCAF_AGENT_NAME"
     AGENT_DESCRIPTION = "DCAF_AGENT_DESCRIPTION"
@@ -169,6 +174,11 @@ def load_agent_config(
             OPENAI_API_KEY - For provider=openai
             AZURE_OPENAI_API_KEY - For provider=azure
             
+        Google Vertex AI (for service account auth in GKE):
+            GOOGLE_GENAI_USE_VERTEXAI - Set to "true" to enable Vertex AI
+            GOOGLE_CLOUD_PROJECT - Google Cloud project ID
+            GOOGLE_CLOUD_LOCATION - Region (e.g., "us-central1")
+            
         A2A:
             DCAF_AGENT_NAME - Agent name for A2A protocol
             DCAF_AGENT_DESCRIPTION - Agent description
@@ -221,6 +231,15 @@ def load_agent_config(
             api_key = get_env(EnvVars.ANTHROPIC_API_KEY)
         elif config["provider"] == "google":
             api_key = get_env(EnvVars.GEMINI_API_KEY) or get_env(EnvVars.GOOGLE_API_KEY)
+            
+            # Google Vertex AI configuration (for service account auth in GKE, etc.)
+            if get_env(EnvVars.GOOGLE_VERTEXAI, cast=bool):
+                config["vertexai"] = True
+            if project_id := get_env(EnvVars.GOOGLE_PROJECT_ID):
+                config["google_project_id"] = project_id
+            if location := get_env(EnvVars.GOOGLE_LOCATION):
+                config["google_location"] = location
+                
         elif config["provider"] == "openai":
             api_key = get_env(EnvVars.OPENAI_API_KEY)
         elif config["provider"] == "azure":
@@ -315,7 +334,12 @@ def is_provider_configured(provider: str) -> bool:
     elif provider == "anthropic":
         return bool(get_env(EnvVars.ANTHROPIC_API_KEY))
     elif provider == "google":
-        return bool(get_env(EnvVars.GEMINI_API_KEY) or get_env(EnvVars.GOOGLE_API_KEY))
+        # API key OR Vertex AI with project ID (service account auth)
+        return bool(
+            get_env(EnvVars.GEMINI_API_KEY) or 
+            get_env(EnvVars.GOOGLE_API_KEY) or
+            (get_env(EnvVars.GOOGLE_VERTEXAI, cast=bool) and get_env(EnvVars.GOOGLE_PROJECT_ID))
+        )
     elif provider == "openai":
         return bool(get_env(EnvVars.OPENAI_API_KEY))
     elif provider == "azure":

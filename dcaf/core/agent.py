@@ -39,9 +39,12 @@ Example with Interceptors:
 """
 
 from dataclasses import dataclass, field
-from typing import Callable, Any, Iterator, Union, Optional
+from typing import Callable, Any, Iterator, Union, Optional, TYPE_CHECKING
 import asyncio
 import logging
+
+if TYPE_CHECKING:
+    from dcaf.schemas.messages import AgentMessage
 
 from .models import ChatMessage, normalize_messages
 from .domain.entities import Conversation, ToolCall
@@ -177,6 +180,55 @@ class AgentResponse:
         if self._agent and self.pending_tools:
             return self._agent._reject_all(self.conversation_id, reason)
         return self
+    
+    def to_message(self) -> "AgentMessage":
+        """
+        Convert to AgentMessage (wire format for HelpDesk).
+        
+        This creates a Pydantic-validated AgentMessage suitable for
+        JSON serialization and the HelpDesk protocol.
+        
+        Returns:
+            AgentMessage ready for serialization
+            
+        Example:
+            response = agent.run(messages)
+            message = response.to_message()
+            return message.model_dump()  # → JSON for HelpDesk
+        """
+        from dcaf.schemas.messages import AgentMessage, Data, ToolCall
+        
+        # Build tool_calls for the Data container
+        tool_calls = []
+        for tc in self.pending_tools:
+            tool_calls.append(ToolCall(
+                id=tc.id,
+                name=tc.name,
+                input=tc.input,
+                execute=False,  # Pending approval
+                tool_description=tc.description or "",
+                input_description={},
+            ))
+        
+        # Build Data container
+        data = Data(
+            tool_calls=tool_calls,
+            cmds=[],
+            executed_cmds=[],
+            executed_tool_calls=[],
+        )
+        
+        # Build meta_data with useful fields
+        meta_data = {
+            "has_pending_approvals": self.needs_approval,
+            "is_complete": self.is_complete,
+        }
+        
+        return AgentMessage(
+            content=self.text or "",
+            data=data,
+            meta_data=meta_data,
+        )
 
 
 class Agent:
@@ -287,10 +339,6 @@ class Agent:
                        Requires static system prompt ≥1024 tokens.
                        Example: model_config={'cache_system_prompt': True}
         
-        high_risk_tools: Names of tools that always require approval, even if
-                        the tool itself doesn't have requires_approval=True.
-                        Example: ["delete_pod", "drop_database"]
-        
         on_event: Callback function(s) for domain events. Useful for logging,
                  notifications, or audit trails.
                  Example: on_event=my_logger or on_event=[logger1, logger2]
@@ -329,6 +377,18 @@ class Agent:
                 - ANTHROPIC_API_KEY for provider="anthropic"
                 - OPENAI_API_KEY for provider="openai"
                 - GOOGLE_API_KEY for provider="google"
+        
+        vertexai: Use Google Vertex AI instead of Google AI Studio.
+                 When True, uses service account/ADC auth instead of API key.
+                 Required for GKE Workload Identity authentication.
+                 Only used when provider="google".
+        
+        google_project_id: Google Cloud project ID for Vertex AI.
+                          Required when vertexai=True.
+                          Falls back to GOOGLE_CLOUD_PROJECT env var.
+        
+        google_location: Google Cloud region for Vertex AI (e.g., "us-central1").
+                        Falls back to GOOGLE_CLOUD_LOCATION env var.
         
         name: Agent name for A2A (Agent-to-Agent) protocol.
              Used as the agent's identity when exposed via A2A.
@@ -370,6 +430,15 @@ class Agent:
             provider="ollama",
             model="llama2",
         )
+        
+        # Google Vertex AI (service account / GKE Workload Identity)
+        agent = Agent(
+            provider="google",
+            model="gemini-2.5-flash",
+            vertexai=True,
+            google_project_id="my-project",
+            google_location="us-central1",
+        )
     """
     
     def __init__(
@@ -381,7 +450,6 @@ class Agent:
         system_prompt: str | None = None,
         system_context: Union[str, Callable[[dict], str]] | None = None,
         model_config: dict | None = None,
-        high_risk_tools: list[str] | None = None,
         on_event: EventHandler | list[EventHandler] | None = None,
         # Interceptor configuration
         request_interceptors: RequestInterceptorInput = None,
@@ -394,6 +462,10 @@ class Agent:
         aws_secret_key: str | None = None,
         # API key (for provider="anthropic", "openai", etc.)
         api_key: str | None = None,
+        # Google Vertex AI configuration (for provider="google")
+        vertexai: bool = False,
+        google_project_id: str | None = None,
+        google_location: str | None = None,
         # A2A configuration
         name: str | None = None,
         description: str | None = None,
@@ -411,7 +483,6 @@ class Agent:
         self.system_prompt = system_prompt
         self._system_context = system_context
         self._model_config = model_config or {}
-        self.high_risk_tools = set(high_risk_tools or [])
         
         # A2A identity
         self.name = name or "dcaf-agent"
@@ -423,6 +494,11 @@ class Agent:
         self._aws_access_key = aws_access_key
         self._aws_secret_key = aws_secret_key
         self._api_key = api_key
+        
+        # Google Vertex AI configuration
+        self._vertexai = vertexai
+        self._google_project_id = google_project_id
+        self._google_location = google_location
         
         # Store interceptor error handling mode
         # "abort" = stop on any error
@@ -468,6 +544,9 @@ class Agent:
             aws_access_key=aws_access_key,
             aws_secret_key=aws_secret_key,
             api_key=api_key,
+            vertexai=vertexai,
+            google_project_id=google_project_id,
+            google_location=google_location,
             model_config=self._model_config,
         )
         self._conversations = InMemoryConversationRepository()
@@ -679,6 +758,42 @@ class Agent:
         
         # Convert to the user-facing response format
         return self._convert_response(internal_response)
+    
+    def chat(
+        self,
+        messages: list[ChatMessage | dict],
+        context: dict | None = None,
+    ) -> "AgentMessage":
+        """
+        Run the agent and return AgentMessage directly (wire format).
+        
+        This is the primary method for HelpDesk and API integrations.
+        It returns an AgentMessage ready for JSON serialization.
+        
+        Args:
+            messages: The conversation messages (same format as run())
+            context: Optional platform context (tenant, namespace, etc.)
+            
+        Returns:
+            AgentMessage ready for JSON serialization
+            
+        Example - HelpDesk integration:
+            agent = Agent(tools=[...])
+            message = agent.chat(messages)
+            return message.model_dump()  # → JSON response
+            
+        Example - Check for pending approvals:
+            message = agent.chat(messages)
+            if message.meta_data.get('has_pending_approvals'):
+                # HelpDesk will show approval UI
+                pass
+                
+        See Also:
+            run(): Returns AgentResponse with behavioral methods
+                   (approve_all, reject_all) for programmatic use.
+        """
+        response = self.run(messages=messages, context=context)
+        return response.to_message()
     
     def _run_request_interceptors(self, llm_request: LLMRequest) -> LLMRequest:
         """
@@ -1016,15 +1131,6 @@ class Agent:
         """
         Check if a tool requires approval.
         
-        Rule: If EITHER the tool flag OR the policy says risky, require approval.
+        Returns True if the tool has requires_approval=True.
         """
-        # Tool says it needs approval
-        if tool_requires:
-            return True
-        
-        # Policy says it's high-risk
-        if tool_name in self.high_risk_tools:
-            return True
-        
-        # Both agree it's safe
-        return False
+        return tool_requires

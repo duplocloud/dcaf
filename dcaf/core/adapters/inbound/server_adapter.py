@@ -18,7 +18,7 @@ from typing import Dict, Any, List, Iterator
 import logging
 
 from ...agent import Agent
-from ....schemas.messages import AgentMessage, ToolCall, ExecutedToolCall
+from ....schemas.messages import AgentMessage, ExecutedToolCall
 from ....schemas.events import (
     StreamEvent,
     TextDeltaEvent,
@@ -104,8 +104,18 @@ class ServerAdapter:
                 context=platform_context,
             )
             
-            # Convert to AgentMessage
-            return self._to_agent_message(response, executed_tool_calls)
+            # Convert to AgentMessage using native to_message()
+            agent_msg = response.to_message()
+            
+            # Add any executed tool calls from this request
+            if executed_tool_calls:
+                agent_msg.data.executed_tool_calls.extend(executed_tool_calls)
+            
+            # If there are pending approvals, ensure helpful content
+            if response.needs_approval and not agent_msg.content:
+                agent_msg.content = "I need your approval to execute the following tools:"
+            
+            return agent_msg
             
         except Exception as e:
             logger.exception(f"Error in agent execution: {e}")
@@ -264,54 +274,3 @@ class ServerAdapter:
                     return f"Error executing {tool_name}: {str(e)}"
         
         return f"Tool '{tool_name}' not found"
-    
-    def _to_agent_message(
-        self, 
-        response, 
-        executed_tool_calls: List[ExecutedToolCall] = None,
-    ) -> AgentMessage:
-        """
-        Convert Core AgentResponse to server AgentMessage schema.
-        
-        This maps:
-        - response.text → AgentMessage.content
-        - response.pending_tools → AgentMessage.data.tool_calls
-        - executed_tool_calls → AgentMessage.data.executed_tool_calls
-        """
-        # Start with the text content
-        content = response.text or ""
-        
-        # If there are pending approvals, add a message
-        if response.needs_approval:
-            content = content or "I need your approval to execute the following tools:"
-        
-        agent_msg = AgentMessage(content=content)
-        
-        # Add pending tool calls for approval
-        if response.needs_approval:
-            for pending in response.pending_tools:
-                # Build input description from tool schema if available
-                input_description = {}
-                for tool in self.agent.tools:
-                    if getattr(tool, 'name', None) == pending.name:
-                        if hasattr(tool, 'schema') and 'properties' in tool.schema:
-                            for prop_name, prop_info in tool.schema['properties'].items():
-                                input_description[prop_name] = {
-                                    "type": prop_info.get("type", "string"),
-                                    "description": prop_info.get("description", ""),
-                                }
-                        break
-                
-                agent_msg.data.tool_calls.append(ToolCall(
-                    id=pending.id,
-                    name=pending.name,
-                    input=pending.input,
-                    tool_description=pending.description or "",
-                    input_description=input_description,
-                ))
-        
-        # Add executed tool calls
-        if executed_tool_calls:
-            agent_msg.data.executed_tool_calls = executed_tool_calls
-        
-        return agent_msg

@@ -342,16 +342,8 @@ Response: { executed_tool_calls: [{output: "pod deleted"}] }
 
 ```python
 def requires_approval(tool, tool_call, context):
-    # 1. Check tool configuration
+    # Check tool configuration
     if tool.requires_approval:
-        return True
-    
-    # 2. Check high-risk tools list
-    if tool.name in agent.high_risk_tools:
-        return True
-    
-    # 3. Check approval policy (custom logic)
-    if approval_policy.is_risky(tool_call, context):
         return True
     
     return False

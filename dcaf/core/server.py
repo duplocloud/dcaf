@@ -440,7 +440,8 @@ class CallableAdapter:
             
             # Handle different return types
             if isinstance(result, AgentResult):
-                return self._result_to_message(result)
+                # Use native to_message() conversion
+                return result.to_message()
             elif isinstance(result, dict):
                 # Allow returning dict directly
                 return AgentMessage(
@@ -517,33 +518,3 @@ class CallableAdapter:
                 })
         
         return approved
-    
-    def _result_to_message(self, result: "AgentResult") -> "AgentMessage":
-        """Convert AgentResult to AgentMessage."""
-        from ..schemas.messages import AgentMessage, ToolCall
-        
-        msg = AgentMessage(content=result.text)
-        
-        # Add pending tool calls
-        for pending in result.pending_tools:
-            msg.data.tool_calls.append(ToolCall(
-                id=pending.id,
-                name=pending.name,
-                input=pending.input,
-                tool_description=pending.description,
-                intent=pending.intent,
-                input_description={},
-                execute=False,
-            ))
-        
-        # Add executed tool calls
-        for executed in result.executed_tools:
-            from ..schemas.messages import ExecutedToolCall
-            msg.data.executed_tool_calls.append(ExecutedToolCall(
-                id=executed.id,
-                name=executed.name,
-                input=executed.input,
-                output=executed.output,
-            ))
-        
-        return msg

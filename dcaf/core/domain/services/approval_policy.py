@@ -55,17 +55,14 @@ class ApprovalPolicy:
     def __init__(
         self,
         always_approve_read_only: bool = True,
-        high_risk_tools: Optional[List[str]] = None,
     ) -> None:
         """
         Initialize the approval policy.
         
         Args:
             always_approve_read_only: If True, tools marked read-only never need approval
-            high_risk_tools: List of tool names that always require approval
         """
         self._always_approve_read_only = always_approve_read_only
-        self._high_risk_tools = set(high_risk_tools or [])
     
     def requires_approval(
         self, 
@@ -99,12 +96,6 @@ class ApprovalPolicy:
         Returns:
             ApprovalDecision with the result and reason
         """
-        # High-risk tools always require approval
-        if tool.name in self._high_risk_tools:
-            return ApprovalDecision.needs_approval(
-                f"Tool '{tool.name}' is marked as high-risk"
-            )
-        
         # Check tool-level configuration
         if tool.requires_approval:
             return ApprovalDecision.needs_approval(
@@ -130,11 +121,3 @@ class ApprovalPolicy:
             List of tools that require approval
         """
         return [t for t in tools if self.requires_approval(t, context)]
-    
-    def add_high_risk_tool(self, tool_name: str) -> None:
-        """Add a tool to the high-risk list."""
-        self._high_risk_tools.add(tool_name)
-    
-    def remove_high_risk_tool(self, tool_name: str) -> None:
-        """Remove a tool from the high-risk list."""
-        self._high_risk_tools.discard(tool_name)

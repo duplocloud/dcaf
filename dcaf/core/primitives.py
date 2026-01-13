@@ -47,8 +47,11 @@ Example - Custom multi-call agent:
 """
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, TYPE_CHECKING
 import logging
+
+if TYPE_CHECKING:
+    from dcaf.schemas.messages import AgentMessage
 
 logger = logging.getLogger(__name__)
 
@@ -174,6 +177,68 @@ class AgentResult:
     def needs_approval(self) -> bool:
         """True if there are pending tool approvals."""
         return len(self.pending_tools) > 0
+    
+    def to_message(self) -> "AgentMessage":
+        """
+        Convert to AgentMessage (wire format for HelpDesk).
+        
+        This creates a Pydantic-validated AgentMessage suitable for
+        JSON serialization and the HelpDesk protocol.
+        
+        Returns:
+            AgentMessage ready for serialization
+            
+        Example:
+            result = AgentResult(text="Here are your pods...")
+            message = result.to_message()
+            return message.model_dump()  # → JSON for HelpDesk
+        """
+        from dcaf.schemas.messages import AgentMessage, Data, ToolCall, ExecutedToolCall
+        
+        # Build tool_calls for pending approvals
+        tool_calls = []
+        for tc in self.pending_tools:
+            tool_calls.append(ToolCall(
+                id=tc.id,
+                name=tc.name,
+                input=tc.input,
+                execute=False,
+                tool_description=tc.description or "",
+                intent=tc.intent,
+                input_description={},
+            ))
+        
+        # Build executed_tool_calls
+        executed_tool_calls = []
+        for tc in self.executed_tools:
+            executed_tool_calls.append(ExecutedToolCall(
+                id=tc.id,
+                name=tc.name,
+                input=tc.input,
+                output=tc.output,
+            ))
+        
+        # Build Data container
+        data = Data(
+            tool_calls=tool_calls,
+            executed_tool_calls=executed_tool_calls,
+            cmds=[],
+            executed_cmds=[],
+        )
+        
+        # Build meta_data
+        meta_data = {
+            "has_pending_approvals": self.needs_approval,
+            "is_complete": not self.needs_approval,
+        }
+        if self.metadata:
+            meta_data.update(self.metadata)
+        
+        return AgentMessage(
+            content=self.text or "",
+            data=data,
+            meta_data=meta_data,
+        )
 
 
 # =============================================================================
