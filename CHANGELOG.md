@@ -15,6 +15,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Updated `_create_google_model()` in the Agno adapter to support Vertex AI configuration
   - Documentation updated in `docs/guides/working-with-gemini.md`
 
+- **GCP Metadata Auto-Detection**: When running on GCP (GKE, GCE, Cloud Run), automatically fetches project ID and location from the metadata service.
+  - Sets `GOOGLE_CLOUD_PROJECT` and `GOOGLE_CLOUD_LOCATION` environment variables automatically
+  - Only fetches once per process, caches in env vars
+  - Explicit configuration always takes priority over auto-detected values
+  - Fails silently when not running on GCP
+
 - **AgentMessage convenience methods**: Added methods to simplify HelpDesk and API integrations.
   - `Agent.chat()`: New method that returns `AgentMessage` directly (wire format ready for JSON serialization)
   - `AgentResponse.to_message()`: Converts an `AgentResponse` to `AgentMessage` for API responses

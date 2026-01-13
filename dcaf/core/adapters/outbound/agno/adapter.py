@@ -35,6 +35,84 @@ from ....application.dto.responses import AgentResponse, ToolCallDTO, StreamEven
 
 logger = logging.getLogger(__name__)
 
+# Track whether we've attempted to fetch GCP metadata
+_GCP_METADATA_FETCH_ATTEMPTED = False
+
+
+def _fetch_and_set_gcp_metadata() -> None:
+    """
+    Fetch GCP project and location from metadata service and set as env vars.
+    
+    This function:
+    - Only runs once per process (tracks via _GCP_METADATA_FETCH_ATTEMPTED)
+    - Only sets env vars if they aren't already set (explicit config wins)
+    - Fails silently if not running on GCP
+    
+    The metadata service is available on GCE, GKE, Cloud Run, and other GCP services.
+    It responds quickly (~10ms) when available, so we use a short timeout.
+    
+    Environment variables set:
+    - GOOGLE_CLOUD_PROJECT: The GCP project ID
+    - GOOGLE_CLOUD_LOCATION: The region (extracted from zone, e.g., us-central1)
+    """
+    global _GCP_METADATA_FETCH_ATTEMPTED
+    
+    # Only attempt once per process
+    if _GCP_METADATA_FETCH_ATTEMPTED:
+        return
+    
+    _GCP_METADATA_FETCH_ATTEMPTED = True
+    
+    # Skip if both are already set (explicit config takes priority)
+    if os.environ.get("GOOGLE_CLOUD_PROJECT") and os.environ.get("GOOGLE_CLOUD_LOCATION"):
+        logger.debug("GCP metadata: Using existing env vars")
+        return
+    
+    # Import requests here to avoid dependency if not using Vertex AI
+    try:
+        import requests
+    except ImportError:
+        logger.debug("GCP metadata: requests not available, skipping")
+        return
+    
+    headers = {"Metadata-Flavor": "Google"}
+    timeout = 2  # Metadata service is local and fast
+    base_url = "http://metadata.google.internal/computeMetadata/v1"
+    
+    try:
+        # Fetch and set project ID
+        if not os.environ.get("GOOGLE_CLOUD_PROJECT"):
+            resp = requests.get(
+                f"{base_url}/project/project-id",
+                headers=headers,
+                timeout=timeout,
+            )
+            if resp.ok:
+                project_id = resp.text.strip()
+                os.environ["GOOGLE_CLOUD_PROJECT"] = project_id
+                logger.info(f"GCP metadata: Set GOOGLE_CLOUD_PROJECT={project_id}")
+        
+        # Fetch zone and extract location
+        if not os.environ.get("GOOGLE_CLOUD_LOCATION"):
+            resp = requests.get(
+                f"{base_url}/instance/zone",
+                headers=headers,
+                timeout=timeout,
+            )
+            if resp.ok:
+                # Zone format: "projects/123456/zones/us-central1-a"
+                zone = resp.text.strip().split("/")[-1]  # "us-central1-a"
+                location = "-".join(zone.split("-")[:-1])  # "us-central1"
+                os.environ["GOOGLE_CLOUD_LOCATION"] = location
+                logger.info(f"GCP metadata: Set GOOGLE_CLOUD_LOCATION={location}")
+                
+    except requests.exceptions.RequestException as e:
+        # Not on GCP or metadata service unavailable - this is fine
+        logger.debug(f"GCP metadata: Not available (not on GCP?): {e}")
+    except Exception as e:
+        # Unexpected error - log but don't fail
+        logger.warning(f"GCP metadata: Unexpected error: {e}")
+
 
 @dataclass
 class AgnoMetrics:
@@ -845,15 +923,23 @@ class AgnoAdapter:
         if self._vertexai:
             model_kwargs["vertexai"] = True
             
-            if self._google_project_id:
-                model_kwargs["project_id"] = self._google_project_id
+            # Try to auto-detect GCP metadata if not explicitly configured
+            # This sets GOOGLE_CLOUD_PROJECT and GOOGLE_CLOUD_LOCATION env vars
+            _fetch_and_set_gcp_metadata()
             
-            if self._google_location:
-                model_kwargs["location"] = self._google_location
+            # Use explicit config, fall back to env vars (which may have been set above)
+            project_id = self._google_project_id or os.environ.get("GOOGLE_CLOUD_PROJECT")
+            location = self._google_location or os.environ.get("GOOGLE_CLOUD_LOCATION")
+            
+            if project_id:
+                model_kwargs["project_id"] = project_id
+            
+            if location:
+                model_kwargs["location"] = location
             
             logger.info(
                 f"Creating Vertex AI Gemini model: {self._model_id} "
-                f"(project={self._google_project_id}, location={self._google_location})"
+                f"(project={project_id}, location={location})"
             )
         else:
             # Google AI Studio mode - use API key

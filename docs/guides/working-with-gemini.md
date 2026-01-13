@@ -323,16 +323,33 @@ response = agent.run([
 
 ### GKE Workload Identity
 
-For Kubernetes deployments with Workload Identity, the agent automatically uses the pod's service account:
+For Kubernetes deployments with Workload Identity, the agent automatically uses the pod's service account. **DCAF auto-detects the project ID and location from the GCP metadata service**, so you don't need to configure them explicitly:
 
 ```python
-# In GKE with Workload Identity - no API key needed!
+# In GKE with Workload Identity - minimal config!
 agent = Agent(
     provider="google",
     model="gemini-2.5-flash",
     vertexai=True,
-    google_project_id="your-gcp-project-id",
-    google_location="us-central1",
+    # project_id and location auto-detected from GCP metadata!
+)
+```
+
+When running on GCP infrastructure (GKE, GCE, Cloud Run), DCAF will:
+1. Query the metadata service at `http://metadata.google.internal/`
+2. Fetch the project ID and zone
+3. Set `GOOGLE_CLOUD_PROJECT` and `GOOGLE_CLOUD_LOCATION` environment variables
+4. Use these for all subsequent Vertex AI requests
+
+You can still override with explicit values if needed:
+
+```python
+agent = Agent(
+    provider="google",
+    model="gemini-2.5-flash",
+    vertexai=True,
+    google_project_id="different-project",  # Explicit override
+    google_location="europe-west1",          # Explicit override
 )
 ```
 
