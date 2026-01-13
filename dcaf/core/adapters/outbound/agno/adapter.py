@@ -939,10 +939,9 @@ class AgnoAdapter:
         - Auto-detects project_id from ADC or metadata service
         - Auto-detects location from zone, with override option
         
-        Location priority:
-        1. Explicit google_location parameter
-        2. DCAF_GOOGLE_MODEL_LOCATION env var (override for when zone doesn't have Gemini)
-        3. Auto-detected from instance zone
+        Location sources:
+        1. DCAF_GOOGLE_MODEL_LOCATION env var (override for when zone doesn't have Gemini)
+        2. Auto-detected from instance zone
         
         Raises ValueError if location cannot be determined.
         
@@ -966,18 +965,14 @@ class AgnoAdapter:
                 "Set GOOGLE_CLOUD_PROJECT environment variable."
             )
         
-        # Location priority:
-        # 1. Explicit parameter
-        # 2. DCAF_GOOGLE_MODEL_LOCATION env var (override)
-        # 3. Auto-detect from zone
+        # Location sources:
+        # 1. DCAF_GOOGLE_MODEL_LOCATION env var (override)
+        # 2. Auto-detect from zone
         # No fallback - fail if we can't determine location
         location = None
         location_source = None
         
-        if self._google_location:
-            location = self._google_location
-            location_source = "explicit parameter"
-        elif os.environ.get("DCAF_GOOGLE_MODEL_LOCATION"):
+        if os.environ.get("DCAF_GOOGLE_MODEL_LOCATION"):
             location = os.environ.get("DCAF_GOOGLE_MODEL_LOCATION")
             location_source = "DCAF_GOOGLE_MODEL_LOCATION env var"
         else:
