@@ -5,10 +5,10 @@ This module provides centralized configuration loading from environment variable
 allowing provider settings (Bedrock, Gemini, Anthropic, etc.) to be driven by
 environment rather than hardcoded in application code.
 
-Example .env file:
+Example .env file (Google on GCP):
     DCAF_PROVIDER=google
-    DCAF_MODEL=gemini-3-flash
-    GEMINI_API_KEY=your-key-here
+    DCAF_MODEL=gemini-2.5-pro
+    # Project/location auto-detected on GCP!
     
 Example usage:
     from dcaf.core import Agent
@@ -72,13 +72,10 @@ class EnvVars:
     
     # API Keys (non-AWS providers)
     ANTHROPIC_API_KEY = "ANTHROPIC_API_KEY"
-    GEMINI_API_KEY = "GEMINI_API_KEY"
-    GOOGLE_API_KEY = "GOOGLE_API_KEY"  # Alternative to GEMINI_API_KEY
     OPENAI_API_KEY = "OPENAI_API_KEY"
     AZURE_OPENAI_API_KEY = "AZURE_OPENAI_API_KEY"
     
-    # Google Vertex AI (for service account auth)
-    GOOGLE_VERTEXAI = "GOOGLE_GENAI_USE_VERTEXAI"  # "true" to enable Vertex AI
+    # Google Vertex AI (auto-detected on GCP)
     GOOGLE_PROJECT_ID = "GOOGLE_CLOUD_PROJECT"
     GOOGLE_LOCATION = "GOOGLE_CLOUD_LOCATION"  # e.g., "us-central1"
     
@@ -170,14 +167,12 @@ def load_agent_config(
             
         API Keys (for other providers):
             ANTHROPIC_API_KEY - For provider=anthropic
-            GEMINI_API_KEY or GOOGLE_API_KEY - For provider=google
             OPENAI_API_KEY - For provider=openai
             AZURE_OPENAI_API_KEY - For provider=azure
             
-        Google Vertex AI (for service account auth in GKE):
-            GOOGLE_GENAI_USE_VERTEXAI - Set to "true" to enable Vertex AI
-            GOOGLE_CLOUD_PROJECT - Google Cloud project ID
-            GOOGLE_CLOUD_LOCATION - Region (e.g., "us-central1")
+        Google Vertex AI (auto-detected on GCP):
+            GOOGLE_CLOUD_PROJECT - Google Cloud project ID (auto-detected)
+            GOOGLE_CLOUD_LOCATION - Region (auto-detected, defaults to us-central1)
             
         A2A:
             DCAF_AGENT_NAME - Agent name for A2A protocol
@@ -230,11 +225,7 @@ def load_agent_config(
         if config["provider"] == "anthropic":
             api_key = get_env(EnvVars.ANTHROPIC_API_KEY)
         elif config["provider"] == "google":
-            api_key = get_env(EnvVars.GEMINI_API_KEY) or get_env(EnvVars.GOOGLE_API_KEY)
-            
-            # Google Vertex AI configuration (for service account auth in GKE, etc.)
-            if get_env(EnvVars.GOOGLE_VERTEXAI, cast=bool):
-                config["vertexai"] = True
+            # Google always uses Vertex AI (auto-detects project/location on GCP)
             if project_id := get_env(EnvVars.GOOGLE_PROJECT_ID):
                 config["google_project_id"] = project_id
             if location := get_env(EnvVars.GOOGLE_LOCATION):
@@ -334,12 +325,9 @@ def is_provider_configured(provider: str) -> bool:
     elif provider == "anthropic":
         return bool(get_env(EnvVars.ANTHROPIC_API_KEY))
     elif provider == "google":
-        # API key OR Vertex AI with project ID (service account auth)
-        return bool(
-            get_env(EnvVars.GEMINI_API_KEY) or 
-            get_env(EnvVars.GOOGLE_API_KEY) or
-            (get_env(EnvVars.GOOGLE_VERTEXAI, cast=bool) and get_env(EnvVars.GOOGLE_PROJECT_ID))
-        )
+        # Google always uses Vertex AI - credentials auto-detected via ADC on GCP
+        # Just need provider and model set, everything else is auto-detected
+        return True
     elif provider == "openai":
         return bool(get_env(EnvVars.OPENAI_API_KEY))
     elif provider == "azure":

@@ -9,22 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Google Vertex AI Support**: Added support for Google Vertex AI with service account authentication, enabling deployment on GKE with Workload Identity.
-  - New `Agent` parameters: `vertexai`, `google_project_id`, `google_location`
-  - New environment variables: `GOOGLE_GENAI_USE_VERTEXAI`, `GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION`
-  - Updated `_create_google_model()` in the Agno adapter to support Vertex AI configuration
-  - Documentation updated in `docs/guides/working-with-gemini.md`
-
-- **GCP Metadata Auto-Detection**: When running on GCP (GKE, GCE, Cloud Run), automatically fetches project ID and location from the metadata service.
-  - Sets `GOOGLE_CLOUD_PROJECT` and `GOOGLE_CLOUD_LOCATION` environment variables automatically
-  - Only fetches once per process, caches in env vars
-  - Explicit configuration always takes priority over auto-detected values
-  - Fails silently when not running on GCP
-
-- **Automatic Vertex AI Mode**: When using `provider="google"` without an API key, Vertex AI mode is now automatic.
-  - No need to set `vertexai=True` or `GOOGLE_GENAI_USE_VERTEXAI=true`
+- **Google Vertex AI Support**: The Google provider now exclusively uses Vertex AI with service account authentication, enabling zero-config deployment on GKE with Workload Identity.
+  - New `Agent` parameters: `google_project_id`, `google_location` (both optional, auto-detected on GCP)
+  - Optional environment variables: `GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION`
   - Just set `provider="google"` and deploy to GCP - it just works!
-  - If you provide an API key, Google AI Studio mode is used instead
+
+- **GCP Auto-Detection**: When running on GCP (GKE, GCE, Cloud Run), automatically detects project ID and location:
+  - Uses `google.auth.default()` for project ID (works with Workload Identity)
+  - Falls back to GCP metadata service for project ID and zone/location
+  - Defaults location to `us-central1` if not detected
+  - Only fetches once per process, caches in env vars
 
 - **AgentMessage convenience methods**: Added methods to simplify HelpDesk and API integrations.
   - `Agent.chat()`: New method that returns `AgentMessage` directly (wire format ready for JSON serialization)

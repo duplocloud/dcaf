@@ -372,22 +372,15 @@ class Agent:
         aws_secret_key: AWS secret access key (optional).
                        Prefer using aws_profile instead for better security.
         
-        api_key: API key for non-AWS providers.
+        api_key: API key for OpenAI, Anthropic providers.
                 Falls back to provider-specific environment variables:
                 - ANTHROPIC_API_KEY for provider="anthropic"
                 - OPENAI_API_KEY for provider="openai"
-                - GOOGLE_API_KEY for provider="google"
         
-        vertexai: Use Google Vertex AI instead of Google AI Studio.
-                 When True, uses service account/ADC auth instead of API key.
-                 Required for GKE Workload Identity authentication.
-                 Only used when provider="google".
-        
-        google_project_id: Google Cloud project ID for Vertex AI.
-                          Required when vertexai=True.
+        google_project_id: Google Cloud project ID (auto-detected on GCP).
                           Falls back to GOOGLE_CLOUD_PROJECT env var.
         
-        google_location: Google Cloud region for Vertex AI (e.g., "us-central1").
+        google_location: Google Cloud region (auto-detected, defaults to us-central1).
                         Falls back to GOOGLE_CLOUD_LOCATION env var.
         
         name: Agent name for A2A (Agent-to-Agent) protocol.
@@ -431,13 +424,10 @@ class Agent:
             model="llama2",
         )
         
-        # Google Vertex AI (service account / GKE Workload Identity)
+        # Google Vertex AI (auto-detects project/location on GCP)
         agent = Agent(
             provider="google",
             model="gemini-2.5-flash",
-            vertexai=True,
-            google_project_id="my-project",
-            google_location="us-central1",
         )
     """
     
@@ -462,8 +452,7 @@ class Agent:
         aws_secret_key: str | None = None,
         # API key (for provider="anthropic", "openai", etc.)
         api_key: str | None = None,
-        # Google Vertex AI configuration (for provider="google")
-        vertexai: bool = False,
+        # Google Vertex AI configuration (auto-detected on GCP)
         google_project_id: str | None = None,
         google_location: str | None = None,
         # A2A configuration
@@ -495,8 +484,7 @@ class Agent:
         self._aws_secret_key = aws_secret_key
         self._api_key = api_key
         
-        # Google Vertex AI configuration
-        self._vertexai = vertexai
+        # Google Vertex AI configuration (auto-detected on GCP)
         self._google_project_id = google_project_id
         self._google_location = google_location
         
@@ -544,7 +532,6 @@ class Agent:
             aws_access_key=aws_access_key,
             aws_secret_key=aws_secret_key,
             api_key=api_key,
-            vertexai=vertexai,
             google_project_id=google_project_id,
             google_location=google_location,
             model_config=self._model_config,

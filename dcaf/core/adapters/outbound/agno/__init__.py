@@ -49,10 +49,9 @@ def create_adapter(**kwargs) -> AgnoAdapter:
             - provider: Provider name ("bedrock", "anthropic", "openai", "google", etc.)
             - aws_profile: AWS profile name (for Bedrock)
             - aws_region: AWS region (for Bedrock)
-            - api_key: API key (for non-AWS providers)
-            - vertexai: Use Google Vertex AI (for service account auth)
-            - google_project_id: Google Cloud project ID (for Vertex AI)
-            - google_location: Google Cloud region (for Vertex AI)
+            - api_key: API key (for OpenAI, Anthropic)
+            - google_project_id: Google Cloud project ID (auto-detected on GCP)
+            - google_location: Google Cloud region (auto-detected, defaults to us-central1)
             - max_tokens: Maximum response tokens
             - temperature: Sampling temperature
             

@@ -1,6 +1,6 @@
 # Working with Google Gemini
 
-DCAF supports Google's Gemini models through the Agno adapter, providing access to the latest Gemini 3 and Gemini 2.x models for agent orchestration.
+DCAF supports Google's Gemini models through Vertex AI, providing zero-configuration deployment on Google Cloud Platform.
 
 ## Overview
 
@@ -15,8 +15,7 @@ Google Gemini offers:
 Install the required Google AI dependencies:
 
 ```bash
-# For Google AI Studio (direct API)
-pip install google-generativeai
+pip install google-generativeai google-auth
 
 # Or install DCAF with Gemini support
 pip install dcaf[gemini]
@@ -24,28 +23,28 @@ pip install dcaf[gemini]
 
 ## Configuration
 
-### Option 1: Environment Variable (Recommended)
+### Zero Configuration on GCP (Recommended)
 
-Set your Gemini API key:
-
-```bash
-export GEMINI_API_KEY="your-api-key-here"
-```
-
-Get your API key from [Google AI Studio](https://aistudio.google.com).
-
-### Option 2: Pass Directly
-
-Pass the API key when creating your agent:
+When running on GCP (GKE, GCE, Cloud Run), DCAF automatically detects your project and location:
 
 ```python
 from dcaf.core import Agent
 
+# That's it! Project/location auto-detected on GCP
 agent = Agent(
     provider="google",
-    model="gemini-3-flash",
-    api_key="your-api-key-here"
+    model="gemini-2.5-pro",
+    system_prompt="You are a helpful assistant."
 )
+```
+
+### Environment Variables (Optional)
+
+Override auto-detected values if needed:
+
+```bash
+export GOOGLE_CLOUD_PROJECT="your-project-id"
+export GOOGLE_CLOUD_LOCATION="us-central1"
 ```
 
 ## Quick Start
@@ -54,12 +53,10 @@ agent = Agent(
 
 ```python
 from dcaf.core import Agent
-import os
 
 agent = Agent(
     provider="google",
-    model="gemini-3-flash",
-    api_key=os.getenv("GEMINI_API_KEY"),
+    model="gemini-2.5-pro",
     system_prompt="You are a helpful assistant."
 )
 
@@ -76,69 +73,41 @@ print(response.text)
 
 **gemini-3-pro-preview** - Most capable model with advanced reasoning
 ```python
-agent = Agent(
-    provider="google",
-    model="gemini-3-pro-preview",
-    api_key=os.getenv("GEMINI_API_KEY")
-)
+agent = Agent(provider="google", model="gemini-3-pro-preview")
 ```
 
 **gemini-3-flash** - Fast inference with strong reasoning
 ```python
-agent = Agent(
-    provider="google",
-    model="gemini-3-flash",
-    api_key=os.getenv("GEMINI_API_KEY")
-)
+agent = Agent(provider="google", model="gemini-3-flash")
 ```
 
 ### Gemini 2.x
 
 **gemini-2.5-flash** - Fast model with thinking support
 ```python
-agent = Agent(
-    provider="google",
-    model="gemini-2.5-flash",
-    api_key=os.getenv("GEMINI_API_KEY")
-)
+agent = Agent(provider="google", model="gemini-2.5-flash")
 ```
 
 **gemini-2.5-pro** - More capable, supports thinking budget
 ```python
-agent = Agent(
-    provider="google",
-    model="gemini-2.5-pro",
-    api_key=os.getenv("GEMINI_API_KEY")
-)
+agent = Agent(provider="google", model="gemini-2.5-pro")
 ```
 
 **gemini-2.0-flash** - Previous generation flash
 ```python
-agent = Agent(
-    provider="google",
-    model="gemini-2.0-flash",
-    api_key=os.getenv("GEMINI_API_KEY")
-)
+agent = Agent(provider="google", model="gemini-2.0-flash")
 ```
 
 ### Gemini 1.5
 
 **gemini-1.5-flash** - Lightweight, fast responses
 ```python
-agent = Agent(
-    provider="google",
-    model="gemini-1.5-flash",
-    api_key=os.getenv("GEMINI_API_KEY")
-)
+agent = Agent(provider="google", model="gemini-1.5-flash")
 ```
 
 **gemini-1.5-pro** - Large context window (2M tokens)
 ```python
-agent = Agent(
-    provider="google",
-    model="gemini-1.5-pro",
-    api_key=os.getenv("GEMINI_API_KEY")
-)
+agent = Agent(provider="google", model="gemini-1.5-pro")
 ```
 
 ## Model Configuration
@@ -151,7 +120,6 @@ Control generation behavior:
 agent = Agent(
     provider="google",
     model="gemini-3-flash",
-    api_key=os.getenv("GEMINI_API_KEY"),
     model_config={
         "temperature": 0.7,      # 0.0 to 1.0 (default: 0.1)
         "max_tokens": 8192,      # Maximum output tokens
@@ -167,7 +135,6 @@ Pass additional Gemini-specific parameters:
 agent = Agent(
     provider="google",
     model="gemini-3-pro-preview",
-    api_key=os.getenv("GEMINI_API_KEY"),
     model_config={
         "thinking_level": "high",     # "low" or "high" (Gemini 3 only)
         "top_p": 0.9,
@@ -201,7 +168,6 @@ def get_weather(city: str) -> str:
 agent = Agent(
     provider="google",
     model="gemini-2.5-flash",
-    api_key=os.getenv("GEMINI_API_KEY"),
     tools=[search, get_weather],
     system_prompt="You are a helpful assistant with access to search and weather tools."
 )
@@ -219,12 +185,10 @@ Use streaming for real-time token generation:
 
 ```python
 from dcaf.core import Agent
-import os
 
 agent = Agent(
     provider="google",
     model="gemini-3-flash",
-    api_key=os.getenv("GEMINI_API_KEY")
 )
 
 for event in agent.stream([
@@ -255,7 +219,6 @@ agent = Agent(
     description="AI code review assistant",
     provider="google",
     model="gemini-3-flash",
-    api_key=os.getenv("GEMINI_API_KEY"),
     tools=[analyze_code]
 )
 
@@ -281,7 +244,6 @@ research_agent = Agent(
     name="researcher",
     provider="google",
     model="gemini-2.5-flash",
-    api_key=os.getenv("GEMINI_API_KEY"),
     tools=[web_search],
     system_prompt="You are a research specialist. Gather information from the web."
 )
@@ -301,9 +263,9 @@ response = orchestrator.run([
 ])
 ```
 
-## Using Vertex AI (Google Cloud)
+## Vertex AI (Default)
 
-For deployments on Google Cloud Platform, just use `provider="google"` without an API key - **Vertex AI mode is automatic**:
+The Google provider always uses Vertex AI. Project and location are auto-detected on GCP:
 
 ```python
 from dcaf.core import Agent
@@ -311,72 +273,40 @@ from dcaf.core import Agent
 # On GCP - this is all you need!
 agent = Agent(
     provider="google",
-    model="gemini-2.5-flash",
+    model="gemini-2.5-pro",
 )
-
-response = agent.run([
-    {"role": "user", "content": "Hello from Vertex AI!"}
-])
 ```
 
-DCAF automatically:
-- Detects you're on GCP (no API key provided)
-- Enables Vertex AI mode
-- Fetches project ID and location from the metadata service
+### How Auto-Detection Works
 
-### GKE Workload Identity
+DCAF automatically detects your GCP environment:
 
-For Kubernetes deployments with Workload Identity, just set the provider to "google" - **Vertex AI mode is automatic when no API key is provided**, and project/location are auto-detected:
+1. **google.auth.default()**: Gets project ID from ADC (works with Workload Identity)
+2. **Metadata service**: Falls back to `http://metadata.google.internal/` for project/zone
+3. **Default location**: Uses `us-central1` if location can't be detected
 
-```python
-# In GKE with Workload Identity - just this!
-agent = Agent(
-    provider="google",
-    model="gemini-2.5-flash",
-)
-# That's it! Vertex AI mode + auto-detected project/location
-```
+### Explicit Configuration
 
-When running on GCP infrastructure (GKE, GCE, Cloud Run) without an API key, DCAF will:
-1. Automatically use Vertex AI mode
-2. Query the metadata service at `http://metadata.google.internal/`
-3. Fetch the project ID and zone
-4. Set `GOOGLE_CLOUD_PROJECT` and `GOOGLE_CLOUD_LOCATION` environment variables
-5. Use these for all subsequent Vertex AI requests
-
-You can still override with explicit values if needed:
+Override auto-detected values if needed:
 
 ```python
 agent = Agent(
     provider="google",
-    model="gemini-2.5-flash",
-    google_project_id="different-project",  # Explicit override
-    google_location="europe-west1",          # Explicit override
+    model="gemini-2.5-pro",
+    google_project_id="my-project",      # Explicit project
+    google_location="europe-west1",       # Explicit region
 )
 ```
 
-### Environment Variables
-
-You can also configure Vertex AI via environment variables:
+Or via environment variables:
 
 ```bash
-export GOOGLE_GENAI_USE_VERTEXAI=true
-export GOOGLE_CLOUD_PROJECT=your-gcp-project-id
-export GOOGLE_CLOUD_LOCATION=us-central1
+export GOOGLE_CLOUD_PROJECT="my-project"
+export GOOGLE_CLOUD_LOCATION="us-central1"
 ```
 
-Then simply:
+### Requirements
 
-```python
-from dcaf.core import Agent
-from dcaf.core.config import load_agent_config
-
-# Automatically picks up Vertex AI config from environment
-config = load_agent_config(provider="google", model="gemini-2.5-flash")
-agent = Agent(**config)
-```
-
-**Requirements:**
 1. GCP project with Vertex AI API enabled
 2. Application Default Credentials configured:
    - **Local dev**: `gcloud auth application-default login`
@@ -401,12 +331,10 @@ Handle Gemini-specific errors:
 
 ```python
 from dcaf.core import Agent
-import os
 
 agent = Agent(
     provider="google",
     model="gemini-3-flash",
-    api_key=os.getenv("GEMINI_API_KEY")
 )
 
 try:
@@ -416,10 +344,12 @@ try:
     print(response.text)
 except ImportError as e:
     print("Google AI package not installed:")
-    print("  pip install google-generativeai")
+    print("  pip install google-generativeai google-auth")
+except ValueError as e:
+    print(f"Configuration error: {e}")
+    print("Ensure GOOGLE_CLOUD_PROJECT and GOOGLE_CLOUD_LOCATION are set")
 except Exception as e:
     print(f"Error: {e}")
-    print("Check your GEMINI_API_KEY is set correctly")
 ```
 
 ## Best Practices
@@ -431,36 +361,16 @@ except Exception as e:
 production_agent = Agent(
     provider="google",
     model="gemini-3-flash",  # Fast, cost-effective
-    api_key=os.getenv("GEMINI_API_KEY")
 )
 
 # For complex reasoning - use pro models
 research_agent = Agent(
     provider="google",
     model="gemini-3-pro-preview",  # Advanced reasoning
-    api_key=os.getenv("GEMINI_API_KEY")
 )
 ```
 
-### 2. Use Environment Variables
-
-```python
-# Good: Environment variable
-agent = Agent(
-    provider="google",
-    model="gemini-3-flash",
-    api_key=os.getenv("GEMINI_API_KEY")  # ✓
-)
-
-# Avoid: Hardcoded API key
-agent = Agent(
-    provider="google",
-    model="gemini-3-flash",
-    api_key="AIzaSy..."  # ✗ Don't commit API keys!
-)
-```
-
-### 3. Monitor Token Usage
+### 2. Monitor Token Usage
 
 Gemini models have different context windows and pricing:
 
@@ -468,16 +378,17 @@ Gemini models have different context windows and pricing:
 agent = Agent(
     provider="google",
     model="gemini-3-flash",
-    api_key=os.getenv("GEMINI_API_KEY"),
     model_config={
         "max_tokens": 2048,  # Limit output to control costs
     }
 )
 ```
 
-### 4. Test with Flash, Deploy with Pro
+### 3. Test with Flash, Deploy with Pro
 
 ```python
+import os
+
 # Development/testing
 if os.getenv("ENV") == "development":
     model = "gemini-3-flash"
@@ -487,7 +398,6 @@ else:
 agent = Agent(
     provider="google",
     model=model,
-    api_key=os.getenv("GEMINI_API_KEY")
 )
 ```
 
@@ -504,24 +414,26 @@ agent = Agent(
 
 ## Troubleshooting
 
-### API Key Not Found
+### Project or Location Not Found
 
 ```bash
-# Check if environment variable is set
-echo $GEMINI_API_KEY
+# Check if environment variables are set
+echo $GOOGLE_CLOUD_PROJECT
+echo $GOOGLE_CLOUD_LOCATION
 
-# Set it if missing
-export GEMINI_API_KEY="your-key-here"
+# Set them if not on GCP (for local development)
+export GOOGLE_CLOUD_PROJECT="your-project-id"
+export GOOGLE_CLOUD_LOCATION="us-central1"
 
-# Or add to your ~/.zshrc or ~/.bashrc
-echo 'export GEMINI_API_KEY="your-key-here"' >> ~/.zshrc
+# Or use gcloud to set up ADC
+gcloud auth application-default login
 ```
 
 ### Import Error
 
 ```bash
-# Install the Google AI package
-pip install google-generativeai
+# Install the Google AI packages
+pip install google-generativeai google-auth
 
 # Or upgrade if already installed
 pip install --upgrade google-generativeai
@@ -559,9 +471,8 @@ Complete examples available in the repository:
 
 ## Resources
 
-- [Google AI Studio](https://aistudio.google.com) - Get API keys
-- [Gemini API Documentation](https://ai.google.dev/docs)
 - [Vertex AI Documentation](https://cloud.google.com/vertex-ai/docs)
+- [Gemini API Documentation](https://ai.google.dev/docs)
 - [Agno Gemini Guide](https://docs.agno.com/models/google)
 - [DCAF Documentation](../index.md)
 
@@ -571,8 +482,8 @@ For issues with Gemini in DCAF:
 
 1. Check this guide
 2. Review [Agno's Gemini docs](https://docs.agno.com/models/google)
-3. Verify your API key is valid
-4. Check Google AI Studio quotas
+3. Verify ADC is configured: `gcloud auth application-default login`
+4. Check Vertex AI quotas in GCP Console
 5. Open an issue on GitHub with logs
 
 ---

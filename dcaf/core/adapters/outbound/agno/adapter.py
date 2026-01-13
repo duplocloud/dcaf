@@ -41,19 +41,17 @@ _GCP_METADATA_FETCH_ATTEMPTED = False
 
 def _fetch_and_set_gcp_metadata() -> None:
     """
-    Fetch GCP project and location from metadata service and set as env vars.
+    Auto-detect GCP project ID and location for Vertex AI.
     
-    This function:
-    - Only runs once per process (tracks via _GCP_METADATA_FETCH_ATTEMPTED)
-    - Only sets env vars if they aren't already set (explicit config wins)
-    - Fails silently if not running on GCP
+    Detection methods (in order):
+    1. Existing env vars (GOOGLE_CLOUD_PROJECT, GOOGLE_CLOUD_LOCATION)
+    2. google.auth.default() - works with ADC, Workload Identity
+    3. GCP metadata service - works on GCE, GKE
+    4. Default location to us-central1 if project found but not location
     
-    The metadata service is available on GCE, GKE, Cloud Run, and other GCP services.
-    It responds quickly (~10ms) when available, so we use a short timeout.
-    
-    Environment variables set:
+    Sets environment variables:
     - GOOGLE_CLOUD_PROJECT: The GCP project ID
-    - GOOGLE_CLOUD_LOCATION: The region (extracted from zone, e.g., us-central1)
+    - GOOGLE_CLOUD_LOCATION: The region (defaults to us-central1)
     """
     global _GCP_METADATA_FETCH_ATTEMPTED
     
@@ -65,53 +63,56 @@ def _fetch_and_set_gcp_metadata() -> None:
     
     # Skip if both are already set (explicit config takes priority)
     if os.environ.get("GOOGLE_CLOUD_PROJECT") and os.environ.get("GOOGLE_CLOUD_LOCATION"):
-        logger.debug("GCP metadata: Using existing env vars")
+        logger.debug("GCP auto-detect: Using existing env vars")
         return
     
-    # Import requests here to avoid dependency if not using Vertex AI
-    try:
-        import requests
-    except ImportError:
-        logger.debug("GCP metadata: requests not available, skipping")
-        return
+    project_id = os.environ.get("GOOGLE_CLOUD_PROJECT")
+    location = os.environ.get("GOOGLE_CLOUD_LOCATION")
     
-    headers = {"Metadata-Flavor": "Google"}
-    timeout = 2  # Metadata service is local and fast
-    base_url = "http://metadata.google.internal/computeMetadata/v1"
-    
-    try:
-        # Fetch and set project ID
-        if not os.environ.get("GOOGLE_CLOUD_PROJECT"):
-            resp = requests.get(
-                f"{base_url}/project/project-id",
-                headers=headers,
-                timeout=timeout,
-            )
-            if resp.ok:
-                project_id = resp.text.strip()
+    # Method 1: Try google.auth.default() - most reliable for Workload Identity
+    if not project_id:
+        try:
+            import google.auth
+            _, detected_project = google.auth.default()
+            if detected_project:
+                project_id = detected_project
                 os.environ["GOOGLE_CLOUD_PROJECT"] = project_id
-                logger.info(f"GCP metadata: Set GOOGLE_CLOUD_PROJECT={project_id}")
-        
-        # Fetch zone and extract location
-        if not os.environ.get("GOOGLE_CLOUD_LOCATION"):
-            resp = requests.get(
-                f"{base_url}/instance/zone",
-                headers=headers,
-                timeout=timeout,
-            )
-            if resp.ok:
-                # Zone format: "projects/123456/zones/us-central1-a"
-                zone = resp.text.strip().split("/")[-1]  # "us-central1-a"
-                location = "-".join(zone.split("-")[:-1])  # "us-central1"
-                os.environ["GOOGLE_CLOUD_LOCATION"] = location
-                logger.info(f"GCP metadata: Set GOOGLE_CLOUD_LOCATION={location}")
-                
-    except requests.exceptions.RequestException as e:
-        # Not on GCP or metadata service unavailable - this is fine
-        logger.debug(f"GCP metadata: Not available (not on GCP?): {e}")
-    except Exception as e:
-        # Unexpected error - log but don't fail
-        logger.warning(f"GCP metadata: Unexpected error: {e}")
+                logger.info(f"GCP auto-detect: Set GOOGLE_CLOUD_PROJECT={project_id} (from ADC)")
+        except Exception as e:
+            logger.debug(f"GCP auto-detect: google.auth.default() failed: {e}")
+    
+    # Method 2: Try metadata service for project and zone
+    if not project_id or not location:
+        try:
+            import requests
+            headers = {"Metadata-Flavor": "Google"}
+            timeout = 2
+            base_url = "http://metadata.google.internal/computeMetadata/v1"
+            
+            if not project_id:
+                resp = requests.get(f"{base_url}/project/project-id", headers=headers, timeout=timeout)
+                if resp.ok:
+                    project_id = resp.text.strip()
+                    os.environ["GOOGLE_CLOUD_PROJECT"] = project_id
+                    logger.info(f"GCP auto-detect: Set GOOGLE_CLOUD_PROJECT={project_id} (from metadata)")
+            
+            if not location:
+                resp = requests.get(f"{base_url}/instance/zone", headers=headers, timeout=timeout)
+                if resp.ok:
+                    # Zone format: "projects/123456/zones/us-central1-a"
+                    zone = resp.text.strip().split("/")[-1]
+                    location = "-".join(zone.split("-")[:-1])
+                    os.environ["GOOGLE_CLOUD_LOCATION"] = location
+                    logger.info(f"GCP auto-detect: Set GOOGLE_CLOUD_LOCATION={location} (from metadata)")
+                    
+        except Exception as e:
+            logger.debug(f"GCP auto-detect: Metadata service unavailable: {e}")
+    
+    # Method 3: Default location if we have project but no location
+    if project_id and not location:
+        location = "us-central1"
+        os.environ["GOOGLE_CLOUD_LOCATION"] = location
+        logger.info(f"GCP auto-detect: Set GOOGLE_CLOUD_LOCATION={location} (default)")
 
 
 @dataclass
@@ -182,10 +183,9 @@ class AgnoAdapter:
         aws_region: Optional[str] = None,
         aws_access_key: Optional[str] = None,
         aws_secret_key: Optional[str] = None,
-        # Generic API key (for non-AWS providers)
+        # Generic API key (for non-AWS providers like OpenAI, Anthropic)
         api_key: Optional[str] = None,
-        # Google Vertex AI configuration (for service account auth)
-        vertexai: bool = False,
+        # Google Vertex AI configuration
         google_project_id: Optional[str] = None,
         google_location: Optional[str] = None,
         # Model configuration (for caching, etc.)
@@ -220,13 +220,10 @@ class AgnoAdapter:
             aws_access_key: AWS access key ID (optional, prefer profile)
             aws_secret_key: AWS secret access key (optional, prefer profile)
             
-            api_key: API key for non-AWS providers
+            api_key: API key for OpenAI, Anthropic providers
             
-            vertexai: Use Google Vertex AI instead of Google AI Studio.
-                     When True, uses service account/ADC auth instead of API key.
-                     Required for GKE Workload Identity authentication.
-            google_project_id: Google Cloud project ID (required for Vertex AI)
-            google_location: Google Cloud region (e.g., "us-central1")
+            google_project_id: Google Cloud project ID (auto-detected if not set)
+            google_location: Google Cloud region (auto-detected, defaults to us-central1)
             
             model_config: Configuration dict for model features (e.g., caching)
             tool_call_limit: Max concurrent tool calls (default 1 to avoid bug)
@@ -247,11 +244,10 @@ class AgnoAdapter:
         self._aws_access_key = aws_access_key
         self._aws_secret_key = aws_secret_key
         
-        # Generic API key
+        # Generic API key (OpenAI, Anthropic)
         self._api_key = api_key
         
-        # Google Vertex AI configuration
-        self._vertexai = vertexai
+        # Google Vertex AI configuration (auto-detected if not set)
         self._google_project_id = google_project_id
         self._google_location = google_location
         
@@ -896,21 +892,12 @@ class AgnoAdapter:
     
     def _create_google_model(self):
         """
-        Create a Google AI (Gemini) model.
+        Create a Google Vertex AI (Gemini) model.
         
-        Mode selection (automatic):
-        - If API key is provided → Google AI Studio mode
-        - If no API key → Vertex AI mode (default for GCP deployments)
-        
-        Vertex AI mode:
-        - Uses Application Default Credentials (ADC)
+        Always uses Vertex AI with Application Default Credentials (ADC):
         - Works with GKE Workload Identity
-        - Auto-detects project_id and location from GCP metadata service
+        - Auto-detects project_id and location
         - No configuration needed when running on GCP!
-        
-        Google AI Studio mode:
-        - Set api_key parameter or GEMINI_API_KEY env var
-        - For local development or non-GCP deployments
         """
         try:
             from agno.models.google import Gemini
@@ -920,52 +907,38 @@ class AgnoAdapter:
                 "Install it with: pip install google-generativeai"
             ) from e
         
+        # Auto-detect GCP project and location
+        _fetch_and_set_gcp_metadata()
+        
+        # Use explicit config, fall back to env vars (which may have been set above)
+        project_id = self._google_project_id or os.environ.get("GOOGLE_CLOUD_PROJECT")
+        location = self._google_location or os.environ.get("GOOGLE_CLOUD_LOCATION")
+        
+        # Vertex AI requires project and location
+        if not project_id or not location:
+            missing = []
+            if not project_id:
+                missing.append("GOOGLE_CLOUD_PROJECT")
+            if not location:
+                missing.append("GOOGLE_CLOUD_LOCATION")
+            raise ValueError(
+                f"Google provider requires project and location. "
+                f"Set environment variables: {', '.join(missing)}"
+            )
+        
         model_kwargs = {
             "id": self._model_id,
             "max_output_tokens": self._max_tokens,
             "temperature": self._temperature,
+            "vertexai": True,
+            "project_id": project_id,
+            "location": location,
         }
         
-        # Determine mode: API key → Google AI Studio, otherwise → Vertex AI
-        # This allows simple config: just set provider="google" and it works on GCP
-        use_vertexai = self._vertexai or not self._api_key
-        
-        if use_vertexai:
-            # Vertex AI mode (service account / GKE Workload Identity)
-            model_kwargs["vertexai"] = True
-            
-            # Try to auto-detect GCP metadata if not explicitly configured
-            # This sets GOOGLE_CLOUD_PROJECT and GOOGLE_CLOUD_LOCATION env vars
-            _fetch_and_set_gcp_metadata()
-            
-            # Use explicit config, fall back to env vars (which may have been set above)
-            project_id = self._google_project_id or os.environ.get("GOOGLE_CLOUD_PROJECT")
-            location = self._google_location or os.environ.get("GOOGLE_CLOUD_LOCATION")
-            
-            # Vertex AI requires project and location
-            if not project_id or not location:
-                missing = []
-                if not project_id:
-                    missing.append("GOOGLE_CLOUD_PROJECT")
-                if not location:
-                    missing.append("GOOGLE_CLOUD_LOCATION")
-                raise ValueError(
-                    f"Vertex AI mode requires project and location. "
-                    f"Set environment variables: {', '.join(missing)}. "
-                    f"Or provide an API key (GEMINI_API_KEY) to use Google AI Studio instead."
-                )
-            
-            model_kwargs["project_id"] = project_id
-            model_kwargs["location"] = location
-            
-            logger.info(
-                f"Creating Vertex AI Gemini model: {self._model_id} "
-                f"(project={project_id}, location={location})"
-            )
-        else:
-            # Google AI Studio mode - use API key
-            model_kwargs["api_key"] = self._api_key
-            logger.info(f"Creating Google AI model: {self._model_id}")
+        logger.info(
+            f"Creating Vertex AI Gemini model: {self._model_id} "
+            f"(project={project_id}, location={location})"
+        )
         
         return Gemini(**model_kwargs)
     

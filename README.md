@@ -255,11 +255,8 @@ DCAF supports multiple LLM providers through the [Agno SDK](https://docs.agno.co
 # AWS Bedrock (default)
 agent = Agent(provider="bedrock", aws_profile="my-profile")
 
-# Google Gemini (API key)
-agent = Agent(provider="google", model="gemini-3-flash", api_key=os.getenv("GEMINI_API_KEY"))
-
-# Google Vertex AI (service account / GKE Workload Identity)
-agent = Agent(provider="google", model="gemini-2.5-flash", vertexai=True, google_project_id="my-project")
+# Google Vertex AI (auto-detects project/location on GCP)
+agent = Agent(provider="google", model="gemini-2.5-pro")
 
 # Anthropic Direct
 agent = Agent(provider="anthropic", model="claude-3-sonnet-20240229", api_key=os.getenv("ANTHROPIC_API_KEY"))
