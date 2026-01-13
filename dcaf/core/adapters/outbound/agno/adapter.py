@@ -35,52 +35,36 @@ from ....application.dto.responses import AgentResponse, ToolCallDTO, StreamEven
 
 logger = logging.getLogger(__name__)
 
-# Track whether we've attempted to fetch GCP metadata
+# Cache for GCP metadata (fetched once per process)
+_gcp_metadata_cache: dict = {}
 _GCP_METADATA_FETCH_ATTEMPTED = False
 
 
-def _detect_gcp_project() -> Optional[str]:
+def _fetch_gcp_metadata() -> None:
     """
-    Auto-detect GCP project ID for Vertex AI.
+    Fetch GCP project and location from metadata service (once per process).
     
-    Detection methods (in order):
-    1. Existing GOOGLE_CLOUD_PROJECT env var
-    2. google.auth.default() - works with ADC, Workload Identity
-    3. GCP metadata service - works on GCE, GKE
-    
-    Returns:
-        The detected project ID, or None if not found.
-        Also sets GOOGLE_CLOUD_PROJECT env var if detected.
+    Stores results in _gcp_metadata_cache and sets GOOGLE_CLOUD_PROJECT env var.
+    Called once, caches results for subsequent calls.
     """
-    global _GCP_METADATA_FETCH_ATTEMPTED
+    global _GCP_METADATA_FETCH_ATTEMPTED, _gcp_metadata_cache
     
-    # Check if already set
-    existing_project = os.environ.get("GOOGLE_CLOUD_PROJECT")
-    if existing_project:
-        logger.info(f"GCP auto-detect: Using existing GOOGLE_CLOUD_PROJECT={existing_project}")
-        return existing_project
-    
-    # Only attempt detection once per process
     if _GCP_METADATA_FETCH_ATTEMPTED:
-        logger.debug("GCP auto-detect: Already attempted, skipping")
-        return os.environ.get("GOOGLE_CLOUD_PROJECT")
+        return
     
     _GCP_METADATA_FETCH_ATTEMPTED = True
-    logger.info("GCP auto-detect: Starting project ID detection for Vertex AI")
+    logger.info("GCP auto-detect: Starting GCP metadata detection for Vertex AI")
     
-    project_id = None
-    
-    # Method 1: Try google.auth.default() - most reliable for Workload Identity
+    # Try google.auth.default() first for project ID
     logger.info("GCP auto-detect: Attempting google.auth.default() for project ID...")
     try:
         import google.auth
         credentials, detected_project = google.auth.default()
         logger.info(f"GCP auto-detect: google.auth.default() returned project={detected_project}, credentials={type(credentials).__name__}")
         if detected_project:
-            project_id = detected_project
-            os.environ["GOOGLE_CLOUD_PROJECT"] = project_id
-            logger.info(f"GCP auto-detect: SUCCESS - Set GOOGLE_CLOUD_PROJECT={project_id} (from ADC)")
-            return project_id
+            _gcp_metadata_cache["project_id"] = detected_project
+            os.environ["GOOGLE_CLOUD_PROJECT"] = detected_project
+            logger.info(f"GCP auto-detect: SUCCESS - Set GOOGLE_CLOUD_PROJECT={detected_project} (from ADC)")
         else:
             logger.warning("GCP auto-detect: google.auth.default() returned credentials but no project ID")
     except ImportError:
@@ -88,71 +72,88 @@ def _detect_gcp_project() -> Optional[str]:
     except Exception as e:
         logger.warning(f"GCP auto-detect: google.auth.default() failed: {type(e).__name__}: {e}")
     
-    # Method 2: Try metadata service for project
+    # Try metadata service for project (if not found via ADC) and location
     logger.info("GCP auto-detect: Attempting GCP metadata service...")
     try:
         import requests
         headers = {"Metadata-Flavor": "Google"}
         timeout = 2
-        url = "http://metadata.google.internal/computeMetadata/v1/project/project-id"
+        base_url = "http://metadata.google.internal/computeMetadata/v1"
         
-        logger.info(f"GCP auto-detect: Fetching project ID from {url}")
+        # Fetch project ID if not already found
+        if "project_id" not in _gcp_metadata_cache:
+            url = f"{base_url}/project/project-id"
+            logger.info(f"GCP auto-detect: Fetching project ID from {url}")
+            try:
+                resp = requests.get(url, headers=headers, timeout=timeout)
+                logger.info(f"GCP auto-detect: Project metadata response status={resp.status_code}")
+                if resp.ok:
+                    project_id = resp.text.strip()
+                    _gcp_metadata_cache["project_id"] = project_id
+                    os.environ["GOOGLE_CLOUD_PROJECT"] = project_id
+                    logger.info(f"GCP auto-detect: SUCCESS - Set GOOGLE_CLOUD_PROJECT={project_id} (from metadata)")
+                else:
+                    logger.warning(f"GCP auto-detect: Project metadata returned {resp.status_code}")
+            except requests.exceptions.ConnectionError as e:
+                logger.warning(f"GCP auto-detect: Cannot connect to metadata service (not on GCP?): {e}")
+            except requests.exceptions.Timeout:
+                logger.warning("GCP auto-detect: Metadata service timed out for project")
+        
+        # Fetch zone/location
+        url = f"{base_url}/instance/zone"
+        logger.info(f"GCP auto-detect: Fetching zone from {url}")
         try:
             resp = requests.get(url, headers=headers, timeout=timeout)
-            logger.info(f"GCP auto-detect: Metadata response status={resp.status_code}")
+            logger.info(f"GCP auto-detect: Zone metadata response status={resp.status_code}")
             if resp.ok:
-                project_id = resp.text.strip()
-                os.environ["GOOGLE_CLOUD_PROJECT"] = project_id
-                logger.info(f"GCP auto-detect: SUCCESS - Set GOOGLE_CLOUD_PROJECT={project_id} (from metadata)")
-                return project_id
+                # Zone format: "projects/123456/zones/us-central1-a"
+                zone_raw = resp.text.strip()
+                zone = zone_raw.split("/")[-1]
+                location = "-".join(zone.split("-")[:-1])
+                _gcp_metadata_cache["location"] = location
+                logger.info(f"GCP auto-detect: Detected location={location} (from zone={zone})")
             else:
-                logger.warning(f"GCP auto-detect: Metadata service returned {resp.status_code}: {resp.text[:100]}")
+                logger.warning(f"GCP auto-detect: Zone metadata returned {resp.status_code}")
         except requests.exceptions.ConnectionError as e:
-            logger.warning(f"GCP auto-detect: Cannot connect to metadata service (not on GCP?): {e}")
+            logger.warning(f"GCP auto-detect: Cannot connect to metadata service for zone: {e}")
         except requests.exceptions.Timeout:
-            logger.warning("GCP auto-detect: Metadata service timed out")
+            logger.warning("GCP auto-detect: Metadata service timed out for zone")
                     
     except ImportError:
         logger.warning("GCP auto-detect: requests package not installed, skipping metadata detection")
     except Exception as e:
         logger.warning(f"GCP auto-detect: Metadata service error: {type(e).__name__}: {e}")
     
-    logger.error("GCP auto-detect: FAILED - Could not detect project ID. Set GOOGLE_CLOUD_PROJECT env var.")
-    return None
+    # Log summary
+    project = _gcp_metadata_cache.get("project_id")
+    location = _gcp_metadata_cache.get("location")
+    if project and location:
+        logger.info(f"GCP auto-detect: Complete - project={project}, location={location}")
+    elif project:
+        logger.info(f"GCP auto-detect: Partial - project={project}, location=not detected")
+    else:
+        logger.error("GCP auto-detect: FAILED - Could not detect project ID. Set GOOGLE_CLOUD_PROJECT env var.")
 
 
-def _detect_gcp_location() -> Optional[str]:
-    """
-    Auto-detect GCP location from metadata service.
+def _get_gcp_project() -> Optional[str]:
+    """Get GCP project ID from cache or env var."""
+    # Check env var first (may have been set externally)
+    existing = os.environ.get("GOOGLE_CLOUD_PROJECT")
+    if existing:
+        return existing
     
-    Returns the region extracted from the instance zone (e.g., us-west2 from us-west2-b).
-    Returns None if not running on GCP or metadata service is unavailable.
+    # Ensure metadata has been fetched
+    _fetch_gcp_metadata()
     
-    Note: This may return a region where Gemini models are NOT available.
-    Use DCAF_GOOGLE_MODEL_LOCATION to override if needed.
-    """
-    logger.info("GCP auto-detect: Attempting to detect location from metadata service...")
-    try:
-        import requests
-        headers = {"Metadata-Flavor": "Google"}
-        timeout = 2
-        url = "http://metadata.google.internal/computeMetadata/v1/instance/zone"
-        
-        resp = requests.get(url, headers=headers, timeout=timeout)
-        logger.info(f"GCP auto-detect: Zone metadata response status={resp.status_code}")
-        if resp.ok:
-            # Zone format: "projects/123456/zones/us-central1-a"
-            zone_raw = resp.text.strip()
-            zone = zone_raw.split("/")[-1]
-            location = "-".join(zone.split("-")[:-1])
-            logger.info(f"GCP auto-detect: Detected location={location} (from zone={zone})")
-            return location
-        else:
-            logger.warning(f"GCP auto-detect: Zone metadata returned {resp.status_code}")
-    except Exception as e:
-        logger.debug(f"GCP auto-detect: Zone detection failed: {type(e).__name__}: {e}")
+    return _gcp_metadata_cache.get("project_id")
+
+
+def _get_gcp_location() -> Optional[str]:
+    """Get GCP location from cache (auto-detected from zone)."""
+    # Ensure metadata has been fetched
+    _fetch_gcp_metadata()
     
-    return None
+    return _gcp_metadata_cache.get("location")
 
 
 @dataclass
@@ -957,7 +958,7 @@ class AgnoAdapter:
             ) from e
         
         # Auto-detect GCP project
-        project_id = self._google_project_id or _detect_gcp_project()
+        project_id = self._google_project_id or _get_gcp_project()
         
         if not project_id:
             raise ValueError(
@@ -976,8 +977,8 @@ class AgnoAdapter:
             location = os.environ.get("DCAF_GOOGLE_MODEL_LOCATION")
             location_source = "DCAF_GOOGLE_MODEL_LOCATION env var"
         else:
-            # Try auto-detect from zone
-            detected = _detect_gcp_location()
+            # Try auto-detect from zone (uses cached metadata)
+            detected = _get_gcp_location()
             if detected:
                 location = detected
                 location_source = "auto-detected from zone"
