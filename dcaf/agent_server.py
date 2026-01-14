@@ -1,4 +1,4 @@
-from typing import Protocol, runtime_checkable, Dict, Any, List 
+from typing import Protocol, runtime_checkable, Dict, Any, List, Optional
 from fastapi import FastAPI, HTTPException, Body
 from pydantic import ValidationError
 from .schemas.messages import AgentMessage, Messages
@@ -8,6 +8,7 @@ import os
 import traceback
 from .channel_routing import ChannelResponseRouter, SlackResponseRouter
 from fastapi.responses import StreamingResponse
+import inspect
 
 logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO"),
@@ -19,11 +20,11 @@ logger = logging.getLogger(__name__)
 @runtime_checkable            
 class AgentProtocol(Protocol):
     """Any agent that can respond to a chat."""
-    def invoke(self, messages: Dict[str, List[Dict[str, Any]]]) -> AgentMessage: ...
+    def invoke(self, messages: Dict[str, List[Dict[str, Any]]], thread_id: Optional[str] = None) -> AgentMessage: ...
 
 
 def create_chat_app(agent: AgentProtocol, router: ChannelResponseRouter = None) -> FastAPI:
-    # ONE-LINER guardrail — fails fast if agent doesn’t meet the protocol
+    # ONE-LINER guardrail — fails fast if agent doesn't meet the protocol
     if not isinstance(agent, AgentProtocol):
         raise TypeError(    
             "Agent must satisfy AgentProtocol "
@@ -73,8 +74,18 @@ def create_chat_app(agent: AgentProtocol, router: ChannelResponseRouter = None) 
         try:
             # Pass the raw messages dictionary directly to the agent
             msgs_obj = msgs_obj.model_dump()
-            logger.info("Invoking agent with messages: %s", msgs_obj)
-            assistant_msg = agent.invoke(msgs_obj)
+            
+            # Extract thread_id from raw_body if present
+            thread_id = raw_body.get("thread_id")
+            
+            # Check if the agent's invoke method accepts thread_id parameter
+            sig = inspect.signature(agent.invoke)
+            if "thread_id" in sig.parameters:
+                logger.info("Invoking agent with messages and thread_id: %s", thread_id)
+                assistant_msg = agent.invoke(msgs_obj, thread_id=thread_id)
+            else:
+                logger.info("Invoking agent with messages (no thread_id support)")
+                assistant_msg = agent.invoke(msgs_obj)
 
             logger.info("Assistant message: %s", assistant_msg)
 
@@ -126,11 +137,64 @@ def create_chat_app(agent: AgentProtocol, router: ChannelResponseRouter = None) 
         except ValidationError as ve:
             raise HTTPException(status_code=422, detail=ve.errors())
         
+        # Extract thread_id from raw_body if present
+        thread_id = raw_body.get("thread_id")
+        
         # Generator function
         def event_generator():
+            # Accumulate events for logging
+            text_parts = []
+            event_counts = {}
+            executed_commands = []
+            executed_tool_calls = []
+            tool_calls = []
+            commands = []
+            stop_reason = None
+
             try:
-                for event in agent.invoke_stream(msgs_obj.model_dump()):
+                # Check if the agent's invoke_stream method accepts thread_id parameter
+                sig = inspect.signature(agent.invoke_stream)
+                if "thread_id" in sig.parameters:
+                    logger.info("Invoking stream agent with messages and thread_id: %s", thread_id)
+                    event_stream = agent.invoke_stream(msgs_obj.model_dump(), thread_id=thread_id)
+                else:
+                    logger.info("Invoking stream agent with messages (no thread_id support)")
+                    event_stream = agent.invoke_stream(msgs_obj.model_dump())
+
+                for event in event_stream:
+                    event_type = event.type
+                    event_counts[event_type] = event_counts.get(event_type, 0) + 1
+
+                    # Accumulate data based on event type
+                    if event_type == "text_delta":
+                        text_parts.append(event.text)
+                    elif event_type == "executed_commands":
+                        executed_commands.extend(event.executed_cmds)
+                    elif event_type == "executed_tool_calls":
+                        executed_tool_calls.extend(event.executed_tool_calls)
+                    elif event_type == "tool_calls":
+                        tool_calls.extend(event.tool_calls)
+                    elif event_type == "commands":
+                        commands.extend(event.commands)
+                    elif event_type == "done":
+                        stop_reason = event.stop_reason
+
                     yield event.model_dump_json() + '\n'
+
+                # Log final aggregated response
+                logger.info("Stream completed - Event counts: %s", event_counts)
+                if text_parts:
+                    full_text = ''.join(text_parts)
+                    logger.info("Streamed assistant message: %s", f'{full_text}')
+                if executed_tool_calls:
+                    logger.info("Executed tool calls: %s", executed_tool_calls)
+                if tool_calls:
+                    logger.info("Tool calls requested: %s", tool_calls)
+                if commands:
+                    logger.info("Commands requested: %s", commands)
+                if stop_reason:
+                    logger.info("Stop reason: %s", stop_reason)
+
             except Exception as e:
                 logger.error("Stream error: %s", str(e), exc_info=True)
                 error_event = ErrorEvent(error=str(e))
