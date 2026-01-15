@@ -1223,17 +1223,16 @@ class AgnoAdapter:
             elif hasattr(run_output.content, 'text'):
                 text = str(run_output.content.text)
         
-        # Debug: Log all run_output attributes to trace the [] issue
-        logger.info(f"🔍 run_output type: {type(run_output)}")
-        logger.info(f"🔍 run_output.content: {repr(getattr(run_output, 'content', None))[:300]}")
-        logger.info(f"🔍 run_output.tools: {repr(getattr(run_output, 'tools', None))[:300]}")
-        logger.info(f"🔍 Final extracted text: {repr(text)[:300]}")
+        # WORKAROUND: Agno SDK bug - content property concatenates text with str([])
+        # when there are tool calls. Strip trailing [] if present.
+        # See: https://github.com/agno-agi/agno/issues/XXX (to be reported)
+        if text and text.endswith('[]'):
+            logger.debug(f"Agno: Stripping trailing '[]' from content (Agno SDK bug)")
+            text = text[:-2]
         
-        # Debug: Check if text has [] appended (bug tracing)
-        if text and '[]' in text:
-            logger.warning(f"🚨 Extracted text contains '[]': {repr(text)[:200]}")
-            # Log more details to find source
-            logger.warning(f"🚨 run_output attributes: {[a for a in dir(run_output) if not a.startswith('_')]}")
+        # Also handle cases where [] appears with whitespace before it
+        if text and text.rstrip().endswith('[]'):
+            text = text.rstrip()[:-2].rstrip()
         
         # Extract tool calls
         tool_calls = []
