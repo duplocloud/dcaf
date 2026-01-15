@@ -1161,57 +1161,71 @@ class AgnoAdapter:
         Returns:
             AgentResponse with appropriate fields set
         """
-        # Extract text content
+        # Extract text content using Agno's built-in method if available
         text = None
-        if hasattr(run_output, 'content') and run_output.content:
-            # Debug logging to understand content structure
-            logger.info(f"🔍 Agno run_output.content type: {type(run_output.content)}")
-            logger.info(f"🔍 Agno run_output.content repr: {repr(run_output.content)[:500]}")
-            
-            # Check if content already has [] in it (bug tracing)
-            content_str = str(run_output.content) if not isinstance(run_output.content, str) else run_output.content
-            if '[]' in content_str:
-                logger.warning(f"🚨 Content already contains '[]': {repr(content_str)[:200]}")
-            
+        if hasattr(run_output, 'get_content_as_string'):
+            # Use Agno's official method to get string content
+            try:
+                raw_content = run_output.get_content_as_string()
+                logger.debug(f"Agno get_content_as_string() returned: {repr(raw_content)[:200]}")
+                
+                # Check if the result looks like JSON (list/dict) and extract text
+                if raw_content:
+                    # If it starts with [ or {, it's JSON-serialized structured content
+                    if raw_content.startswith('[') or raw_content.startswith('{'):
+                        # Try to parse and extract text
+                        import json
+                        try:
+                            parsed = json.loads(raw_content)
+                            if isinstance(parsed, list):
+                                # Extract text from content blocks
+                                text_parts = []
+                                for block in parsed:
+                                    if isinstance(block, dict) and block.get("type") == "text":
+                                        text_parts.append(block.get("text", ""))
+                                    elif isinstance(block, str):
+                                        text_parts.append(block)
+                                text = " ".join(text_parts) if text_parts else None
+                            elif isinstance(parsed, dict) and "text" in parsed:
+                                text = parsed["text"]
+                            else:
+                                # Not a recognized format, use as-is if it looks like text
+                                text = None
+                        except json.JSONDecodeError:
+                            # Not valid JSON, use as-is
+                            text = raw_content
+                    else:
+                        # Plain text content
+                        text = raw_content
+            except Exception as e:
+                logger.warning(f"Agno get_content_as_string() failed: {e}")
+                text = None
+        
+        # Fallback: direct content access if get_content_as_string didn't work
+        if text is None and hasattr(run_output, 'content') and run_output.content:
+            logger.debug(f"Agno: Falling back to direct content access")
             if isinstance(run_output.content, str):
                 text = run_output.content
-                logger.info(f"🔍 Agno: Content is string: {repr(text)[:200]}")
             elif isinstance(run_output.content, list):
-                # Content is a list of content blocks (text, tool_use, etc.)
-                # Extract only text blocks
+                # Content is a list of content blocks
                 text_parts = []
                 for block in run_output.content:
                     if isinstance(block, dict):
-                        # Handle dict-style content blocks
                         if block.get("type") == "text":
                             text_parts.append(block.get("text", ""))
                         elif "text" in block:
                             text_parts.append(block.get("text", ""))
                     elif isinstance(block, str):
-                        # Plain string in the list
                         text_parts.append(block)
                     elif hasattr(block, 'text'):
-                        # Object with text attribute
                         text_parts.append(str(block.text))
                 text = " ".join(text_parts) if text_parts else None
             elif hasattr(run_output.content, 'text'):
-                # Content is an object with a text attribute
                 text = str(run_output.content.text)
-            else:
-                # Fallback: try to get meaningful string representation
-                content_str = str(run_output.content)
-                # Avoid including list/dict representations
-                if not content_str.startswith('[') and not content_str.startswith('{'):
-                    text = content_str
-                else:
-                    logger.warning(f"Agno: Unexpected content type: {type(run_output.content)}")
-                    text = None
         
-        # Log final extracted text
-        if text:
-            logger.info(f"🔍 Agno: Final extracted text: {repr(text)[:200]}")
-            if '[]' in text:
-                logger.warning(f"🚨 Final text contains '[]' - this is the bug!")
+        # Debug: Check if text has [] appended (bug tracing)
+        if text and '[]' in text:
+            logger.warning(f"🚨 Extracted text contains '[]': {repr(text)[:200]}")
         
         # Extract tool calls
         tool_calls = []
