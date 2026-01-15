@@ -41,6 +41,7 @@ class AgentRequest:
         static_system: Static portion of system prompt (for caching)
         dynamic_system: Dynamic portion of system prompt (not cached)
         stream: Whether to stream the response
+        session: Session data that persists across conversation turns
         
     Example with message history:
         request = AgentRequest(
@@ -50,6 +51,12 @@ class AgentRequest:
                 {"role": "assistant", "content": "There are 3 pods: nginx, redis, api"},
             ],
             tools=[...],
+        )
+    
+    Example with session:
+        request = AgentRequest(
+            content="Continue the wizard",
+            session={"wizard_step": 2, "user_name": "Alice"},
         )
     """
     
@@ -62,6 +69,7 @@ class AgentRequest:
     static_system: Optional[str] = None  # Static system prompt (cached)
     dynamic_system: Optional[str] = None  # Dynamic system prompt (not cached)
     stream: bool = False
+    session: Optional[Dict[str, Any]] = None  # Session data for persistence
     
     def get_conversation_id(self) -> Optional[ConversationId]:
         """Get the conversation ID as a value object."""
@@ -74,6 +82,10 @@ class AgentRequest:
         if self.context:
             return PlatformContext.from_dict(self.context)
         return PlatformContext.empty()
+    
+    def get_session(self) -> Dict[str, Any]:
+        """Get the session data as a dict."""
+        return self.session or {}
 
 
 @dataclass

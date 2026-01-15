@@ -28,7 +28,8 @@ Use **custom functions** when you need:
 ## Quick Start
 
 ```python
-from dcaf.core import Agent, AgentResult, serve
+from dcaf.core import Agent, Session, serve
+from dcaf.core.primitives import AgentResult
 from dcaf.tools import tool
 
 @tool(description="Get current time")
@@ -36,8 +37,12 @@ def get_time() -> str:
     from datetime import datetime
     return datetime.now().isoformat()
 
-def my_agent(messages: list, context: dict) -> AgentResult:
-    """Your custom agent logic."""
+def my_agent(messages: list, context: dict, session: Session) -> AgentResult:
+    """Your custom agent logic with session access."""
+    
+    # Track call count in session
+    call_count = session.get("call_count", 0)
+    session.set("call_count", call_count + 1)
     
     # Create an agent and run it
     agent = Agent(
@@ -45,14 +50,20 @@ def my_agent(messages: list, context: dict) -> AgentResult:
         system="You are a helpful assistant.",
     )
     
-    response = agent.run(messages)
+    # Pass session to agent.run()
+    response = agent.run(messages, session=session.to_dict())
     
-    # Return the result
-    return AgentResult(text=response.text)
+    # Return the result with session
+    return AgentResult(
+        text=response.text,
+        session=session.to_dict(),
+    )
 
 # Serve it
 serve(my_agent)
 ```
+
+**Note:** The `session` parameter is optional for backward compatibility. Functions without it still work.
 
 ---
 
@@ -61,10 +72,16 @@ serve(my_agent)
 ### Custom functions return `AgentResult`
 
 ```python
-from dcaf.core import AgentResult, ToolApproval, ToolResult
+from dcaf.core.primitives import AgentResult, ToolApproval, ToolResult
 
 # Simple text response
 return AgentResult(text="Here are your pods: nginx, redis, api")
+
+# With session data
+return AgentResult(
+    text="Here are your pods: nginx, redis, api",
+    session={"last_query": "pods", "count": 3},
+)
 
 # Needs approval
 return AgentResult(
@@ -96,11 +113,12 @@ return AgentResult(
 ### Use `from_agent_response()` for convenience
 
 ```python
-from dcaf.core import Agent, from_agent_response, serve
+from dcaf.core import Agent, Session, serve
+from dcaf.core.primitives import from_agent_response, AgentResult
 
-def my_agent(messages: list, context: dict) -> AgentResult:
+def my_agent(messages: list, context: dict, session: Session) -> AgentResult:
     agent = Agent(tools=[...])
-    response = agent.run(messages)
+    response = agent.run(messages, session=session.to_dict())
     return from_agent_response(response)
 
 serve(my_agent)
@@ -115,10 +133,16 @@ serve(my_agent)
 Each call depends on the previous:
 
 ```python
-from dcaf.core import Agent, AgentResult
+from dcaf.core import Agent, Session
+from dcaf.core.primitives import AgentResult
 
-def research_agent(messages: list, context: dict) -> AgentResult:
+def research_agent(messages: list, context: dict, session: Session) -> AgentResult:
     user_question = messages[-1]["content"]
+    
+    # Track research topics in session
+    topics = session.get("research_topics", [])
+    topics.append(user_question[:50])
+    session.set("research_topics", topics)
     
     # Step 1: Classify the question
     classifier = Agent(system="Classify as: factual, opinion, or action. Reply with one word.")
@@ -134,12 +158,12 @@ def research_agent(messages: list, context: dict) -> AgentResult:
         summarizer = Agent(system="Provide a concise summary.")
         summary = summarizer.run([{"role": "user", "content": f"Summarize: {research.text}"}])
         
-        return AgentResult(text=summary.text)
+        return AgentResult(text=summary.text, session=session.to_dict())
     
     elif "action" in classification.text.lower():
         # Use tools
         executor = Agent(tools=[...], system="Execute the requested action.")
-        result = executor.run(messages)
+        result = executor.run(messages, session=session.to_dict())
         
         return AgentResult(
             text=result.text,
@@ -147,13 +171,14 @@ def research_agent(messages: list, context: dict) -> AgentResult:
                 ToolApproval(id=p.id, name=p.name, input=p.input, description=p.description)
                 for p in result.pending_tools
             ],
+            session=session.to_dict(),
         )
     
     else:
         # Simple response
         responder = Agent(system="Be helpful and friendly.")
         result = responder.run(messages)
-        return AgentResult(text=result.text)
+        return AgentResult(text=result.text, session=session.to_dict())
 ```
 
 ### Pattern 2: Parallel Calls

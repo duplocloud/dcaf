@@ -14,12 +14,18 @@ Example - Agent class:
     serve(agent, port=8000)
 
 Example - Custom function:
-    from dcaf.core import serve
-    from dcaf.core.primitives import llm, AgentResult
+    from dcaf.core import serve, Session
+    from dcaf.core.primitives import AgentResult
     
-    def my_agent(messages: list, context: dict) -> AgentResult:
-        response = llm.call(messages)
-        return AgentResult(text=response.text)
+    def my_agent(messages: list, context: dict, session: Session) -> AgentResult:
+        # Access and modify session
+        count = session.get("call_count", 0)
+        session.set("call_count", count + 1)
+        
+        return AgentResult(
+            text=f"Call #{count + 1}",
+            session=session.to_dict(),  # Return updated session
+        )
     
     serve(my_agent, port=8000)
 
@@ -40,15 +46,17 @@ Example - With custom routes:
 
 from typing import TYPE_CHECKING, Callable, Sequence, Union
 import logging
+import inspect
 
 if TYPE_CHECKING:
     from .agent import Agent
     from fastapi import APIRouter
+    from .session import Session
 
 logger = logging.getLogger(__name__)
 
-# Type for agent handlers
-AgentHandler = Callable[[list, dict], "AgentResult"]
+# Type for agent handlers (can be 2-arg or 3-arg with session)
+AgentHandler = Callable[..., "AgentResult"]
 
 
 def serve(
@@ -407,10 +415,31 @@ class CallableAdapter:
     
     This allows users to write custom agent functions without
     using the Agent class.
+    
+    Supports both old-style (2 args) and new-style (3 args with session) handlers:
+        # Old style (still supported)
+        def my_agent(messages: list, context: dict) -> AgentResult:
+            ...
+        
+        # New style with session
+        def my_agent(messages: list, context: dict, session: Session) -> AgentResult:
+            ...
     """
     
     def __init__(self, handler: AgentHandler):
         self.handler = handler
+        # Check if handler accepts session parameter
+        self._accepts_session = self._check_accepts_session(handler)
+    
+    def _check_accepts_session(self, handler: AgentHandler) -> bool:
+        """Check if the handler function accepts a session parameter."""
+        try:
+            sig = inspect.signature(handler)
+            params = list(sig.parameters.keys())
+            # Check for 3+ parameters or a parameter named 'session'
+            return len(params) >= 3 or 'session' in params
+        except (ValueError, TypeError):
+            return False
     
     def invoke(self, messages: dict) -> "AgentMessage":
         """
@@ -421,10 +450,14 @@ class CallableAdapter:
         """
         from ..schemas.messages import AgentMessage, ToolCall
         from .primitives import AgentResult
+        from .session import Session
         
         # Extract messages and context
         messages_list = messages.get("messages", [])
         context = self._extract_context(messages_list)
+        
+        # Extract session from request
+        session = self._extract_session(messages_list)
         
         # Add approved tool calls to context if present
         approved = self._extract_approved_tools(messages_list)
@@ -434,12 +467,18 @@ class CallableAdapter:
         # Convert to simple format for user's handler
         simple_messages = self._simplify_messages(messages_list)
         
-        # Call user's handler
+        # Call user's handler (with or without session based on signature)
         try:
-            result = self.handler(simple_messages, context)
+            if self._accepts_session:
+                result = self.handler(simple_messages, context, session)
+            else:
+                result = self.handler(simple_messages, context)
             
             # Handle different return types
             if isinstance(result, AgentResult):
+                # If handler didn't include session but modified it, include it
+                if not result.session and session.is_modified:
+                    result.session = session.to_dict()
                 # Use native to_message() conversion
                 return result.to_message()
             elif isinstance(result, dict):
@@ -498,6 +537,23 @@ class CallableAdapter:
                         return ctx.model_dump()
                     return dict(ctx)
         return {}
+    
+    def _extract_session(self, messages_list: list) -> "Session":
+        """Extract session data from the latest message's data field."""
+        from .session import Session
+        
+        # Look for session in the latest message's data
+        for msg in reversed(messages_list):
+            data = msg.get("data", {})
+            if data:
+                # Handle both dict and Pydantic model
+                if hasattr(data, "model_dump"):
+                    data = data.model_dump()
+                session_data = data.get("session", {})
+                if session_data:
+                    return Session.from_dict(session_data)
+        
+        return Session()
     
     def _extract_approved_tools(self, messages_list: list) -> list[dict]:
         """Extract approved tool calls from the latest message."""

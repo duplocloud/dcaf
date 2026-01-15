@@ -9,7 +9,7 @@ This module provides the data types used when building custom agent functions:
 For making LLM calls, use the Agent class.
 
 Example - Custom multi-call agent:
-    from dcaf.core import Agent, serve
+    from dcaf.core import Agent, serve, Session
     from dcaf.core.primitives import AgentResult
     from dcaf.tools import tool
     
@@ -17,10 +17,14 @@ Example - Custom multi-call agent:
     def delete_pod(name: str) -> str:
         return kubectl(f"delete pod {name}")
     
-    def my_agent(messages: list, context: dict) -> AgentResult:
+    def my_agent(messages: list, context: dict, session: Session) -> AgentResult:
         # Create agents for different purposes
         classifier = Agent(system="Classify intent: query or action")
         executor = Agent(tools=[delete_pod], system="K8s assistant")
+        
+        # Access session data
+        step = session.get("step", 1)
+        session.set("step", step + 1)
         
         # Your logic - any structure
         intent = classifier.run(messages)
@@ -38,9 +42,10 @@ Example - Custom multi-call agent:
                     )
                     for p in result.pending_tools
                 ],
+                session=session.to_dict(),  # Include session in response
             )
         
-        return AgentResult(text=intent.text)
+        return AgentResult(text=intent.text, session=session.to_dict())
     
     # Serve it
     serve(my_agent)
@@ -137,6 +142,7 @@ class AgentResult:
         text: The response text to show the user
         pending_tools: Tool calls needing user approval
         executed_tools: Tools that were executed this turn
+        session: Session data to persist across conversation turns
         metadata: Optional metadata (logged but not shown to user)
         
     Example - Simple response:
@@ -167,10 +173,17 @@ class AgentResult:
                 )
             ],
         )
+    
+    Example - With session:
+        return AgentResult(
+            text="Step 2 complete!",
+            session={"wizard_step": 2, "user_name": "Alice"},
+        )
     """
     text: str = ""
     pending_tools: list[ToolApproval] = field(default_factory=list)
     executed_tools: list[ToolResult] = field(default_factory=list)
+    session: dict[str, Any] = field(default_factory=dict)
     metadata: dict[str, Any] = field(default_factory=dict)
     
     @property
@@ -218,12 +231,13 @@ class AgentResult:
                 output=tc.output,
             ))
         
-        # Build Data container
+        # Build Data container with session
         data = Data(
             tool_calls=tool_calls,
             executed_tool_calls=executed_tool_calls,
             cmds=[],
             executed_cmds=[],
+            session=self.session,
         )
         
         # Build meta_data
@@ -258,9 +272,9 @@ def from_agent_response(response) -> AgentResult:
         AgentResult suitable for returning from a custom agent function
         
     Example:
-        def my_agent(messages, context) -> AgentResult:
+        def my_agent(messages, context, session) -> AgentResult:
             agent = Agent(tools=[...])
-            response = agent.run(messages)
+            response = agent.run(messages, session=session.to_dict())
             return from_agent_response(response)
     """
     pending = [
@@ -283,8 +297,12 @@ def from_agent_response(response) -> AgentResult:
         for e in getattr(response, 'executed_tools', [])
     ]
     
+    # Get session from response
+    session_data = getattr(response, 'session', {}) or {}
+    
     return AgentResult(
         text=response.text,
         pending_tools=pending,
         executed_tools=executed,
+        session=session_data,
     )

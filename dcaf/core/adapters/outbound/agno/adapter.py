@@ -1166,8 +1166,36 @@ class AgnoAdapter:
         if hasattr(run_output, 'content') and run_output.content:
             if isinstance(run_output.content, str):
                 text = run_output.content
+            elif isinstance(run_output.content, list):
+                # Content is a list of content blocks (text, tool_use, etc.)
+                # Extract only text blocks
+                text_parts = []
+                for block in run_output.content:
+                    if isinstance(block, dict):
+                        # Handle dict-style content blocks
+                        if block.get("type") == "text":
+                            text_parts.append(block.get("text", ""))
+                        elif "text" in block:
+                            text_parts.append(block.get("text", ""))
+                    elif isinstance(block, str):
+                        # Plain string in the list
+                        text_parts.append(block)
+                    elif hasattr(block, 'text'):
+                        # Object with text attribute
+                        text_parts.append(str(block.text))
+                text = " ".join(text_parts) if text_parts else None
+            elif hasattr(run_output.content, 'text'):
+                # Content is an object with a text attribute
+                text = str(run_output.content.text)
             else:
-                text = str(run_output.content)
+                # Fallback: try to get meaningful string representation
+                content_str = str(run_output.content)
+                # Avoid including list/dict representations
+                if not content_str.startswith('[') and not content_str.startswith('{'):
+                    text = content_str
+                else:
+                    logger.warning(f"Agno: Unexpected content type: {type(run_output.content)}")
+                    text = None
         
         # Extract tool calls
         tool_calls = []

@@ -10,11 +10,12 @@ Interceptors let you hook into the LLM request/response pipeline. Think of them 
 2. [Quick Start](#quick-start)
 3. [Request Interceptors](#request-interceptors)
 4. [Response Interceptors](#response-interceptors)
-5. [Error Handling](#error-handling)
-6. [Async Interceptors](#async-interceptors)
-7. [Common Use Cases](#common-use-cases)
-8. [Best Practices](#best-practices)
-9. [API Reference](#api-reference)
+5. [Session Access](#session-access)
+6. [Error Handling](#error-handling)
+7. [Async Interceptors](#async-interceptors)
+8. [Common Use Cases](#common-use-cases)
+9. [Best Practices](#best-practices)
+10. [API Reference](#api-reference)
 
 ---
 
@@ -141,6 +142,7 @@ request = LLMRequest(
 | `tools` | `list` | Tools the AI can use. |
 | `system` | `str \| None` | System prompt (instructions for the AI). |
 | `context` | `dict` | Platform context (tenant, user, etc.). |
+| `session` | `Session` | Persistent state across conversation turns. |
 
 ### LLMRequest Methods
 
@@ -229,6 +231,7 @@ response = LLMResponse(
 | `tool_calls` | `list[dict]` | Tools the AI wants to use. |
 | `usage` | `dict \| None` | Token usage statistics. |
 | `raw` | `Any` | Original provider response (for debugging). |
+| `session` | `Session` | Persistent state across conversation turns. |
 
 ### LLMResponse Methods
 
@@ -294,6 +297,91 @@ agent = Agent(
     tools=[...],
     response_interceptors=redact_secrets,
 )
+```
+
+---
+
+## Session Access
+
+Both `LLMRequest` and `LLMResponse` have access to the session, allowing interceptors to read and modify persistent state across conversation turns.
+
+### Reading Session in Request Interceptors
+
+```python
+def add_user_context(request: LLMRequest) -> LLMRequest:
+    """Add user-specific context from session."""
+    # Read from session
+    user_name = request.session.get("user_name", "User")
+    user_prefs = request.session.get("user_preferences", {})
+    
+    # Add context based on session data
+    request.add_system_context(f"User: {user_name}")
+    
+    if user_prefs.get("verbose_mode"):
+        request.add_system_context("User prefers detailed explanations.")
+    
+    return request
+```
+
+### Modifying Session in Request Interceptors
+
+```python
+def track_request_count(request: LLMRequest) -> LLMRequest:
+    """Track how many requests the user has made."""
+    count = request.session.get("request_count", 0)
+    request.session.set("request_count", count + 1)
+    request.session.set("last_request_time", datetime.now().isoformat())
+    
+    return request
+```
+
+### Modifying Session in Response Interceptors
+
+```python
+def track_response_metrics(response: LLMResponse) -> LLMResponse:
+    """Track response metrics in session."""
+    # Update session with response info
+    response.session.set("last_response_length", len(response.text))
+    response.session.set("had_tool_calls", response.has_tool_calls())
+    
+    # Accumulate total tokens if available
+    if response.usage:
+        total = response.session.get("total_tokens", 0)
+        total += response.usage.get("output_tokens", 0)
+        response.session.set("total_tokens", total)
+    
+    return response
+
+agent = Agent(
+    tools=[...],
+    response_interceptors=track_response_metrics,
+)
+```
+
+### Session with Typed Models
+
+You can store and retrieve typed models in session:
+
+```python
+from pydantic import BaseModel
+
+class UserPreferences(BaseModel):
+    theme: str = "light"
+    language: str = "en"
+    verbose: bool = False
+
+def apply_user_preferences(request: LLMRequest) -> LLMRequest:
+    """Apply user preferences from session."""
+    # Get as typed model
+    prefs = request.session.get("user_prefs", as_type=UserPreferences)
+    
+    if prefs:
+        if prefs.language != "en":
+            request.add_system_context(f"Respond in {prefs.language}.")
+        if prefs.verbose:
+            request.add_system_context("Provide detailed explanations.")
+    
+    return request
 ```
 
 ---
@@ -677,6 +765,7 @@ class LLMRequest:
     tools: list[Any]          # Available tools
     system: str | None        # System prompt
     context: dict             # Platform context
+    session: Session          # Session for persistent state
     
     def get_latest_user_message(self) -> str:
         """Get the content of the most recent user message."""
@@ -694,6 +783,7 @@ class LLMResponse:
     tool_calls: list[dict]    # Tool calls (if any)
     usage: dict | None        # Token usage
     raw: Any                  # Original response
+    session: Session          # Session for persistent state
     
     def has_tool_calls(self) -> bool:
         """Check if there are tool calls."""
@@ -740,5 +830,6 @@ agent = Agent(
 ## See Also
 
 - [Agent Documentation](../core/index.md) - Full Agent class reference
+- [Session Management](./session-management.md) - Complete session guide
 - [Architecture Guide](../architecture.md) - How DCAF works internally
 - [Custom Agents Guide](./custom-agents.md) - Building complex agents

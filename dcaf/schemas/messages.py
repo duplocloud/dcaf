@@ -84,6 +84,7 @@ class Data(BaseModel):
     tool_calls: List[ToolCall] = Field(default_factory=list)
     executed_tool_calls: List[ExecutedToolCall] = Field(default_factory=list)
     url_configs: List[URLConfig] = Field(default_factory=list)
+    session: Dict[str, Any] = Field(default_factory=dict, description="Session state that persists across conversation turns")
 
 
 class User(BaseModel):

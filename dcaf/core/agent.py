@@ -53,6 +53,7 @@ from .application.services import AgentService, ApprovalService
 from .application.dto import AgentRequest, AgentResponse
 from .adapters.loader import load_adapter, list_frameworks
 from .adapters.outbound.persistence import InMemoryConversationRepository
+from .session import Session
 
 # Import interceptor types and utilities
 from .interceptors import (
@@ -149,6 +150,7 @@ class AgentResponse:
         pending_tools: List of tool calls awaiting approval
         conversation_id: ID of the conversation (for continuing later)
         is_complete: Whether the agent has finished (no pending approvals)
+        session: Session data that persists across conversation turns
         
     Example:
         response = agent.run("Delete the failing pods")
@@ -159,12 +161,16 @@ class AgentResponse:
                 print(f"  - {tool.name}: {tool.input}")
         else:
             print(response.text)
+        
+        # Access session data
+        print(response.session)  # dict of session values
     """
     text: str | None = None
     needs_approval: bool = False
     pending_tools: list[PendingToolCall] = field(default_factory=list)
     conversation_id: str = ""
     is_complete: bool = True
+    session: dict[str, Any] = field(default_factory=dict)
     
     # Internal reference for continuing
     _agent: "Agent" = field(repr=False, default=None)
@@ -210,12 +216,13 @@ class AgentResponse:
                 input_description={},
             ))
         
-        # Build Data container
+        # Build Data container with session
         data = Data(
             tool_calls=tool_calls,
             cmds=[],
             executed_cmds=[],
             executed_tool_calls=[],
+            session=self.session,
         )
         
         # Build meta_data with useful fields
@@ -580,6 +587,7 @@ class Agent:
         self, 
         messages: list[ChatMessage | dict],
         context: dict | None = None,
+        session: Session | dict | None = None,
     ) -> AgentResponse:
         """
         Run the agent with a conversation.
@@ -603,9 +611,13 @@ class Agent:
             context: Optional platform context (tenant, namespace, etc.)
                      This is merged with any context in individual messages.
                      Common fields: tenant_name, k8s_namespace, user_id
+                     
+            session: Optional session data that persists across conversation turns.
+                     Can be a Session instance or a dict. Session data is available
+                     in interceptors and tools, and is returned in the response.
             
         Returns:
-            AgentResponse with the result
+            AgentResponse with the result and updated session
             
         Raises:
             InterceptorError: If a request interceptor blocks the request.
@@ -624,6 +636,14 @@ class Agent:
                 context={"tenant_name": "production", "k8s_namespace": "web"},
             )
             
+        Example - With session:
+            response = agent.run(
+                messages=[{"role": "user", "content": "Continue wizard"}],
+                session={"wizard_step": 2, "user_name": "Alice"},
+            )
+            # Session updates are in response.session
+            print(response.session)
+            
         Example - Handling interceptor errors:
             try:
                 response = agent.run(messages=[...])
@@ -634,6 +654,15 @@ class Agent:
         # Validate input
         if not messages:
             raise ValueError("messages cannot be empty")
+        
+        # === HYDRATE SESSION ===
+        # Convert dict to Session if needed, or create empty Session
+        if session is None:
+            effective_session = Session()
+        elif isinstance(session, dict):
+            effective_session = Session.from_dict(session)
+        else:
+            effective_session = session
         
         # Normalize to ChatMessage instances (accepts both dicts and ChatMessage)
         normalized_messages = normalize_messages(messages)
@@ -654,6 +683,7 @@ class Agent:
                 tools=self.tools,
                 system_prompt=self.system_prompt,
                 context=context or {},
+                session=effective_session,
             )
             
             # Run the request interceptor pipeline
@@ -703,6 +733,7 @@ class Agent:
             static_system=static_system,
             dynamic_system=dynamic_system,
             context=effective_context,
+            session=effective_session.to_dict(),
         )
         
         # Execute the agent service (calls the LLM)
@@ -717,6 +748,7 @@ class Agent:
                 text=internal_response.text or "",
                 tool_calls=[],  # Tool calls are handled separately
                 raw=internal_response,
+                session=effective_session,
             )
             
             # Run the response interceptor pipeline
@@ -729,6 +761,7 @@ class Agent:
                     needs_approval=False,
                     pending_tools=[],
                     is_complete=True,
+                    session=effective_session.to_dict(),
                     _agent=self,
                 )
             except Exception as unexpected_error:
@@ -744,14 +777,17 @@ class Agent:
                 # Update the internal response with the modified text
                 # We create a modified version since the original may be immutable
                 internal_response.text = llm_response.text
+                # Update session from response interceptors if modified
+                effective_session = llm_response.session
         
         # Convert to the user-facing response format
-        return self._convert_response(internal_response)
+        return self._convert_response(internal_response, session=effective_session)
     
     def chat(
         self,
         messages: list[ChatMessage | dict],
         context: dict | None = None,
+        session: Session | dict | None = None,
     ) -> "AgentMessage":
         """
         Run the agent and return AgentMessage directly (wire format).
@@ -762,6 +798,8 @@ class Agent:
         Args:
             messages: The conversation messages (same format as run())
             context: Optional platform context (tenant, namespace, etc.)
+            session: Optional session data that persists across conversation turns.
+                     Can be a Session instance or a dict.
             
         Returns:
             AgentMessage ready for JSON serialization
@@ -777,11 +815,15 @@ class Agent:
                 # HelpDesk will show approval UI
                 pass
                 
+        Example - With session:
+            message = agent.chat(messages, session={"user_id": "123"})
+            # Session data is in message.data.session
+                
         See Also:
             run(): Returns AgentResponse with behavioral methods
                    (approve_all, reject_all) for programmatic use.
         """
-        response = self.run(messages=messages, context=context)
+        response = self.run(messages=messages, context=context, session=session)
         return response.to_message()
     
     def _run_request_interceptors(self, llm_request: LLMRequest) -> LLMRequest:
@@ -1060,7 +1102,7 @@ class Agent:
     
     # Private methods
     
-    def _convert_response(self, internal: Any) -> AgentResponse:
+    def _convert_response(self, internal: Any, session: Session | None = None) -> AgentResponse:
         """Convert internal response to simple AgentResponse."""
         pending_tools = []
         
@@ -1075,12 +1117,18 @@ class Agent:
                     _approval_service=self._approval_service,
                 ))
         
+        # Get session data - prefer from internal response, fall back to passed session
+        session_data = getattr(internal, 'session', None) or {}
+        if not session_data and session is not None:
+            session_data = session.to_dict() if isinstance(session, Session) else session
+        
         return AgentResponse(
             text=internal.text,
             needs_approval=getattr(internal, 'has_pending_approvals', False),
             pending_tools=pending_tools,
             conversation_id=internal.conversation_id,
             is_complete=getattr(internal, 'is_complete', True),
+            session=session_data,
             _agent=self,
         )
     

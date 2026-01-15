@@ -202,10 +202,15 @@ agent = Agent(provider="ollama", model="llama2")
 For complex logic beyond simple tool calling, define a custom function:
 
 ```python
-from dcaf.core import Agent, AgentResult, serve
+from dcaf.core import Agent, Session, serve
+from dcaf.core.primitives import AgentResult
 
-def my_custom_agent(messages: list, context: dict) -> AgentResult:
-    """Custom agent with multi-step logic."""
+def my_custom_agent(messages: list, context: dict, session: Session) -> AgentResult:
+    """Custom agent with multi-step logic and session access."""
+    # Track call count in session
+    call_count = session.get("call_count", 0)
+    session.set("call_count", call_count + 1)
+    
     # Step 1: Classify intent
     classifier = Agent(system="Classify the user's intent")
     intent = classifier.run(messages).text
@@ -213,16 +218,22 @@ def my_custom_agent(messages: list, context: dict) -> AgentResult:
     # Step 2: Route to appropriate handler
     if "kubernetes" in intent.lower():
         k8s_agent = Agent(tools=[list_pods, delete_pod])
-        response = k8s_agent.run(messages)
+        response = k8s_agent.run(messages, session=session.to_dict())
     else:
         general_agent = Agent(system="You are a helpful assistant")
         response = general_agent.run(messages)
     
-    return AgentResult(text=response.text)
+    # Return result with updated session
+    return AgentResult(
+        text=response.text,
+        session=session.to_dict(),
+    )
 
 # Serve the custom function
 serve(my_custom_agent, port=8000)
 ```
+
+**Note**: The `session` parameter is optional for backward compatibility. Functions without it still work.
 
 ---
 
@@ -602,7 +613,32 @@ A Session is a key-value store that:
 - **Persists across turns** - Data survives between user messages
 - **Travels with the protocol** - Automatically serialized in responses
 - **Supports typed models** - Store Pydantic models and dataclasses with auto-serialization
-- **Provides simple API** - Dict-like access with type hints
+- **Available everywhere** - In tools, interceptors, custom agent functions, and `agent.run()`
+
+### Using Session in agent.run()
+
+You can pass session data directly to `agent.run()`:
+
+```python
+from dcaf.core import Agent
+
+agent = Agent(tools=[...])
+
+# Pass session as a dict
+response = agent.run(
+    messages=[{"role": "user", "content": "Continue the wizard"}],
+    session={"wizard_step": 2, "user_name": "Alice"},
+)
+
+# Access updated session from response
+print(response.session)  # {"wizard_step": 3, ...}
+
+# Pass session to next request
+next_response = agent.run(
+    messages=[{"role": "user", "content": "Next step"}],
+    session=response.session,
+)
+```
 
 ### Using Session in Tools
 
@@ -794,20 +830,33 @@ Turn 3:
 
 ### Interceptors
 
-Interceptors let you hook into the request/response pipeline:
+Interceptors let you hook into the request/response pipeline. They also have access to session data:
 
 ```python
 from dcaf.core import Agent, LLMRequest, LLMResponse, InterceptorError
 
 def add_context(request: LLMRequest) -> LLMRequest:
-    """Add tenant info before sending to LLM."""
+    """Add tenant info and session data before sending to LLM."""
     tenant = request.context.get("tenant_name", "unknown")
     request.add_system_context(f"User's tenant: {tenant}")
+    
+    # Access session in interceptor
+    user_name = request.session.get("user_name", "User")
+    request.add_system_context(f"User: {user_name}")
+    
+    # Track request count
+    count = request.session.get("request_count", 0)
+    request.session.set("request_count", count + 1)
+    
     return request
 
 def redact_secrets(response: LLMResponse) -> LLMResponse:
     """Remove leaked secrets from response."""
     response.text = response.text.replace("sk-secret", "[REDACTED]")
+    
+    # Update session with response metrics
+    response.session.set("last_response_length", len(response.text))
+    
     return response
 
 agent = Agent(

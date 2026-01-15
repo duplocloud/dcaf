@@ -12,7 +12,7 @@ A Session is a key-value store that:
 - **Travels with the protocol** - Automatically serialized in responses
 - **Supports typed models** - Store Pydantic models and dataclasses with auto-serialization
 - **Provides simple API** - Dict-like access with type hints
-- **Is injected automatically** - Tools declare a `Session` parameter
+- **Available everywhere** - In tools, interceptors, custom agent functions, and `agent.run()`
 
 ---
 
@@ -320,6 +320,146 @@ def execute_deployment(session: Session) -> str:
     session.delete("deployment")
     
     return "\n".join(results)
+```
+
+---
+
+## Using Session with Agent.run()
+
+You can pass session data directly to `agent.run()` and `agent.chat()`:
+
+```python
+from dcaf.core import Agent, Session
+
+agent = Agent(tools=[...])
+
+# Pass session as a dict
+response = agent.run(
+    messages=[{"role": "user", "content": "Continue the wizard"}],
+    session={"wizard_step": 2, "user_name": "Alice"},
+)
+
+# Access updated session from response
+print(response.session)  # {"wizard_step": 3, "user_name": "Alice", ...}
+
+# Pass session to next request
+next_response = agent.run(
+    messages=[{"role": "user", "content": "Next step"}],
+    session=response.session,
+)
+```
+
+You can also pass a `Session` instance:
+
+```python
+from dcaf.core import Agent, Session
+
+session = Session()
+session.set("user_id", "12345")
+
+response = agent.run(messages=[...], session=session)
+
+# Session changes are in response
+print(response.session)
+```
+
+---
+
+## Using Session in Custom Agent Functions
+
+Custom agent functions receive session as an optional third parameter:
+
+```python
+from dcaf.core import serve, Session
+from dcaf.core.primitives import AgentResult
+
+def my_agent(messages: list, context: dict, session: Session) -> AgentResult:
+    """Custom agent with session access."""
+    # Read from session
+    call_count = session.get("call_count", 0)
+    
+    # Modify session
+    session.set("call_count", call_count + 1)
+    session.set("last_message", messages[-1]["content"])
+    
+    # Return result with session data
+    return AgentResult(
+        text=f"This is call #{call_count + 1}",
+        session=session.to_dict(),  # Include updated session in response
+    )
+
+serve(my_agent)
+```
+
+**Backward Compatibility**: Functions without a session parameter still work:
+
+```python
+# Old style (still supported)
+def my_agent(messages: list, context: dict) -> AgentResult:
+    return AgentResult(text="Hello!")
+
+# New style with session
+def my_agent(messages: list, context: dict, session: Session) -> AgentResult:
+    return AgentResult(text="Hello!", session=session.to_dict())
+```
+
+---
+
+## Using Session in Interceptors
+
+Request and response interceptors have access to session:
+
+### Request Interceptor
+
+```python
+from dcaf.core import Agent, LLMRequest
+
+def add_user_context(request: LLMRequest) -> LLMRequest:
+    """Add user-specific context from session."""
+    # Access session data
+    user_prefs = request.session.get("user_preferences", {})
+    user_name = request.session.get("user_name", "User")
+    
+    # Add context to system prompt
+    request.add_system_context(f"User: {user_name}")
+    if user_prefs.get("verbose"):
+        request.add_system_context("User prefers detailed explanations.")
+    
+    # Track request count
+    count = request.session.get("request_count", 0)
+    request.session.set("request_count", count + 1)
+    
+    return request
+
+agent = Agent(
+    tools=[...],
+    request_interceptors=add_user_context,
+)
+```
+
+### Response Interceptor
+
+```python
+from dcaf.core import Agent, LLMResponse
+
+def track_response_metrics(response: LLMResponse) -> LLMResponse:
+    """Track response metrics in session."""
+    # Update session with response info
+    response.session.set("last_response_length", len(response.text))
+    response.session.set("had_tool_calls", response.has_tool_calls())
+    
+    # Accumulate total tokens if available
+    if response.usage:
+        total = response.session.get("total_tokens", 0)
+        total += response.usage.get("output_tokens", 0)
+        response.session.set("total_tokens", total)
+    
+    return response
+
+agent = Agent(
+    tools=[...],
+    response_interceptors=track_response_metrics,
+)
 ```
 
 ---

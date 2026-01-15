@@ -310,6 +310,27 @@ class ToolCallingBoilerplateAgent(AgentProtocol):
         
         return executed_tool_calls, approval_required_tools
 
+    def _extract_text_from_content(self, response_content: List[Dict[str, Any]]) -> str:
+        """
+        Extract text content from Bedrock Converse API content blocks.
+        
+        Args:
+            response_content: List of content blocks from Bedrock response
+            
+        Returns:
+            Concatenated text from all text blocks
+        """
+        text_parts = []
+        for block in response_content:
+            if isinstance(block, dict):
+                if block.get("type") == "text":
+                    text_parts.append(block.get("text", ""))
+                elif "text" in block:
+                    text_parts.append(block.get("text", ""))
+            elif isinstance(block, str):
+                text_parts.append(block)
+        return " ".join(text_parts) if text_parts else ""
+
     def call_bedrock_anthropic_llm(self, messages: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Call the LLM with tool support"""
         system_prompt = """You are a helpful assistant called Dash. Do not use tools (other than the return_final_response_to_user tool) unless necessary.
@@ -374,7 +395,8 @@ Be surgical, simple and less wordy."""
             
             # Call LLM
             response = self.call_bedrock_anthropic_llm(conversation_messages)
-            response_content = response.get("content", [])
+            # Extract content from Bedrock Converse API response structure
+            response_content = response.get("output", {}).get("message", {}).get("content", [])
             
             # Check if final response tool is called
             final_response_call = None
@@ -444,7 +466,8 @@ Be surgical, simple and less wordy."""
                 continue
             
             # Fallback - no tools or final response
-            return AgentMessage(content=response)
+            text_content = self._extract_text_from_content(response_content)
+            return AgentMessage(content=text_content)
 
 
 # Usage example:

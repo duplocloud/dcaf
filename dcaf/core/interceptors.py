@@ -199,7 +199,10 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Callable, Awaitable, Union
+from typing import Any, Callable, Awaitable, Union, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .session import Session
 
 # Set up logging for this module
 logger = logging.getLogger(__name__)
@@ -224,6 +227,7 @@ class LLMRequest:
     - tools: What actions the AI can take (like "list_pods", "delete_pod")
     - system: Special instructions for how the AI should behave
     - context: Extra info like which tenant/environment the user is in
+    - session: Persistent state across conversation turns
     
     EXAMPLE:
     ========
@@ -239,6 +243,10 @@ class LLMRequest:
             system="You are a helpful Kubernetes assistant.",
             context={"tenant_name": "production", "user_id": "alice"},
         )
+        
+        # Access session in interceptor
+        user_prefs = request.session.get("user_preferences", {})
+        request.session.set("last_action", "list_pods")
     
     FIELDS EXPLAINED:
     =================
@@ -262,6 +270,10 @@ class LLMRequest:
         - "k8s_namespace": Which Kubernetes namespace
         - "user_id": Who is making the request
         - "duplo_token": Auth token (be careful with this!)
+        
+    session: Session
+        Persistent state that travels with each request/response.
+        Use this to store data across conversation turns.
     """
     
     # The conversation messages (list of dicts with "role" and "content")
@@ -276,14 +288,23 @@ class LLMRequest:
     # Platform context (tenant, namespace, credentials, etc.)
     context: dict = field(default_factory=dict)
     
+    # Session for persistent state across conversation turns
+    session: "Session" = field(default=None)
+    
     def __post_init__(self) -> None:
         """
         Called automatically after the object is created.
         Ensures context is never None (always a dict).
+        Ensures session is never None (always a Session).
         """
         # Make sure context is always a dict, never None
         if self.context is None:
             self.context = {}
+        
+        # Make sure session is always a Session instance
+        if self.session is None:
+            from .session import Session
+            self.session = Session()
     
     def get_latest_user_message(self) -> str:
         """
@@ -350,6 +371,7 @@ class LLMResponse:
     - tool_calls: Actions the AI wants to take (like calling a function)
     - usage: Token counts (how much of the AI's "attention" was used)
     - raw: The original, unmodified response from the provider
+    - session: Persistent state across conversation turns
     
     EXAMPLE:
     ========
@@ -366,6 +388,9 @@ class LLMResponse:
             ],
             usage={"input_tokens": 150, "output_tokens": 45},
         )
+        
+        # Modify session in response interceptor
+        response.session.set("last_response_length", len(response.text))
     
     FIELDS EXPLAINED:
     =================
@@ -389,6 +414,10 @@ class LLMResponse:
     raw: Any
         The original, unmodified response from the LLM provider.
         Useful for debugging or accessing provider-specific fields.
+        
+    session: Session
+        Persistent state that travels with each request/response.
+        Modify this to update session data in the response.
     """
     
     # The AI's text response
@@ -402,6 +431,15 @@ class LLMResponse:
     
     # Original provider response (for debugging)
     raw: Any = None
+    
+    # Session for persistent state across conversation turns
+    session: "Session" = field(default=None)
+    
+    def __post_init__(self) -> None:
+        """Ensure session is never None."""
+        if self.session is None:
+            from .session import Session
+            self.session = Session()
     
     def has_tool_calls(self) -> bool:
         """
@@ -805,6 +843,7 @@ def create_request_from_messages(
     tools: list[Any] | None = None,
     system_prompt: str | None = None,
     context: dict | None = None,
+    session: "Session | None" = None,
 ) -> LLMRequest:
     """
     Create an LLMRequest from raw components.
@@ -817,6 +856,7 @@ def create_request_from_messages(
         tools: List of tool objects (optional)
         system_prompt: System prompt string (optional)
         context: Platform context dict (optional)
+        session: Session instance for persistent state (optional)
         
     Returns:
         A new LLMRequest object
@@ -833,6 +873,7 @@ def create_request_from_messages(
         tools=tools or [],
         system=system_prompt,
         context=context or {},
+        session=session,
     )
 
 
@@ -841,6 +882,7 @@ def create_response_from_text(
     tool_calls: list[dict] | None = None,
     usage: dict | None = None,
     raw: Any = None,
+    session: "Session | None" = None,
 ) -> LLMResponse:
     """
     Create an LLMResponse from raw components.
@@ -853,6 +895,7 @@ def create_response_from_text(
         tool_calls: List of tool call dicts (optional)
         usage: Token usage dict (optional)
         raw: Original provider response (optional)
+        session: Session instance for persistent state (optional)
         
     Returns:
         A new LLMResponse object
@@ -868,4 +911,5 @@ def create_response_from_text(
         tool_calls=tool_calls or [],
         usage=usage,
         raw=raw,
+        session=session,
     )
