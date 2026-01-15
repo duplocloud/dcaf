@@ -25,6 +25,7 @@ from agno.models.aws import AwsBedrock
 from agno.models.message import Message as AgnoMessage
 from agno.tools import tool as agno_tool_decorator
 from agno.run.agent import RunStatus
+from agno.utils.log import set_log_level_to_debug, set_log_level_to_info
 
 from .tool_converter import AgnoToolConverter
 from .message_converter import AgnoMessageConverter
@@ -38,6 +39,34 @@ logger = logging.getLogger(__name__)
 # Cache for GCP metadata (fetched once per process)
 _gcp_metadata_cache: dict = {}
 _GCP_METADATA_FETCH_ATTEMPTED = False
+
+
+def _sync_agno_log_level() -> None:
+    """
+    Sync Agno's debug mode with DCAF's logging level.
+
+    This enables unified logging control via Python's standard LOG_LEVEL:
+    - DEBUG (10): Enable Agno debug mode with level=2 (verbose)
+    - INFO (20) or higher: Disable Agno debug mode (INFO level only)
+
+    This is called once during AgnoAdapter initialization to ensure both
+    DCAF and Agno logging are controlled by the same environment variable.
+    """
+    root_logger = logging.getLogger()
+    current_level = root_logger.level
+
+    if current_level <= logging.DEBUG:
+        # Enable Agno debug mode with maximum verbosity
+        set_log_level_to_debug(level=2)
+        logger.debug(
+            f"Agno debug mode enabled (level=2) - Python log level is DEBUG ({current_level})"
+        )
+    else:
+        # Disable Agno debug mode (INFO level)
+        set_log_level_to_info()
+        logger.debug(
+            f"Agno debug mode disabled (INFO only) - Python log level is {logging.getLevelName(current_level)} ({current_level})"
+        )
 
 
 def _fetch_gcp_metadata() -> None:
@@ -316,7 +345,10 @@ class AgnoAdapter:
         # System prompt parts for caching
         self._static_system = None
         self._dynamic_system = None
-        
+
+        # Sync Agno's logging with DCAF's logging level
+        _sync_agno_log_level()
+
         logger.info(
             f"AgnoAdapter initialized: model={model_id}, provider={provider}, "
             f"region={self._aws_region}, tool_limit={self._tool_call_limit}, "
@@ -432,10 +464,10 @@ class AgnoAdapter:
     ) -> AgentResponse:
         """
         Invoke the agent asynchronously.
-        
+
         This is the preferred method for async contexts (FastAPI, etc.)
         as it doesn't block the event loop.
-        
+
         Args:
             messages: List of message objects (domain Message or dicts)
             tools: List of dcaf Tool objects
@@ -443,10 +475,31 @@ class AgnoAdapter:
             static_system: Static portion of system prompt (for caching)
             dynamic_system: Dynamic portion of system prompt (not cached)
             platform_context: Optional platform context to inject into tools
-            
+
         Returns:
             AgentResponse with the result
         """
+        # 🔍 LOG RUNTIME INVOKE PARAMETERS - What DCAF is passing to Agno adapter
+        logger.debug("🔍 AGENT RUNTIME INVOKE PARAMETERS:")
+        logger.debug(f"  Messages: {len(messages)} total")
+        for i, msg in enumerate(messages):
+            if hasattr(msg, 'role'):
+                role = msg.role.value if hasattr(msg.role, 'value') else str(msg.role)
+                content = getattr(msg, 'text', None) or getattr(msg, 'content', None)
+                logger.debug(f"    [{i}] {role}: {content}")
+            elif isinstance(msg, dict):
+                logger.debug(f"    [{i}] {msg.get('role')}: {msg.get('content')}")
+            else:
+                logger.debug(f"    [{i}] {type(msg).__name__}: {msg}")
+        logger.debug(f"  Tools: {len(tools)} total")
+        for tool in tools:
+            tool_name = getattr(tool, 'name', None) or getattr(tool, '__name__', str(tool))
+            logger.debug(f"    - {tool_name}")
+        logger.debug(f"  System Prompt: {system_prompt[:200] + '...' if system_prompt and len(system_prompt) > 200 else system_prompt}")
+        logger.debug(f"  Static System: {static_system[:200] + '...' if static_system and len(static_system) > 200 else static_system}")
+        logger.debug(f"  Dynamic System: {dynamic_system[:200] + '...' if dynamic_system and len(dynamic_system) > 200 else dynamic_system}")
+        logger.debug(f"  Platform Context: {platform_context}")
+
         # Store system prompt parts for model creation (if using caching)
         self._static_system = static_system
         self._dynamic_system = dynamic_system
@@ -497,7 +550,7 @@ class AgnoAdapter:
     ) -> AsyncIterator[StreamEvent]:
         """
         Invoke the agent with async streaming response.
-        
+
         Args:
             messages: List of message objects
             tools: List of dcaf Tool objects
@@ -505,10 +558,31 @@ class AgnoAdapter:
             static_system: Static portion of system prompt (for caching)
             dynamic_system: Dynamic portion of system prompt (not cached)
             platform_context: Optional platform context to inject into tools
-            
+
         Yields:
             StreamEvent objects for real-time updates
         """
+        # 🔍 LOG RUNTIME INVOKE PARAMETERS - What DCAF is passing to Agno adapter (STREAMING)
+        logger.debug("🔍 AGENT RUNTIME INVOKE PARAMETERS (STREAMING):")
+        logger.debug(f"  Messages: {len(messages)} total")
+        for i, msg in enumerate(messages):
+            if hasattr(msg, 'role'):
+                role = msg.role.value if hasattr(msg.role, 'value') else str(msg.role)
+                content = getattr(msg, 'text', None) or getattr(msg, 'content', None)
+                logger.debug(f"    [{i}] {role}: {content}")
+            elif isinstance(msg, dict):
+                logger.debug(f"    [{i}] {msg.get('role')}: {msg.get('content')}")
+            else:
+                logger.debug(f"    [{i}] {type(msg).__name__}: {msg}")
+        logger.debug(f"  Tools: {len(tools)} total")
+        for tool in tools:
+            tool_name = getattr(tool, 'name', None) or getattr(tool, '__name__', str(tool))
+            logger.debug(f"    - {tool_name}")
+        logger.debug(f"  System Prompt: {system_prompt[:200] + '...' if system_prompt and len(system_prompt) > 200 else system_prompt}")
+        logger.debug(f"  Static System: {static_system[:200] + '...' if static_system and len(static_system) > 200 else static_system}")
+        logger.debug(f"  Dynamic System: {dynamic_system[:200] + '...' if dynamic_system and len(dynamic_system) > 200 else dynamic_system}")
+        logger.debug(f"  Platform Context: {platform_context}")
+
         # Store system prompt parts for model creation (if using caching)
         self._static_system = static_system
         self._dynamic_system = dynamic_system

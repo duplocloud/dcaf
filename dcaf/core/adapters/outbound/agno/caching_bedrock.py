@@ -1,18 +1,23 @@
 """
 AWS Bedrock model with prompt caching support.
 
-TEMPORARY IMPLEMENTATION: This module extends Agno's AwsBedrock class to add 
-cache checkpoints to system prompts. This is a workaround until Agno adds 
+TEMPORARY IMPLEMENTATION: This module extends Agno's AwsBedrock class to add
+cache checkpoints to system prompts. This is a workaround until Agno adds
 native prompt caching support (expected in future release).
 
 Once Agno supports caching natively, this module should be removed.
 """
 
-from typing import Any, Dict, List, Optional, Tuple
+import json
+from typing import Any, AsyncIterator, Dict, Iterator, List, Optional, Tuple, Type, Union
 import logging
+
+from pydantic import BaseModel
 
 from agno.models.aws import AwsBedrock
 from agno.models.message import Message
+from agno.models.response import ModelResponse
+from agno.run.agent import RunOutput
 
 logger = logging.getLogger(__name__)
 
@@ -221,18 +226,18 @@ class CachingAwsBedrock(AwsBedrock):
     def _log_cache_metrics(self, response: Dict[str, Any]) -> None:
         """
         Log cache performance metrics from Bedrock response.
-        
+
         Bedrock returns cache metrics in the response under 'usage':
         - cacheReadInputTokens: Tokens retrieved from cache (cache HIT)
         - cacheCreationInputTokens: Tokens cached for first time (cache MISS)
-        
+
         Args:
             response: The Bedrock API response
         """
         usage = response.get("usage", {})
         cache_hit = usage.get("cacheReadInputTokens", 0)
         cache_miss = usage.get("cacheCreationInputTokens", 0)
-        
+
         if cache_hit > 0:
             logger.info(
                 f"✅ Cache HIT: {cache_hit} tokens reused "
@@ -249,6 +254,166 @@ class CachingAwsBedrock(AwsBedrock):
                 "Possible reasons: system prompt too short, caching not supported "
                 "by this model, or Bedrock API change."
             )
+
+    async def ainvoke(
+        self,
+        messages: List[Message],
+        assistant_message: Message,
+        response_format: Optional[Union[Dict, Type[BaseModel]]] = None,
+        tools: Optional[List[Dict[str, Any]]] = None,
+        tool_choice: Optional[Union[str, Dict[str, Any]]] = None,
+        run_response: Optional[RunOutput] = None,
+        compress_tool_results: bool = False,
+    ) -> ModelResponse:
+        """
+        Async invoke the Bedrock API with raw request/response logging.
+
+        This override adds debug logging to capture the exact request sent
+        to Bedrock and the exact response received, for debugging and auditing.
+
+        Args:
+            messages: List of messages to send
+            assistant_message: The assistant message to populate
+            response_format: Optional response format specification
+            tools: Optional list of tool definitions
+            tool_choice: Optional tool choice strategy
+            run_response: Optional run output to update metrics
+            compress_tool_results: Whether to compress tool results
+
+        Returns:
+            ModelResponse: The parsed response from Bedrock
+        """
+        # Format messages and build request body (same as parent)
+        formatted_messages, system_message = self._format_messages(messages, compress_tool_results)
+
+        tool_config = None
+        if tools:
+            tool_config = {"tools": self._format_tools_for_request(tools)}
+
+        body = {
+            "system": system_message,
+            "toolConfig": tool_config,
+            "inferenceConfig": self._get_inference_config(),
+        }
+        body = {k: v for k, v in body.items() if v is not None}
+
+        if self.request_params:
+            body.update(**self.request_params)
+
+        # 🔍 LOG RAW REQUEST - This is the exact data sent to Bedrock
+        logger.info("🔍 RAW LLM REQUEST TO BEDROCK:")
+        logger.info(f"  Model ID: {self.id}")
+        logger.info(f"  Messages ({len(formatted_messages)} total):")
+        logger.info(f"{json.dumps(formatted_messages, indent=4, default=str)}")
+        logger.info(f"  Request Body:")
+        logger.info(f"{json.dumps(body, indent=4, default=str)}")
+
+        if run_response and run_response.metrics:
+            run_response.metrics.set_time_to_first_token()
+
+        assistant_message.metrics.start_timer()
+
+        # Make the actual Bedrock API call
+        async with self.get_async_client() as client:
+            response = await client.converse(modelId=self.id, messages=formatted_messages, **body)
+
+        assistant_message.metrics.stop_timer()
+
+        # 🔍 LOG RAW RESPONSE - This is the exact data returned from Bedrock
+        logger.info("🔍 RAW LLM RESPONSE FROM BEDROCK:")
+        logger.info(f"{json.dumps(response, indent=4, default=str)}")
+
+        # Log cache metrics if caching is enabled
+        if self._cache_system_prompt:
+            self._log_cache_metrics(response)
+
+        model_response = self._parse_provider_response(response, response_format=response_format)
+
+        return model_response
+
+    async def ainvoke_stream(
+        self,
+        messages: List[Message],
+        assistant_message: Message,
+        response_format: Optional[Union[Dict, Type[BaseModel]]] = None,
+        tools: Optional[List[Dict[str, Any]]] = None,
+        tool_choice: Optional[Union[str, Dict[str, Any]]] = None,
+        run_response: Optional[RunOutput] = None,
+        compress_tool_results: bool = False,
+    ) -> AsyncIterator[ModelResponse]:
+        """
+        Async invoke the Bedrock API with streaming and raw request logging.
+
+        This override adds debug logging to capture the exact request sent
+        to Bedrock. Response logging is done per chunk in the stream.
+
+        Args:
+            messages: List of messages to send
+            assistant_message: The assistant message to populate
+            response_format: Optional response format specification
+            tools: Optional list of tool definitions
+            tool_choice: Optional tool choice strategy
+            run_response: Optional run output to update metrics
+            compress_tool_results: Whether to compress tool results
+
+        Yields:
+            ModelResponse: Streaming response chunks from Bedrock
+        """
+        # Format messages and build request body (same as parent)
+        formatted_messages, system_message = self._format_messages(messages, compress_tool_results)
+
+        tool_config = None
+        if tools:
+            tool_config = {"tools": self._format_tools_for_request(tools)}
+
+        body = {
+            "system": system_message,
+            "toolConfig": tool_config,
+            "inferenceConfig": self._get_inference_config(),
+        }
+        body = {k: v for k, v in body.items() if v is not None}
+
+        if self.request_params:
+            body.update(**self.request_params)
+
+        # 🔍 LOG RAW REQUEST - This is the exact data sent to Bedrock
+        logger.info("🔍 RAW LLM REQUEST TO BEDROCK (STREAMING):")
+        logger.info(f"  Model ID: {self.id}")
+        logger.info(f"  Messages ({len(formatted_messages)} total):")
+        logger.info(f"{json.dumps(formatted_messages, indent=4, default=str)}")
+        logger.info(f"  Request Body:")
+        logger.info(f"{json.dumps(body, indent=4, default=str)}")
+
+        if run_response and run_response.metrics:
+            run_response.metrics.set_time_to_first_token()
+
+        assistant_message.metrics.start_timer()
+
+        # Make the actual Bedrock streaming API call
+        async with self.get_async_client() as client:
+            response = await client.converse_stream(modelId=self.id, messages=formatted_messages, **body)
+
+            # 🔍 Log that we're starting to receive chunks
+            logger.info("🔍 RAW LLM RESPONSE FROM BEDROCK (STREAMING): Starting to receive chunks...")
+
+            chunk_count = 0
+            async for chunk in response.get("stream"):
+                chunk_count += 1
+                # Log each chunk at INFO level
+                logger.info(f"🔍 Stream chunk #{chunk_count}: {json.dumps(chunk, indent=2, default=str)}")
+
+                model_response = self._parse_provider_response_chunk(
+                    chunk,
+                    assistant_message,
+                    response_format=response_format
+                )
+
+                if model_response:
+                    yield model_response
+
+            logger.info(f"🔍 RAW LLM RESPONSE FROM BEDROCK (STREAMING): Received {chunk_count} total chunks")
+
+        assistant_message.metrics.stop_timer()
 
 
 # Note: We intentionally don't export a create_caching_model() factory
