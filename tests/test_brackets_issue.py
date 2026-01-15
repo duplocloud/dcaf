@@ -123,7 +123,11 @@ class TestBracketsIssue:
         except Exception as e:
             pytest.skip(f"API call failed (credentials issue?): {e}")
         
+        # Verify we got actual content (not just an empty/error response)
         assert response is not None, "Response should not be None"
+        assert response.text is not None and len(response.text) > 0, (
+            f"Response text is empty - API may have failed silently. Response: {response}"
+        )
         
         logger.info(f"Response type: {type(response)}")
         logger.info(f"Response.text: {repr(response.text)}")
@@ -188,6 +192,14 @@ class TestBracketsIssue:
         logger.info(f"run_output.images: {run_output.images}")
         logger.info(f"run_output.videos: {run_output.videos}")
         logger.info(f"run_output.audio: {run_output.audio}")
+        logger.info(f"run_output.files: {run_output.files}")
+        logger.info(f"run_output.status: {run_output.status}")
+        
+        # Check messages for raw content
+        if run_output.messages:
+            logger.info(f"=== MESSAGES ({len(run_output.messages)}) ===")
+            for i, msg in enumerate(run_output.messages):
+                logger.info(f"  Message {i}: role={msg.role}, content={repr(str(msg.content)[:200]) if msg.content else None}")
         
         # Check get_content_as_string
         if hasattr(run_output, 'get_content_as_string'):
