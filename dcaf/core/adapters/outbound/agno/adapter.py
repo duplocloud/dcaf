@@ -1223,11 +1223,35 @@ class AgnoAdapter:
             elif hasattr(run_output.content, 'text'):
                 text = str(run_output.content.text)
         
-        # WORKAROUND: Agno SDK bug - content property concatenates text with str([])
-        # when there are tool calls. Strip trailing [] if present.
-        # See: https://github.com/agno-agi/agno/issues/XXX (to be reported)
+        # DEBUG: Deep inspection of run_output.content to trace [] issue
+        raw_content = getattr(run_output, 'content', None)
+        logger.info(f"🔬 run_output.content TYPE: {type(raw_content)}")
+        logger.info(f"🔬 run_output.content REPR: {repr(raw_content)[:500]}")
+        if raw_content is not None:
+            logger.info(f"🔬 run_output.content ID: {id(raw_content)}")
+            if hasattr(raw_content, '__class__'):
+                logger.info(f"🔬 run_output.content CLASS: {raw_content.__class__.__module__}.{raw_content.__class__.__name__}")
+            if hasattr(raw_content, '__dict__'):
+                logger.info(f"🔬 run_output.content __dict__: {raw_content.__dict__}")
+            # Check if it's a string that was built from concatenation
+            if isinstance(raw_content, str) and '[]' in raw_content:
+                logger.warning(f"🚨 CONTENT IS STRING WITH []: checking if it ends with []")
+                logger.warning(f"🚨 Last 10 chars: {repr(raw_content[-10:])}")
+                logger.warning(f"🚨 Content endswith '[]': {raw_content.endswith('[]')}")
+        
+        # Also log other potentially relevant attributes
+        if hasattr(run_output, 'images'):
+            logger.info(f"🔬 run_output.images: {run_output.images}")
+        if hasattr(run_output, 'videos'):
+            logger.info(f"🔬 run_output.videos: {run_output.videos}")
+        if hasattr(run_output, 'audio'):
+            logger.info(f"🔬 run_output.audio: {run_output.audio}")
+        if hasattr(run_output, 'files'):
+            logger.info(f"🔬 run_output.files: {run_output.files}")
+        
+        # WORKAROUND: Strip trailing [] if present (temporary fix)
         if text and text.endswith('[]'):
-            logger.debug(f"Agno: Stripping trailing '[]' from content (Agno SDK bug)")
+            logger.warning(f"🔧 Stripping trailing '[]' from content")
             text = text[:-2]
         
         # Also handle cases where [] appears with whitespace before it
