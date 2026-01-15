@@ -1164,8 +1164,18 @@ class AgnoAdapter:
         # Extract text content
         text = None
         if hasattr(run_output, 'content') and run_output.content:
+            # Debug logging to understand content structure
+            logger.info(f"🔍 Agno run_output.content type: {type(run_output.content)}")
+            logger.info(f"🔍 Agno run_output.content repr: {repr(run_output.content)[:500]}")
+            
+            # Check if content already has [] in it (bug tracing)
+            content_str = str(run_output.content) if not isinstance(run_output.content, str) else run_output.content
+            if '[]' in content_str:
+                logger.warning(f"🚨 Content already contains '[]': {repr(content_str)[:200]}")
+            
             if isinstance(run_output.content, str):
                 text = run_output.content
+                logger.info(f"🔍 Agno: Content is string: {repr(text)[:200]}")
             elif isinstance(run_output.content, list):
                 # Content is a list of content blocks (text, tool_use, etc.)
                 # Extract only text blocks
@@ -1196,6 +1206,12 @@ class AgnoAdapter:
                 else:
                     logger.warning(f"Agno: Unexpected content type: {type(run_output.content)}")
                     text = None
+        
+        # Log final extracted text
+        if text:
+            logger.info(f"🔍 Agno: Final extracted text: {repr(text)[:200]}")
+            if '[]' in text:
+                logger.warning(f"🚨 Final text contains '[]' - this is the bug!")
         
         # Extract tool calls
         tool_calls = []
