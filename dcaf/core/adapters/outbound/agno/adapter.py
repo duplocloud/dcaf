@@ -894,35 +894,27 @@ class AgnoAdapter:
         
         # Check if caching is enabled via model_config
         cache_enabled = self._model_config.get("cache_system_prompt", False)
-        
+
         # Log configuration
         logger.info(
             f"Agno: Initialized Bedrock model {self._model_id} "
             f"(temperature={self._temperature}, max_tokens={self._max_tokens}, "
             f"cache_system_prompt={cache_enabled})"
         )
-        
-        # Create the appropriate model
-        if cache_enabled:
-            logger.info("Using CachingAwsBedrock (temporary until Agno adds native support)")
-            return CachingAwsBedrock(
-                id=self._model_id,
-                aws_region=region,
-                async_session=async_session,
-                temperature=self._temperature,
-                max_tokens=self._max_tokens,
-                cache_system_prompt=True,
-                static_system=self._static_system,
-                dynamic_system=self._dynamic_system,
-            )
-        else:
-            return AwsBedrock(
-                id=self._model_id,
-                aws_region=region,
-                async_session=async_session,
-                temperature=self._temperature,
-                max_tokens=self._max_tokens,
-            )
+
+        # Always use CachingAwsBedrock for raw logging support
+        # Even when caching is disabled, this class provides the logging we need
+        logger.debug("Using CachingAwsBedrock for raw LLM logging support")
+        return CachingAwsBedrock(
+            id=self._model_id,
+            aws_region=region,
+            async_session=async_session,
+            temperature=self._temperature,
+            max_tokens=self._max_tokens,
+            cache_system_prompt=cache_enabled,
+            static_system=self._static_system,
+            dynamic_system=self._dynamic_system,
+        )
     
     @staticmethod
     def _infer_region_from_model_id(model_id: str, fallback_region: str) -> str:
