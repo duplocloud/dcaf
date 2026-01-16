@@ -4,22 +4,30 @@ MCP Tools integration for DCAF.
 This module provides a framework-agnostic wrapper for connecting to external
 MCP (Model Context Protocol) servers and using their tools with DCAF agents.
 
-Example:
+DCAF automatically manages the MCP connection lifecycle - just pass MCPTools
+to your agent and the framework handles connect/disconnect automatically.
+
+Example (Automatic Lifecycle - Recommended):
     from dcaf.core import Agent
     from dcaf.mcp import MCPTools
 
-    # Connect to an MCP server
+    # Configure MCP server connection
     mcp_tools = MCPTools(
         url="http://localhost:8000/mcp",
         transport="streamable-http",
     )
 
-    # Use with async context manager
-    async with mcp_tools:
-        agent = Agent(tools=[my_local_tool, mcp_tools])
-        result = await agent.arun("Use the MCP tools to help me")
+    # Just pass to agent - DCAF manages the connection automatically!
+    agent = Agent(tools=[my_local_tool, mcp_tools])
+    result = await agent.arun("Use the MCP tools to help me")
 
-    # Or for stdio transport (local MCP server process)
+Example (Manual Lifecycle - Optional):
+    # For explicit control, use async context manager
+    async with mcp_tools:
+        agent = Agent(tools=[mcp_tools])
+        result = await agent.arun("Use the MCP tools")
+
+Example (stdio transport):
     mcp_tools = MCPTools(
         command="python my_mcp_server.py",
         transport="stdio",
@@ -39,26 +47,26 @@ class MCPTools:
     This class provides a DCAF-native interface for MCP tool integration.
     It can be passed directly to Agent(tools=[...]) alongside regular DCAF tools.
 
+    **Automatic Lifecycle Management**: DCAF automatically manages the MCP
+    connection - just pass MCPTools to your agent and it handles connect/disconnect.
+
     Supports three transport protocols:
     - stdio: Run a local command that speaks MCP protocol
     - sse: Connect via Server-Sent Events (deprecated, use streamable-http)
     - streamable-http: Connect via HTTP streaming (recommended)
 
-    Example:
-        # HTTP transport (recommended)
+    Example (Automatic - Recommended):
+        # Just configure and pass to agent
         mcp = MCPTools(
             url="http://localhost:8000/mcp",
             transport="streamable-http",
         )
 
-        # stdio transport (local process)
-        mcp = MCPTools(
-            command="python my_mcp_server.py",
-            transport="stdio",
-            env={"API_KEY": "secret"},
-        )
+        agent = Agent(tools=[mcp])
+        result = await agent.arun("Help me with something")
+        # Connection is managed automatically!
 
-        # With tool filtering
+    Example (With Filtering):
         mcp = MCPTools(
             url="http://localhost:8000/mcp",
             transport="streamable-http",
@@ -67,7 +75,8 @@ class MCPTools:
             tool_name_prefix="mcp",             # Prefix all tool names
         )
 
-        # Use with agent
+    Example (Manual Context Manager):
+        # For explicit control over connection lifecycle
         async with mcp:
             agent = Agent(tools=[mcp])
             result = await agent.arun("Help me with something")
@@ -253,19 +262,32 @@ class MCPTools:
             )
         return list(self._agno_mcp_tools.functions.keys())
 
-    def _get_agno_toolkit(self):
+    def _get_agno_toolkit(self, auto_create: bool = True):
         """
         Get the underlying Agno MCPTools instance.
 
         This is used internally by the Agno adapter to pass the toolkit
         directly to Agno's Agent. Users should not need to call this.
 
+        When auto_create=True (the default), this will create the Agno MCPTools
+        instance if it doesn't exist yet, allowing Agno's Agent to handle the
+        connection lifecycle automatically.
+
+        Args:
+            auto_create: If True, create the Agno MCPTools if not yet created.
+                        This allows Agno to manage the connection lifecycle.
+
         Returns:
             The Agno MCPTools instance.
 
         Raises:
-            RuntimeError: If not connected.
+            RuntimeError: If auto_create=False and not connected.
         """
+        if auto_create:
+            # Create the Agno MCPTools if needed - Agno will handle connection
+            return self._create_agno_mcp_tools()
+
+        # Legacy behavior: require initialization
         if not self._initialized or self._agno_mcp_tools is None:
             raise RuntimeError(
                 "MCPTools not connected. Use 'async with mcp_tools:' or call 'await mcp_tools.connect()' first."

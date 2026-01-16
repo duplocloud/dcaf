@@ -81,14 +81,57 @@ class TestMCPToolsNotConnectedErrors:
         with pytest.raises(RuntimeError, match="not connected"):
             mcp.get_tool_names()
 
-    def test_get_agno_toolkit_requires_connection(self):
-        """Should raise RuntimeError if not connected."""
+    def test_get_agno_toolkit_auto_create_false_requires_connection(self):
+        """Should raise RuntimeError if auto_create=False and not connected."""
         from dcaf.mcp import MCPTools
 
         mcp = MCPTools(url="http://localhost:8000/mcp", transport="streamable-http")
 
         with pytest.raises(RuntimeError, match="not connected"):
-            mcp._get_agno_toolkit()
+            mcp._get_agno_toolkit(auto_create=False)
+
+
+class TestMCPToolsAutoConnect:
+    """Test automatic connection behavior for framework integration."""
+
+    def test_get_agno_toolkit_auto_creates_by_default(self):
+        """Should auto-create Agno MCPTools when auto_create=True (default)."""
+        from dcaf.mcp import MCPTools
+
+        mcp = MCPTools(url="http://localhost:8000/mcp", transport="streamable-http")
+
+        # Mock the Agno import
+        with patch("dcaf.mcp.tools.MCPTools._create_agno_mcp_tools") as mock_create:
+            mock_agno = Mock()
+            mock_agno.initialized = False
+            mock_create.return_value = mock_agno
+
+            # Should NOT raise - it creates the toolkit for Agno to manage
+            result = mcp._get_agno_toolkit()
+
+            mock_create.assert_called_once()
+            assert result == mock_agno
+
+    def test_adapter_handles_uninitialized_mcp_tools(self):
+        """Adapter should accept uninitialized MCPTools and let Agno manage lifecycle."""
+        from dcaf.mcp import MCPTools
+        from dcaf.core.adapters.outbound.agno.adapter import AgnoAdapter
+
+        mcp = MCPTools(url="http://localhost:8000/mcp", transport="streamable-http")
+
+        # Mock the Agno MCPTools creation
+        mock_agno = Mock()
+        mock_agno.initialized = False
+        mock_agno.functions = {}
+
+        with patch.object(mcp, "_create_agno_mcp_tools", return_value=mock_agno):
+            adapter = AgnoAdapter()
+
+            # Convert tools - should not raise even though not connected
+            agno_tools = adapter._convert_tools_to_agno([mcp])
+
+            assert len(agno_tools) == 1
+            assert agno_tools[0] == mock_agno
 
 
 class TestAdapterMCPToolsDetection:

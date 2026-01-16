@@ -1132,17 +1132,24 @@ class AgnoAdapter:
             # We check by class name to avoid importing dcaf.mcp in the adapter
             if self._is_dcaf_mcp_tools(tool_obj):
                 # Extract the underlying Agno Toolkit and pass it through
-                try:
-                    agno_toolkit = tool_obj._get_agno_toolkit()
-                    agno_tools.append(agno_toolkit)
+                # auto_create=True allows Agno's Agent to handle the connection lifecycle
+                # (connect before run, disconnect after run)
+                agno_toolkit = tool_obj._get_agno_toolkit(auto_create=True)
+                agno_tools.append(agno_toolkit)
+
+                # Log based on whether tools are already loaded
+                if tool_obj.initialized:
                     logger.info(
-                        f"Added MCPTools with {len(agno_toolkit.functions)} tools: "
+                        f"Added MCPTools (pre-connected) with {len(agno_toolkit.functions)} tools: "
                         f"{list(agno_toolkit.functions.keys())}"
                     )
-                    continue
-                except RuntimeError as e:
-                    logger.error(f"MCPTools not connected: {e}")
-                    raise
+                else:
+                    logger.info(
+                        f"Added MCPTools (will auto-connect): "
+                        f"transport={tool_obj._transport}, "
+                        f"url={tool_obj._url or tool_obj._command}"
+                    )
+                continue
 
             # Get the full tool schema including input_schema
             # This ensures enums, descriptions, and constraints are passed to the LLM

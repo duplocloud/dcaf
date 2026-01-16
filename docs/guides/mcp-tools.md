@@ -50,7 +50,9 @@ MCP tools require the `mcp` package:
 pip install mcp
 ```
 
-### Basic Usage
+### Basic Usage (Automatic Lifecycle)
+
+DCAF automatically manages the MCP connection lifecycle - just pass `MCPTools` to your agent:
 
 ```python
 from dcaf.core import Agent
@@ -63,19 +65,35 @@ def get_time() -> str:
     from datetime import datetime
     return datetime.now().isoformat()
 
-# Connect to an external MCP server
+# Configure MCP server connection
 mcp_tools = MCPTools(
     url="http://localhost:8000/mcp",
     transport="streamable-http",
 )
 
-# Use with agent (async context manager)
+# Just pass it to the agent - DCAF handles connect/disconnect automatically!
+async def main():
+    agent = Agent(tools=[get_time, mcp_tools])
+    result = await agent.arun("Search for Python tutorials and tell me the time")
+    print(result.text)
+```
+
+The framework automatically:
+1. Connects to the MCP server when the agent runs
+2. Makes tools available to the LLM
+3. Disconnects and cleans up after the run completes
+
+### Manual Connection (Optional)
+
+If you need explicit control over the connection lifecycle, you can still use the async context manager:
+
+```python
 async def main():
     async with mcp_tools:
-        # Combine local tools with MCP tools
-        agent = Agent(tools=[get_time, mcp_tools])
-        result = await agent.arun("Search for Python tutorials and tell me the time")
-        print(result.text)
+        # Connection is established here
+        agent = Agent(tools=[mcp_tools])
+        result = await agent.arun("Search for something")
+    # Connection is closed here
 ```
 
 ---
@@ -196,18 +214,19 @@ db_mcp = MCPTools(
     tool_name_prefix="db",
 )
 
-async with search_mcp, db_mcp:
-    agent = Agent(tools=[search_mcp, db_mcp])
-    # Agent sees: search_query, search_fetch, db_query, db_insert, etc.
+# Multiple MCP servers - DCAF manages both automatically
+agent = Agent(tools=[search_mcp, db_mcp])
+result = await agent.arun("Search and query")
+# Agent sees: search_query, search_fetch, db_query, db_insert, etc.
 ```
 
 ---
 
 ## Using with Agents
 
-### With Async Context Manager (Recommended)
+### Automatic Lifecycle (Recommended)
 
-The recommended pattern ensures proper connection cleanup:
+Just pass `MCPTools` to your agent - DCAF handles the rest:
 
 ```python
 from dcaf.core import Agent
@@ -219,35 +238,51 @@ mcp_tools = MCPTools(
 )
 
 async def main():
+    # No context manager needed - DCAF manages connection automatically
+    agent = Agent(tools=[mcp_tools])
+    result = await agent.arun("Search for something")
+    # Connection is automatically established and cleaned up
+```
+
+This is the simplest and recommended approach. The framework:
+- Connects when the agent runs
+- Disconnects after the run completes
+- Handles errors and cleanup automatically
+
+### Explicit Context Manager (Optional)
+
+Use the context manager when you need to:
+- Reuse a connection across multiple agent runs
+- Inspect available tools before running
+- Have explicit control over connection timing
+
+```python
+async def main():
     async with mcp_tools:
+        # Connection established - you can inspect tools
+        print(f"Available tools: {mcp_tools.get_tool_names()}")
+
         agent = Agent(tools=[mcp_tools])
 
-        # Multiple interactions within the same connection
+        # Multiple runs share the same connection
         result1 = await agent.arun("Search for X")
         result2 = await agent.arun("Now search for Y")
 
-    # Connection automatically closed here
+    # Connection explicitly closed here
 ```
 
 ### Manual Connection Management
 
-For more control over the connection lifecycle:
+For fine-grained control:
 
 ```python
-mcp_tools = MCPTools(
-    url="http://localhost:8000/mcp",
-    transport="streamable-http",
-)
-
 async def main():
-    # Manually connect
     await mcp_tools.connect()
 
     try:
         agent = Agent(tools=[mcp_tools])
         result = await agent.arun("Search for something")
     finally:
-        # Always close the connection
         await mcp_tools.close()
 ```
 
