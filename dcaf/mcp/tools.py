@@ -36,6 +36,8 @@ Example (stdio transport):
 
 from typing import Optional, List, Literal, Dict, Any
 import logging
+import functools
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -145,11 +147,15 @@ class MCPTools:
         self._agno_mcp_tools = None
         self._initialized = False
 
-        logger.info(
-            f"MCPTools configured: transport={transport}, "
-            f"url={url}, command={command}, "
-            f"include={include_tools}, exclude={exclude_tools}"
-        )
+        # Log configuration at INFO level for visibility
+        target = url if transport in ("sse", "streamable-http") else command
+        logger.info(f"🔌 MCP: Configured MCPTools (transport={transport}, target={target})")
+        if include_tools:
+            logger.info(f"🔌 MCP: Tool filter - include: {include_tools}")
+        if exclude_tools:
+            logger.info(f"🔌 MCP: Tool filter - exclude: {exclude_tools}")
+        if tool_name_prefix:
+            logger.info(f"🔌 MCP: Tool name prefix: {tool_name_prefix}")
 
     @property
     def initialized(self) -> bool:
@@ -169,11 +175,15 @@ class MCPTools:
         if Agno's MCP integration isn't installed.
         """
         if self._agno_mcp_tools is not None:
+            logger.debug("🔌 MCP: Reusing existing Agno MCPTools instance")
             return self._agno_mcp_tools
+
+        logger.info(f"🔌 MCP: Creating Agno MCPTools instance...")
 
         try:
             from agno.tools.mcp import MCPTools as AgnoMCPTools
         except ImportError as e:
+            logger.error("🔌 MCP: Failed to import - 'mcp' package not installed")
             raise ImportError(
                 "MCP tools require the 'mcp' package. "
                 "Install it with: pip install mcp"
@@ -192,7 +202,90 @@ class MCPTools:
             refresh_connection=self._refresh_connection,
         )
 
+        target = self._url or self._command
+        logger.info(f"🔌 MCP: Agno MCPTools created (target={target})")
+
+        # Wrap the toolkit to add logging for tool execution
+        self._wrap_tools_with_logging()
+
         return self._agno_mcp_tools
+
+    def _wrap_tools_with_logging(self) -> None:
+        """
+        Wrap MCP tool entrypoints with logging to track tool execution.
+
+        This modifies the Agno MCPTools functions in-place to add logging
+        before and after each tool call, including timing and result info.
+        """
+        if self._agno_mcp_tools is None:
+            return
+
+        # Store original build_tools and wrap it
+        original_build_tools = self._agno_mcp_tools.build_tools
+
+        async def wrapped_build_tools():
+            """Build tools and then wrap them with logging."""
+            await original_build_tools()
+            # After tools are built, wrap each function's entrypoint
+            self._wrap_function_entrypoints()
+
+        # Replace the build_tools method
+        self._agno_mcp_tools.build_tools = wrapped_build_tools
+
+    def _wrap_function_entrypoints(self) -> None:
+        """Wrap each function's entrypoint with logging."""
+        if self._agno_mcp_tools is None:
+            return
+
+        target = self._url or self._command
+
+        for func_name, func in self._agno_mcp_tools.functions.items():
+            if not hasattr(func, 'entrypoint') or func.entrypoint is None:
+                continue
+
+            original_entrypoint = func.entrypoint
+
+            # Create a logging wrapper for async functions
+            @functools.wraps(original_entrypoint)
+            async def logged_entrypoint(*args, _tool_name=func_name, _target=target, _original=original_entrypoint, **kwargs):
+                """Wrapper that logs MCP tool execution."""
+                # Log tool call start
+                logger.info(f"🔧 MCP Tool Call: {_tool_name} (target={_target})")
+                if kwargs:
+                    # Truncate long values for readability
+                    logged_kwargs = {}
+                    for k, v in kwargs.items():
+                        str_v = str(v)
+                        if len(str_v) > 200:
+                            logged_kwargs[k] = str_v[:200] + "..."
+                        else:
+                            logged_kwargs[k] = v
+                    logger.info(f"🔧 MCP Tool Args: {logged_kwargs}")
+
+                start_time = time.time()
+                try:
+                    result = await _original(*args, **kwargs)
+                    duration = time.time() - start_time
+
+                    # Log result (truncated if long)
+                    result_str = str(result)
+                    if len(result_str) > 500:
+                        result_preview = result_str[:500] + "..."
+                    else:
+                        result_preview = result_str
+
+                    logger.info(f"🔧 MCP Tool Result: {_tool_name} completed in {duration:.3f}s")
+                    logger.debug(f"🔧 MCP Tool Result Preview: {result_preview}")
+
+                    return result
+
+                except Exception as e:
+                    duration = time.time() - start_time
+                    logger.error(f"🔧 MCP Tool Error: {_tool_name} failed after {duration:.3f}s - {type(e).__name__}: {e}")
+                    raise
+
+            # Replace the entrypoint
+            func.entrypoint = logged_entrypoint
 
     async def connect(self, force: bool = False) -> None:
         """
@@ -205,15 +298,22 @@ class MCPTools:
         Args:
             force: If True, force reconnection even if already connected.
         """
+        target = self._url or self._command
+        logger.info(f"🔌 MCP: Connecting to MCP server (target={target}, force={force})...")
+
         agno_tools = self._create_agno_mcp_tools()
         await agno_tools.connect(force=force)
         self._initialized = agno_tools.initialized
 
         if self._initialized:
             tool_count = len(agno_tools.functions)
-            logger.info(f"MCPTools connected: {tool_count} tools available")
-            for name in agno_tools.functions.keys():
-                logger.debug(f"  - {name}")
+            tool_names = list(agno_tools.functions.keys())
+            logger.info(f"🔌 MCP: ✅ Connected successfully - {tool_count} tools available")
+            logger.info(f"🔌 MCP: Available tools: {tool_names}")
+            for name in tool_names:
+                logger.debug(f"🔌 MCP:   - {name}")
+        else:
+            logger.warning(f"🔌 MCP: ⚠️ Connection completed but not initialized")
 
     async def close(self) -> None:
         """
@@ -221,10 +321,14 @@ class MCPTools:
 
         This method is called automatically when exiting the async context manager.
         """
+        target = self._url or self._command
         if self._agno_mcp_tools is not None:
+            logger.info(f"🔌 MCP: Closing connection (target={target})...")
             await self._agno_mcp_tools.close()
             self._initialized = False
-            logger.info("MCPTools connection closed")
+            logger.info(f"🔌 MCP: ✅ Connection closed successfully")
+        else:
+            logger.debug(f"🔌 MCP: No connection to close (target={target})")
 
     async def is_alive(self) -> bool:
         """
@@ -234,16 +338,26 @@ class MCPTools:
             True if connected and responsive, False otherwise.
         """
         if self._agno_mcp_tools is None:
+            logger.debug("🔌 MCP: is_alive() = False (no connection)")
             return False
-        return await self._agno_mcp_tools.is_alive()
+        alive = await self._agno_mcp_tools.is_alive()
+        logger.debug(f"🔌 MCP: is_alive() = {alive}")
+        return alive
 
     async def __aenter__(self) -> "MCPTools":
         """Enter the async context manager, connecting to the MCP server."""
+        target = self._url or self._command
+        logger.debug(f"🔌 MCP: Entering context manager (target={target})")
         await self.connect()
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
         """Exit the async context manager, closing the connection."""
+        target = self._url or self._command
+        if exc_type:
+            logger.warning(f"🔌 MCP: Exiting context manager with exception: {exc_type.__name__}: {exc_val}")
+        else:
+            logger.debug(f"🔌 MCP: Exiting context manager (target={target})")
         await self.close()
 
     def get_tool_names(self) -> List[str]:
@@ -260,7 +374,9 @@ class MCPTools:
             raise RuntimeError(
                 "MCPTools not connected. Use 'async with mcp_tools:' or call 'await mcp_tools.connect()' first."
             )
-        return list(self._agno_mcp_tools.functions.keys())
+        tool_names = list(self._agno_mcp_tools.functions.keys())
+        logger.debug(f"🔌 MCP: get_tool_names() returning {len(tool_names)} tools: {tool_names}")
+        return tool_names
 
     def _get_agno_toolkit(self, auto_create: bool = True):
         """
@@ -285,6 +401,7 @@ class MCPTools:
         """
         if auto_create:
             # Create the Agno MCPTools if needed - Agno will handle connection
+            logger.debug("🔌 MCP: _get_agno_toolkit(auto_create=True) - creating/returning toolkit for Agno lifecycle management")
             return self._create_agno_mcp_tools()
 
         # Legacy behavior: require initialization
@@ -292,6 +409,7 @@ class MCPTools:
             raise RuntimeError(
                 "MCPTools not connected. Use 'async with mcp_tools:' or call 'await mcp_tools.connect()' first."
             )
+        logger.debug("🔌 MCP: _get_agno_toolkit(auto_create=False) - returning pre-connected toolkit")
         return self._agno_mcp_tools
 
     def __repr__(self) -> str:

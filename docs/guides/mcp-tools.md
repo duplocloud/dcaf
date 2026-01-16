@@ -12,8 +12,9 @@ This guide covers how to use external MCP (Model Context Protocol) servers with 
 4. [Tool Filtering](#tool-filtering)
 5. [Using with Agents](#using-with-agents)
 6. [Connection Management](#connection-management)
-7. [Error Handling](#error-handling)
-8. [Best Practices](#best-practices)
+7. [Logging and Monitoring](#logging-and-monitoring)
+8. [Error Handling](#error-handling)
+9. [Best Practices](#best-practices)
 
 ---
 
@@ -394,6 +395,111 @@ mcp_tools = MCPTools(
 
 ---
 
+## Logging and Monitoring
+
+DCAF provides comprehensive logging for MCP tools to help you monitor connections, track tool usage, and debug issues.
+
+### Log Levels
+
+MCP logging uses Python's standard logging module under `dcaf.mcp.tools`:
+
+| Level | What's Logged |
+|-------|---------------|
+| `INFO` | Connection lifecycle events, tool discovery, tool execution |
+| `DEBUG` | Detailed state changes, tool result previews |
+| `WARNING` | Connection issues, exceptions during cleanup |
+| `ERROR` | Failed connections, tool execution errors |
+
+### Enabling MCP Logging
+
+```python
+import logging
+
+# Enable INFO level to see connection and tool events
+logging.basicConfig(level=logging.INFO)
+
+# Or enable DEBUG for more detail
+logging.getLogger("dcaf.mcp.tools").setLevel(logging.DEBUG)
+```
+
+### Lifecycle Events
+
+When using MCPTools, you'll see logs for:
+
+**Configuration:**
+```
+INFO - 🔌 MCP: Configured MCPTools (transport=streamable-http, target=http://localhost:8000/mcp)
+INFO - 🔌 MCP: Tool filter - include: ['search', 'query']
+INFO - 🔌 MCP: Tool name prefix: docs
+```
+
+**Connection:**
+```
+INFO - 🔌 MCP: Connecting to MCP server (target=http://localhost:8000/mcp, force=False)...
+INFO - 🔌 MCP: ✅ Connected successfully - 3 tools available
+INFO - 🔌 MCP: Available tools: ['search', 'query', 'fetch']
+```
+
+**Disconnection:**
+```
+INFO - 🔌 MCP: Closing connection (target=http://localhost:8000/mcp)...
+INFO - 🔌 MCP: ✅ Connection closed successfully
+```
+
+### Tool Execution Logging
+
+When the LLM calls an MCP tool, you'll see:
+
+```
+INFO - 🔧 MCP Tool Call: searchDocumentation (target=http://localhost:8000/mcp)
+INFO - 🔧 MCP Tool Args: {'query': 'kubernetes deployment'}
+INFO - 🔧 MCP Tool Result: searchDocumentation completed in 0.234s
+```
+
+If a tool fails:
+```
+ERROR - 🔧 MCP Tool Error: searchDocumentation failed after 5.012s - TimeoutError: Connection timed out
+```
+
+### Agent Integration Logging
+
+When adding MCPTools to an agent, you'll see:
+
+```
+INFO - 🔌 MCP: Added MCPTools to agent - will auto-connect (transport=streamable-http, target=http://localhost:8000/mcp)
+```
+
+Or if pre-connected:
+```
+INFO - 🔌 MCP: Added pre-connected MCPTools to agent (target=http://localhost:8000/mcp, tools=['search', 'query'])
+```
+
+### Production Logging Configuration
+
+For production, configure logging to capture MCP events:
+
+```python
+import logging
+
+# Configure structured logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+
+# Optionally increase verbosity for debugging
+# logging.getLogger("dcaf.mcp.tools").setLevel(logging.DEBUG)
+```
+
+### Log Message Reference
+
+| Prefix | Category | Example |
+|--------|----------|---------|
+| `🔌 MCP:` | Connection lifecycle | Connecting, connected, closing, closed |
+| `🔧 MCP Tool` | Tool execution | Tool calls, arguments, results, errors |
+
+---
+
 ## Error Handling
 
 ### Connection Errors
@@ -521,9 +627,25 @@ async def run_with_fallback(message: str):
         return await agent.arun(message)
 ```
 
-### 5. Log Available Tools
+### 5. Enable Logging in Production
 
-For debugging, log what tools are available:
+Enable MCP logging to track connections and tool usage:
+
+```python
+import logging
+
+# Enable INFO level for MCP events
+logging.getLogger("dcaf.mcp.tools").setLevel(logging.INFO)
+
+# You'll see:
+# INFO - 🔌 MCP: ✅ Connected successfully - 3 tools available
+# INFO - 🔧 MCP Tool Call: search (target=http://...)
+# INFO - 🔧 MCP Tool Result: search completed in 0.234s
+```
+
+### 6. Inspect Tools After Connection
+
+For debugging, verify which tools are available:
 
 ```python
 async with mcp_tools:

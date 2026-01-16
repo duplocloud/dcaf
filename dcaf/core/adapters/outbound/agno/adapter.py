@@ -1138,16 +1138,17 @@ class AgnoAdapter:
                 agno_tools.append(agno_toolkit)
 
                 # Log based on whether tools are already loaded
+                target = tool_obj._url or tool_obj._command
                 if tool_obj.initialized:
+                    tool_names = list(agno_toolkit.functions.keys())
                     logger.info(
-                        f"Added MCPTools (pre-connected) with {len(agno_toolkit.functions)} tools: "
-                        f"{list(agno_toolkit.functions.keys())}"
+                        f"🔌 MCP: Added pre-connected MCPTools to agent "
+                        f"(target={target}, tools={tool_names})"
                     )
                 else:
                     logger.info(
-                        f"Added MCPTools (will auto-connect): "
-                        f"transport={tool_obj._transport}, "
-                        f"url={tool_obj._url or tool_obj._command}"
+                        f"🔌 MCP: Added MCPTools to agent - will auto-connect "
+                        f"(transport={tool_obj._transport}, target={target})"
                     )
                 continue
 
