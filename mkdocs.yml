@@ -139,6 +139,7 @@ nav:
   - Guides:
     - Custom Agents: guides/custom-agents.md
     - Building Tools: guides/building-tools.md
+    - MCP Tools (External): guides/mcp-tools.md
     - Environment Configuration: guides/environment-configuration.md
     - Session Management: guides/session-management.md
     - Interceptors: guides/interceptors.md

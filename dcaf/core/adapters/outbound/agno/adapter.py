@@ -1099,36 +1099,55 @@ class AgnoAdapter:
     # =========================================================================
     
     def _convert_tools_to_agno(
-        self, 
+        self,
         tools: List[Any],
         platform_context: Optional[Dict[str, Any]] = None,
-    ) -> List[Callable]:
+    ) -> List[Any]:
         """
         Convert dcaf Tools to Agno-compatible tool format.
-        
+
         Uses Agno's @tool decorator with the full JSON schema for proper
         integration. The schema is critical for the LLM to understand
         tool parameters, types, constraints (enums), and descriptions.
-        
+
         For tools that require platform_context, this method creates wrapper
         functions that automatically inject the context when Agno executes them.
         This bridges the gap between interceptor-set context and tool execution.
-        
+
+        Also handles DCAF MCPTools instances by extracting the underlying
+        Agno Toolkit and passing it through directly.
+
         Args:
-            tools: List of dcaf Tool objects
+            tools: List of dcaf Tool objects or MCPTools instances
             platform_context: Optional platform context to inject into tools
                              that declare a `platform_context` parameter
-            
+
         Returns:
-            List of Agno-decorated tool functions with proper schemas
+            List of Agno-compatible tools (decorated functions or Toolkits)
         """
         agno_tools = []
-        
+
         for tool_obj in tools:
+            # Check if this is a DCAF MCPTools instance
+            # We check by class name to avoid importing dcaf.mcp in the adapter
+            if self._is_dcaf_mcp_tools(tool_obj):
+                # Extract the underlying Agno Toolkit and pass it through
+                try:
+                    agno_toolkit = tool_obj._get_agno_toolkit()
+                    agno_tools.append(agno_toolkit)
+                    logger.info(
+                        f"Added MCPTools with {len(agno_toolkit.functions)} tools: "
+                        f"{list(agno_toolkit.functions.keys())}"
+                    )
+                    continue
+                except RuntimeError as e:
+                    logger.error(f"MCPTools not connected: {e}")
+                    raise
+
             # Get the full tool schema including input_schema
             # This ensures enums, descriptions, and constraints are passed to the LLM
             tool_schema = self._tool_converter.to_agno(tool_obj)
-            
+
             # Determine which function to wrap with Agno's decorator
             if tool_obj.requires_platform_context and platform_context is not None:
                 # Create a wrapper that injects platform_context
@@ -1182,11 +1201,31 @@ class AgnoAdapter:
             )
         
         return agno_tools
-    
+
+    def _is_dcaf_mcp_tools(self, obj: Any) -> bool:
+        """
+        Check if an object is a DCAF MCPTools instance.
+
+        We use class name checking to avoid circular imports between
+        the adapter and dcaf.mcp module.
+
+        Args:
+            obj: The object to check
+
+        Returns:
+            True if this is a DCAF MCPTools instance
+        """
+        # Check by class name and presence of _get_agno_toolkit method
+        return (
+            type(obj).__name__ == "MCPTools"
+            and hasattr(obj, "_get_agno_toolkit")
+            and hasattr(obj, "initialized")
+        )
+
     # =========================================================================
     # Response Conversion
     # =========================================================================
-    
+
     def _extract_metrics(self, run_output: Any) -> Optional[AgnoMetrics]:
         """
         Extract metrics from Agno's RunOutput.

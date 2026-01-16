@@ -48,6 +48,7 @@ curl -X POST http://localhost:8000/api/chat \
 | 🌐 **REST API** | One-line server with `serve(agent)` |
 | 📡 **Streaming** | Real-time token-by-token responses |
 | 🔀 **Custom Logic** | Build agents with any structure you need |
+| 🔧 **MCP Integration** | Connect to external MCP servers and use their tools |
 
 ---
 
@@ -217,6 +218,7 @@ The agent will pause and ask for approval before executing.
 ### Reference
 
 - [Tools](./api-reference/tools.md) - Creating tools with `@tool`
+- [MCP Tools](./guides/mcp-tools.md) - Connect to external MCP servers
 - [Schemas](./api-reference/schemas.md) - Message format reference
 - [Streaming](./guides/streaming.md) - Streaming responses
 
