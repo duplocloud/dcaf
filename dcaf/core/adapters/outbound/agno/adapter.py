@@ -1114,11 +1114,11 @@ class AgnoAdapter:
         functions that automatically inject the context when Agno executes them.
         This bridges the gap between interceptor-set context and tool execution.
 
-        Also handles DCAF MCPTools instances by extracting the underlying
+        Also handles DCAF MCPTool instances by extracting the underlying
         Agno Toolkit and passing it through directly.
 
         Args:
-            tools: List of dcaf Tool objects or MCPTools instances
+            tools: List of dcaf Tool objects or MCPTool instances
             platform_context: Optional platform context to inject into tools
                              that declare a `platform_context` parameter
 
@@ -1128,7 +1128,7 @@ class AgnoAdapter:
         agno_tools = []
 
         for tool_obj in tools:
-            # Check if this is a DCAF MCPTools instance
+            # Check if this is a DCAF MCPTool instance
             # We check by class name to avoid importing dcaf.mcp in the adapter
             if self._is_dcaf_mcp_tools(tool_obj):
                 # Extract the underlying Agno Toolkit and pass it through
@@ -1142,12 +1142,12 @@ class AgnoAdapter:
                 if tool_obj.initialized:
                     tool_names = list(agno_toolkit.functions.keys())
                     logger.info(
-                        f"🔌 MCP: Added pre-connected MCPTools to agent "
+                        f"🔌 MCP: Added pre-connected MCPTool to agent "
                         f"(target={target}, tools={tool_names})"
                     )
                 else:
                     logger.info(
-                        f"🔌 MCP: Added MCPTools to agent - will auto-connect "
+                        f"🔌 MCP: Added MCPTool to agent - will auto-connect "
                         f"(transport={tool_obj._transport}, target={target})"
                     )
                 continue
@@ -1212,7 +1212,7 @@ class AgnoAdapter:
 
     def _is_dcaf_mcp_tools(self, obj: Any) -> bool:
         """
-        Check if an object is a DCAF MCPTools instance.
+        Check if an object is a DCAF MCPTool instance.
 
         We use class name checking to avoid circular imports between
         the adapter and dcaf.mcp module.
@@ -1221,11 +1221,11 @@ class AgnoAdapter:
             obj: The object to check
 
         Returns:
-            True if this is a DCAF MCPTools instance
+            True if this is a DCAF MCPTool instance
         """
         # Check by class name and presence of _get_agno_toolkit method
         return (
-            type(obj).__name__ == "MCPTools"
+            type(obj).__name__ == "MCPTool"
             and hasattr(obj, "_get_agno_toolkit")
             and hasattr(obj, "initialized")
         )

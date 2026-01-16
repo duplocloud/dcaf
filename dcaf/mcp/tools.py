@@ -1,34 +1,34 @@
 """
-MCP Tools integration for DCAF.
+MCP Tool integration for DCAF.
 
 This module provides a framework-agnostic wrapper for connecting to external
 MCP (Model Context Protocol) servers and using their tools with DCAF agents.
 
-DCAF automatically manages the MCP connection lifecycle - just pass MCPTools
+DCAF automatically manages the MCP connection lifecycle - just pass MCPTool
 to your agent and the framework handles connect/disconnect automatically.
 
 Example (Automatic Lifecycle - Recommended):
     from dcaf.core import Agent
-    from dcaf.mcp import MCPTools
+    from dcaf.mcp import MCPTool
 
     # Configure MCP server connection
-    mcp_tools = MCPTools(
+    mcp_tool = MCPTool(
         url="http://localhost:8000/mcp",
         transport="streamable-http",
     )
 
     # Just pass to agent - DCAF manages the connection automatically!
-    agent = Agent(tools=[my_local_tool, mcp_tools])
+    agent = Agent(tools=[my_local_tool, mcp_tool])
     result = await agent.arun("Use the MCP tools to help me")
 
 Example (Manual Lifecycle - Optional):
     # For explicit control, use async context manager
-    async with mcp_tools:
-        agent = Agent(tools=[mcp_tools])
+    async with mcp_tool:
+        agent = Agent(tools=[mcp_tool])
         result = await agent.arun("Use the MCP tools")
 
 Example (stdio transport):
-    mcp_tools = MCPTools(
+    mcp_tool = MCPTool(
         command="python my_mcp_server.py",
         transport="stdio",
     )
@@ -42,15 +42,15 @@ import time
 logger = logging.getLogger(__name__)
 
 
-class MCPTools:
+class MCPTool:
     """
-    A toolkit for connecting to external MCP servers and using their tools.
+    A tool for connecting to external MCP servers and using their tools.
 
     This class provides a DCAF-native interface for MCP tool integration.
     It can be passed directly to Agent(tools=[...]) alongside regular DCAF tools.
 
     **Automatic Lifecycle Management**: DCAF automatically manages the MCP
-    connection - just pass MCPTools to your agent and it handles connect/disconnect.
+    connection - just pass MCPTool to your agent and it handles connect/disconnect.
 
     Supports three transport protocols:
     - stdio: Run a local command that speaks MCP protocol
@@ -59,7 +59,7 @@ class MCPTools:
 
     Example (Automatic - Recommended):
         # Just configure and pass to agent
-        mcp = MCPTools(
+        mcp = MCPTool(
             url="http://localhost:8000/mcp",
             transport="streamable-http",
         )
@@ -69,7 +69,7 @@ class MCPTools:
         # Connection is managed automatically!
 
     Example (With Filtering):
-        mcp = MCPTools(
+        mcp = MCPTool(
             url="http://localhost:8000/mcp",
             transport="streamable-http",
             include_tools=["tool1", "tool2"],  # Only include these
@@ -124,12 +124,12 @@ class MCPTools:
         if transport == "stdio" and command is None:
             raise ValueError(
                 "The 'command' parameter is required when using stdio transport. "
-                "Example: MCPTools(command='python my_server.py', transport='stdio')"
+                "Example: MCPTool(command='python my_server.py', transport='stdio')"
             )
         if transport in ("sse", "streamable-http") and url is None:
             raise ValueError(
                 f"The 'url' parameter is required when using {transport} transport. "
-                f"Example: MCPTools(url='http://localhost:8000/mcp', transport='{transport}')"
+                f"Example: MCPTool(url='http://localhost:8000/mcp', transport='{transport}')"
             )
 
         # Store configuration
@@ -149,7 +149,7 @@ class MCPTools:
 
         # Log configuration at INFO level for visibility
         target = url if transport in ("sse", "streamable-http") else command
-        logger.info(f"🔌 MCP: Configured MCPTools (transport={transport}, target={target})")
+        logger.info(f"🔌 MCP: Configured MCPTool (transport={transport}, target={target})")
         if include_tools:
             logger.info(f"🔌 MCP: Tool filter - include: {include_tools}")
         if exclude_tools:
@@ -344,7 +344,7 @@ class MCPTools:
         logger.debug(f"🔌 MCP: is_alive() = {alive}")
         return alive
 
-    async def __aenter__(self) -> "MCPTools":
+    async def __aenter__(self) -> "MCPTool":
         """Enter the async context manager, connecting to the MCP server."""
         target = self._url or self._command
         logger.debug(f"🔌 MCP: Entering context manager (target={target})")
@@ -372,7 +372,7 @@ class MCPTools:
         """
         if not self._initialized or self._agno_mcp_tools is None:
             raise RuntimeError(
-                "MCPTools not connected. Use 'async with mcp_tools:' or call 'await mcp_tools.connect()' first."
+                "MCPTool not connected. Use 'async with mcp_tool:' or call 'await mcp_tool.connect()' first."
             )
         tool_names = list(self._agno_mcp_tools.functions.keys())
         logger.debug(f"🔌 MCP: get_tool_names() returning {len(tool_names)} tools: {tool_names}")
@@ -407,7 +407,7 @@ class MCPTools:
         # Legacy behavior: require initialization
         if not self._initialized or self._agno_mcp_tools is None:
             raise RuntimeError(
-                "MCPTools not connected. Use 'async with mcp_tools:' or call 'await mcp_tools.connect()' first."
+                "MCPTool not connected. Use 'async with mcp_tool:' or call 'await mcp_tool.connect()' first."
             )
         logger.debug("🔌 MCP: _get_agno_toolkit(auto_create=False) - returning pre-connected toolkit")
         return self._agno_mcp_tools
@@ -422,4 +422,4 @@ class MCPTools:
         status = "connected" if self._initialized else "not connected"
         tool_count = len(self._agno_mcp_tools.functions) if self._initialized and self._agno_mcp_tools else 0
 
-        return f"<MCPTools {target} transport={self._transport} {status} tools={tool_count}>"
+        return f"<MCPTool {target} transport={self._transport} {status} tools={tool_count}>"

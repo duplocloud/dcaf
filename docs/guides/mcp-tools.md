@@ -20,7 +20,7 @@ This guide covers how to use external MCP (Model Context Protocol) servers with 
 
 ## Introduction
 
-The Model Context Protocol (MCP) is an open standard for connecting AI assistants to external data sources and tools. DCAF provides `MCPTools` - a framework-agnostic wrapper that lets you connect to any MCP server and use its tools alongside your local DCAF tools.
+The Model Context Protocol (MCP) is an open standard for connecting AI assistants to external data sources and tools. DCAF provides `MCPTool` - a framework-agnostic wrapper that lets you connect to any MCP server and use its tools alongside your local DCAF tools.
 
 ### What is MCP?
 
@@ -30,9 +30,9 @@ MCP servers expose:
 - **Resources**: Data that can be read by AI agents
 - **Prompts**: Pre-defined prompt templates
 
-DCAF's `MCPTools` focuses on **consuming tools** from external MCP servers.
+DCAF's `MCPTool` focuses on **consuming tools** from external MCP servers.
 
-### Why Use MCPTools?
+### Why Use MCPTool?
 
 - **Extend your agent's capabilities** with tools from external services
 - **Reuse existing MCP servers** (databases, APIs, file systems, etc.)
@@ -53,11 +53,11 @@ pip install mcp
 
 ### Basic Usage (Automatic Lifecycle)
 
-DCAF automatically manages the MCP connection lifecycle - just pass `MCPTools` to your agent:
+DCAF automatically manages the MCP connection lifecycle - just pass `MCPTool` to your agent:
 
 ```python
 from dcaf.core import Agent
-from dcaf.mcp import MCPTools
+from dcaf.mcp import MCPTool
 from dcaf.tools import tool
 
 # Define a local tool
@@ -67,14 +67,14 @@ def get_time() -> str:
     return datetime.now().isoformat()
 
 # Configure MCP server connection
-mcp_tools = MCPTools(
+mcp_tool = MCPTool(
     url="http://localhost:8000/mcp",
     transport="streamable-http",
 )
 
 # Just pass it to the agent - DCAF handles connect/disconnect automatically!
 async def main():
-    agent = Agent(tools=[get_time, mcp_tools])
+    agent = Agent(tools=[get_time, mcp_tool])
     result = await agent.arun("Search for Python tutorials and tell me the time")
     print(result.text)
 ```
@@ -90,9 +90,9 @@ If you need explicit control over the connection lifecycle, you can still use th
 
 ```python
 async def main():
-    async with mcp_tools:
+    async with mcp_tool:
         # Connection is established here
-        agent = Agent(tools=[mcp_tools])
+        agent = Agent(tools=[mcp_tool])
         result = await agent.arun("Search for something")
     # Connection is closed here
 ```
@@ -101,16 +101,16 @@ async def main():
 
 ## Transport Protocols
 
-DCAF's `MCPTools` supports three transport protocols for connecting to MCP servers.
+DCAF's `MCPTool` supports three transport protocols for connecting to MCP servers.
 
 ### Streamable HTTP (Recommended)
 
 For HTTP-based MCP servers. This is the recommended protocol for production use.
 
 ```python
-from dcaf.mcp import MCPTools
+from dcaf.mcp import MCPTool
 
-mcp_tools = MCPTools(
+mcp_tool = MCPTool(
     url="http://localhost:8000/mcp",
     transport="streamable-http",
     timeout_seconds=30,
@@ -122,7 +122,7 @@ mcp_tools = MCPTools(
 For servers using SSE transport (deprecated in favor of streamable-http):
 
 ```python
-mcp_tools = MCPTools(
+mcp_tool = MCPTool(
     url="http://localhost:8000/mcp",
     transport="sse",
 )
@@ -136,7 +136,7 @@ mcp_tools = MCPTools(
 For running a local MCP server process. The server communicates via stdin/stdout.
 
 ```python
-mcp_tools = MCPTools(
+mcp_tool = MCPTool(
     command="python my_mcp_server.py",
     transport="stdio",
     env={"API_KEY": "secret"},  # Optional environment variables
@@ -168,7 +168,7 @@ When an MCP server exposes many tools, you can filter which ones to use.
 Only include the tools you need:
 
 ```python
-mcp_tools = MCPTools(
+mcp_tool = MCPTool(
     url="http://localhost:8000/mcp",
     transport="streamable-http",
     include_tools=["search", "query", "get_document"],
@@ -180,7 +180,7 @@ mcp_tools = MCPTools(
 Exclude tools you don't want:
 
 ```python
-mcp_tools = MCPTools(
+mcp_tool = MCPTool(
     url="http://localhost:8000/mcp",
     transport="streamable-http",
     exclude_tools=["dangerous_delete", "admin_reset"],
@@ -192,7 +192,7 @@ mcp_tools = MCPTools(
 Prevent name collisions by prefixing tool names:
 
 ```python
-mcp_tools = MCPTools(
+mcp_tool = MCPTool(
     url="http://localhost:8000/mcp",
     transport="streamable-http",
     tool_name_prefix="search",  # Tools become: search_query, search_fetch, etc.
@@ -203,13 +203,13 @@ This is useful when combining multiple MCP servers:
 
 ```python
 # Two MCP servers with potentially conflicting tool names
-search_mcp = MCPTools(
+search_mcp = MCPTool(
     url="http://search-service:8000/mcp",
     transport="streamable-http",
     tool_name_prefix="search",
 )
 
-db_mcp = MCPTools(
+db_mcp = MCPTool(
     url="http://db-service:8000/mcp",
     transport="streamable-http",
     tool_name_prefix="db",
@@ -227,20 +227,20 @@ result = await agent.arun("Search and query")
 
 ### Automatic Lifecycle (Recommended)
 
-Just pass `MCPTools` to your agent - DCAF handles the rest:
+Just pass `MCPTool` to your agent - DCAF handles the rest:
 
 ```python
 from dcaf.core import Agent
-from dcaf.mcp import MCPTools
+from dcaf.mcp import MCPTool
 
-mcp_tools = MCPTools(
+mcp_tool = MCPTool(
     url="http://localhost:8000/mcp",
     transport="streamable-http",
 )
 
 async def main():
     # No context manager needed - DCAF manages connection automatically
-    agent = Agent(tools=[mcp_tools])
+    agent = Agent(tools=[mcp_tool])
     result = await agent.arun("Search for something")
     # Connection is automatically established and cleaned up
 ```
@@ -259,11 +259,11 @@ Use the context manager when you need to:
 
 ```python
 async def main():
-    async with mcp_tools:
+    async with mcp_tool:
         # Connection established - you can inspect tools
-        print(f"Available tools: {mcp_tools.get_tool_names()}")
+        print(f"Available tools: {mcp_tool.get_tool_names()}")
 
-        agent = Agent(tools=[mcp_tools])
+        agent = Agent(tools=[mcp_tool])
 
         # Multiple runs share the same connection
         result1 = await agent.arun("Search for X")
@@ -278,13 +278,13 @@ For fine-grained control:
 
 ```python
 async def main():
-    await mcp_tools.connect()
+    await mcp_tool.connect()
 
     try:
-        agent = Agent(tools=[mcp_tools])
+        agent = Agent(tools=[mcp_tool])
         result = await agent.arun("Search for something")
     finally:
-        await mcp_tools.close()
+        await mcp_tool.close()
 ```
 
 ### Combining with Local Tools
@@ -293,7 +293,7 @@ MCP tools work seamlessly with native DCAF tools:
 
 ```python
 from dcaf.core import Agent
-from dcaf.mcp import MCPTools
+from dcaf.mcp import MCPTool
 from dcaf.tools import tool
 
 # Local DCAF tool
@@ -308,16 +308,16 @@ def send_email(to: str, subject: str, body: str) -> str:
     return f"Email sent to {to}"
 
 # External MCP tools
-mcp_tools = MCPTools(
+mcp_tool = MCPTool(
     url="http://localhost:8000/mcp",
     transport="streamable-http",
 )
 
 async def main():
-    async with mcp_tools:
+    async with mcp_tool:
         # Agent has access to both local and MCP tools
         agent = Agent(
-            tools=[add, send_email, mcp_tools],
+            tools=[add, send_email, mcp_tool],
             system_prompt="You are a helpful assistant with math, email, and search capabilities."
         )
 
@@ -331,9 +331,9 @@ async def main():
 After connecting, you can inspect which tools are available:
 
 ```python
-async with mcp_tools:
+async with mcp_tool:
     # Get list of tool names
-    tool_names = mcp_tools.get_tool_names()
+    tool_names = mcp_tool.get_tool_names()
     print(f"Available MCP tools: {tool_names}")
 
     # Output: ['search', 'query', 'fetch_document', ...]
@@ -348,17 +348,17 @@ async with mcp_tools:
 Check if the connection is established:
 
 ```python
-mcp_tools = MCPTools(
+mcp_tool = MCPTool(
     url="http://localhost:8000/mcp",
     transport="streamable-http",
 )
 
-print(mcp_tools.initialized)  # False - not connected yet
+print(mcp_tool.initialized)  # False - not connected yet
 
-async with mcp_tools:
-    print(mcp_tools.initialized)  # True - connected
+async with mcp_tool:
+    print(mcp_tool.initialized)  # True - connected
 
-print(mcp_tools.initialized)  # False - connection closed
+print(mcp_tool.initialized)  # False - connection closed
 ```
 
 ### Connection Health Check
@@ -366,11 +366,11 @@ print(mcp_tools.initialized)  # False - connection closed
 Check if an existing connection is still alive:
 
 ```python
-async with mcp_tools:
-    is_alive = await mcp_tools.is_alive()
+async with mcp_tool:
+    is_alive = await mcp_tool.is_alive()
     if not is_alive:
         # Reconnect if needed
-        await mcp_tools.connect(force=True)
+        await mcp_tool.connect(force=True)
 ```
 
 ### Force Reconnection
@@ -378,7 +378,7 @@ async with mcp_tools:
 Force a fresh connection, even if already connected:
 
 ```python
-await mcp_tools.connect(force=True)
+await mcp_tool.connect(force=True)
 ```
 
 ### Refresh on Each Run
@@ -386,7 +386,7 @@ await mcp_tools.connect(force=True)
 For long-running applications, refresh the connection and tools on each agent run:
 
 ```python
-mcp_tools = MCPTools(
+mcp_tool = MCPTool(
     url="http://localhost:8000/mcp",
     transport="streamable-http",
     refresh_connection=True,  # Refresh on each agent run
@@ -424,11 +424,11 @@ logging.getLogger("dcaf.mcp.tools").setLevel(logging.DEBUG)
 
 ### Lifecycle Events
 
-When using MCPTools, you'll see logs for:
+When using MCPTool, you'll see logs for:
 
 **Configuration:**
 ```
-INFO - 🔌 MCP: Configured MCPTools (transport=streamable-http, target=http://localhost:8000/mcp)
+INFO - 🔌 MCP: Configured MCPTool (transport=streamable-http, target=http://localhost:8000/mcp)
 INFO - 🔌 MCP: Tool filter - include: ['search', 'query']
 INFO - 🔌 MCP: Tool name prefix: docs
 ```
@@ -463,15 +463,15 @@ ERROR - 🔧 MCP Tool Error: searchDocumentation failed after 5.012s - TimeoutEr
 
 ### Agent Integration Logging
 
-When adding MCPTools to an agent, you'll see:
+When adding MCPTool to an agent, you'll see:
 
 ```
-INFO - 🔌 MCP: Added MCPTools to agent - will auto-connect (transport=streamable-http, target=http://localhost:8000/mcp)
+INFO - 🔌 MCP: Added MCPTool to agent - will auto-connect (transport=streamable-http, target=http://localhost:8000/mcp)
 ```
 
 Or if pre-connected:
 ```
-INFO - 🔌 MCP: Added pre-connected MCPTools to agent (target=http://localhost:8000/mcp, tools=['search', 'query'])
+INFO - 🔌 MCP: Added pre-connected MCPTool to agent (target=http://localhost:8000/mcp, tools=['search', 'query'])
 ```
 
 ### Production Logging Configuration
@@ -507,9 +507,9 @@ logging.basicConfig(
 Handle connection failures gracefully:
 
 ```python
-from dcaf.mcp import MCPTools
+from dcaf.mcp import MCPTool
 
-mcp_tools = MCPTools(
+mcp_tool = MCPTool(
     url="http://localhost:8000/mcp",
     transport="streamable-http",
     timeout_seconds=10,
@@ -517,8 +517,8 @@ mcp_tools = MCPTools(
 
 async def main():
     try:
-        async with mcp_tools:
-            agent = Agent(tools=[mcp_tools])
+        async with mcp_tool:
+            agent = Agent(tools=[mcp_tool])
             result = await agent.arun("Search for something")
     except ConnectionError as e:
         print(f"Failed to connect to MCP server: {e}")
@@ -529,19 +529,19 @@ async def main():
 
 ### Not Connected Errors
 
-Operations on an unconnected `MCPTools` raise `RuntimeError`:
+Operations on an unconnected `MCPTool` raise `RuntimeError`:
 
 ```python
-mcp_tools = MCPTools(
+mcp_tool = MCPTool(
     url="http://localhost:8000/mcp",
     transport="streamable-http",
 )
 
 # This raises RuntimeError - not connected yet
 try:
-    tool_names = mcp_tools.get_tool_names()
+    tool_names = mcp_tool.get_tool_names()
 except RuntimeError as e:
-    print(e)  # "MCPTools not connected. Use 'async with mcp_tools:' or call 'await mcp_tools.connect()' first."
+    print(e)  # "MCPTool not connected. Use 'async with mcp_tool:' or call 'await mcp_tool.connect()' first."
 ```
 
 ### Timeout Configuration
@@ -549,7 +549,7 @@ except RuntimeError as e:
 Configure connection and read timeouts:
 
 ```python
-mcp_tools = MCPTools(
+mcp_tool = MCPTool(
     url="http://localhost:8000/mcp",
     transport="streamable-http",
     timeout_seconds=30,  # 30 second timeout
@@ -566,13 +566,13 @@ Ensure connections are properly closed:
 
 ```python
 # ✅ Good - automatic cleanup
-async with mcp_tools:
-    agent = Agent(tools=[mcp_tools])
+async with mcp_tool:
+    agent = Agent(tools=[mcp_tool])
     result = await agent.arun("...")
 
 # ❌ Bad - connection may leak
-await mcp_tools.connect()
-agent = Agent(tools=[mcp_tools])
+await mcp_tool.connect()
+agent = Agent(tools=[mcp_tool])
 result = await agent.arun("...")
 # Forgot to close!
 ```
@@ -583,14 +583,14 @@ Only expose necessary tools to the agent:
 
 ```python
 # ✅ Good - explicit allowlist
-mcp_tools = MCPTools(
+mcp_tool = MCPTool(
     url="http://localhost:8000/mcp",
     transport="streamable-http",
     include_tools=["search", "read"],  # Only safe, read-only tools
 )
 
 # ❌ Risky - all tools exposed
-mcp_tools = MCPTools(
+mcp_tool = MCPTool(
     url="http://localhost:8000/mcp",
     transport="streamable-http",
     # No filtering - agent can use any tool
@@ -603,12 +603,12 @@ Prevent name collisions:
 
 ```python
 # ✅ Good - clear namespacing
-search_mcp = MCPTools(url="...", tool_name_prefix="search")
-db_mcp = MCPTools(url="...", tool_name_prefix="db")
+search_mcp = MCPTool(url="...", tool_name_prefix="search")
+db_mcp = MCPTool(url="...", tool_name_prefix="db")
 
 # ❌ Bad - potential name collision
-search_mcp = MCPTools(url="...")  # Has "query" tool
-db_mcp = MCPTools(url="...")      # Also has "query" tool - collision!
+search_mcp = MCPTool(url="...")  # Has "query" tool
+db_mcp = MCPTool(url="...")      # Also has "query" tool - collision!
 ```
 
 ### 4. Handle Connection Failures
@@ -618,8 +618,8 @@ Always have a fallback strategy:
 ```python
 async def run_with_fallback(message: str):
     try:
-        async with mcp_tools:
-            agent = Agent(tools=[local_tools, mcp_tools])
+        async with mcp_tool:
+            agent = Agent(tools=[local_tools, mcp_tool])
             return await agent.arun(message)
     except Exception as e:
         logger.warning(f"MCP unavailable: {e}, falling back to local tools")
@@ -648,8 +648,8 @@ logging.getLogger("dcaf.mcp.tools").setLevel(logging.INFO)
 For debugging, verify which tools are available:
 
 ```python
-async with mcp_tools:
-    tools = mcp_tools.get_tool_names()
+async with mcp_tool:
+    tools = mcp_tool.get_tool_names()
     logger.info(f"Connected to MCP server with tools: {tools}")
 ```
 
@@ -657,10 +657,10 @@ async with mcp_tools:
 
 ## API Reference
 
-### MCPTools Class
+### MCPTool Class
 
 ```python
-class MCPTools:
+class MCPTool:
     def __init__(
         self,
         command: Optional[str] = None,        # For stdio transport
@@ -695,7 +695,7 @@ class MCPTools:
 ### Context Manager
 
 ```python
-async with mcp_tools:
+async with mcp_tool:
     # Connection established
     ...
 # Connection automatically closed

@@ -61,15 +61,15 @@ __all__ = [
     "create_server",
     "MCPIntegrationError",
     # MCP client (connect to external MCP servers)
-    "MCPTools",
+    "MCPTool",
     # Legacy names for backwards compatibility
     "serve_mcp",
     "create_mcp_server",
     "get_mcp_tool_schemas",
 ]
 
-# Import MCPTools for connecting to external MCP servers
-from .tools import MCPTools
+# Import MCPTool for connecting to external MCP servers
+from .tools import MCPTool
 
 logger = logging.getLogger(__name__)
 

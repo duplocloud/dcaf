@@ -1,63 +1,63 @@
 """
-Tests for DCAF MCPTools integration.
+Tests for DCAF MCPTool integration.
 
 These tests verify:
-1. MCPTools initialization and parameter validation
-2. The adapter correctly recognizes MCPTools instances
-3. MCPTools can be used alongside regular DCAF tools
+1. MCPTool initialization and parameter validation
+2. The adapter correctly recognizes MCPTool instances
+3. MCPTool can be used alongside regular DCAF tools
 """
 
 import pytest
 from unittest.mock import Mock, AsyncMock, patch, MagicMock
 
 
-class TestMCPToolsInitialization:
-    """Test MCPTools initialization and validation."""
+class TestMCPToolInitialization:
+    """Test MCPTool initialization and validation."""
 
     def test_stdio_transport_requires_command(self):
         """Should raise ValueError if stdio transport without command."""
-        from dcaf.mcp import MCPTools
+        from dcaf.mcp import MCPTool
 
         with pytest.raises(ValueError, match="command.*required"):
-            MCPTools(transport="stdio")
+            MCPTool(transport="stdio")
 
     def test_streamable_http_transport_requires_url(self):
         """Should raise ValueError if streamable-http transport without url."""
-        from dcaf.mcp import MCPTools
+        from dcaf.mcp import MCPTool
 
         with pytest.raises(ValueError, match="url.*required"):
-            MCPTools(transport="streamable-http")
+            MCPTool(transport="streamable-http")
 
     def test_sse_transport_requires_url(self):
         """Should raise ValueError if sse transport without url."""
-        from dcaf.mcp import MCPTools
+        from dcaf.mcp import MCPTool
 
         with pytest.raises(ValueError, match="url.*required"):
-            MCPTools(transport="sse")
+            MCPTool(transport="sse")
 
     def test_stdio_transport_with_command_succeeds(self):
         """Should succeed when stdio transport has command."""
-        from dcaf.mcp import MCPTools
+        from dcaf.mcp import MCPTool
 
-        mcp = MCPTools(command="python server.py", transport="stdio")
+        mcp = MCPTool(command="python server.py", transport="stdio")
         assert mcp._command == "python server.py"
         assert mcp._transport == "stdio"
         assert not mcp.initialized
 
     def test_streamable_http_transport_with_url_succeeds(self):
         """Should succeed when streamable-http transport has url."""
-        from dcaf.mcp import MCPTools
+        from dcaf.mcp import MCPTool
 
-        mcp = MCPTools(url="http://localhost:8000/mcp", transport="streamable-http")
+        mcp = MCPTool(url="http://localhost:8000/mcp", transport="streamable-http")
         assert mcp._url == "http://localhost:8000/mcp"
         assert mcp._transport == "streamable-http"
         assert not mcp.initialized
 
     def test_tool_filtering_options(self):
         """Should store include/exclude tool options."""
-        from dcaf.mcp import MCPTools
+        from dcaf.mcp import MCPTool
 
-        mcp = MCPTools(
+        mcp = MCPTool(
             url="http://localhost:8000/mcp",
             transport="streamable-http",
             include_tools=["tool1", "tool2"],
@@ -69,39 +69,39 @@ class TestMCPToolsInitialization:
         assert mcp._tool_name_prefix == "mcp"
 
 
-class TestMCPToolsNotConnectedErrors:
+class TestMCPToolNotConnectedErrors:
     """Test that appropriate errors are raised when not connected."""
 
     def test_get_tool_names_requires_connection(self):
         """Should raise RuntimeError if not connected."""
-        from dcaf.mcp import MCPTools
+        from dcaf.mcp import MCPTool
 
-        mcp = MCPTools(url="http://localhost:8000/mcp", transport="streamable-http")
+        mcp = MCPTool(url="http://localhost:8000/mcp", transport="streamable-http")
 
         with pytest.raises(RuntimeError, match="not connected"):
             mcp.get_tool_names()
 
     def test_get_agno_toolkit_auto_create_false_requires_connection(self):
         """Should raise RuntimeError if auto_create=False and not connected."""
-        from dcaf.mcp import MCPTools
+        from dcaf.mcp import MCPTool
 
-        mcp = MCPTools(url="http://localhost:8000/mcp", transport="streamable-http")
+        mcp = MCPTool(url="http://localhost:8000/mcp", transport="streamable-http")
 
         with pytest.raises(RuntimeError, match="not connected"):
             mcp._get_agno_toolkit(auto_create=False)
 
 
-class TestMCPToolsAutoConnect:
+class TestMCPToolAutoConnect:
     """Test automatic connection behavior for framework integration."""
 
     def test_get_agno_toolkit_auto_creates_by_default(self):
-        """Should auto-create Agno MCPTools when auto_create=True (default)."""
-        from dcaf.mcp import MCPTools
+        """Should auto-create Agno MCPTool when auto_create=True (default)."""
+        from dcaf.mcp import MCPTool
 
-        mcp = MCPTools(url="http://localhost:8000/mcp", transport="streamable-http")
+        mcp = MCPTool(url="http://localhost:8000/mcp", transport="streamable-http")
 
         # Mock the Agno import
-        with patch("dcaf.mcp.tools.MCPTools._create_agno_mcp_tools") as mock_create:
+        with patch("dcaf.mcp.tools.MCPTool._create_agno_mcp_tools") as mock_create:
             mock_agno = Mock()
             mock_agno.initialized = False
             mock_create.return_value = mock_agno
@@ -113,13 +113,13 @@ class TestMCPToolsAutoConnect:
             assert result == mock_agno
 
     def test_adapter_handles_uninitialized_mcp_tools(self):
-        """Adapter should accept uninitialized MCPTools and let Agno manage lifecycle."""
-        from dcaf.mcp import MCPTools
+        """Adapter should accept uninitialized MCPTool and let Agno manage lifecycle."""
+        from dcaf.mcp import MCPTool
         from dcaf.core.adapters.outbound.agno.adapter import AgnoAdapter
 
-        mcp = MCPTools(url="http://localhost:8000/mcp", transport="streamable-http")
+        mcp = MCPTool(url="http://localhost:8000/mcp", transport="streamable-http")
 
-        # Mock the Agno MCPTools creation
+        # Mock the Agno MCPTool creation
         mock_agno = Mock()
         mock_agno.initialized = False
         mock_agno.functions = {}
@@ -134,21 +134,21 @@ class TestMCPToolsAutoConnect:
             assert agno_tools[0] == mock_agno
 
 
-class TestAdapterMCPToolsDetection:
-    """Test that AgnoAdapter correctly detects DCAF MCPTools."""
+class TestAdapterMCPToolDetection:
+    """Test that AgnoAdapter correctly detects DCAF MCPTool."""
 
     def test_adapter_detects_mcp_tools(self):
-        """Adapter should identify DCAF MCPTools instances."""
-        from dcaf.mcp import MCPTools
+        """Adapter should identify DCAF MCPTool instances."""
+        from dcaf.mcp import MCPTool
         from dcaf.core.adapters.outbound.agno.adapter import AgnoAdapter
 
-        mcp = MCPTools(url="http://localhost:8000/mcp", transport="streamable-http")
+        mcp = MCPTool(url="http://localhost:8000/mcp", transport="streamable-http")
         adapter = AgnoAdapter()
 
         assert adapter._is_dcaf_mcp_tools(mcp) is True
 
     def test_adapter_does_not_detect_regular_tools(self):
-        """Adapter should not identify regular tools as MCPTools."""
+        """Adapter should not identify regular tools as MCPTool."""
         from dcaf.tools import tool
         from dcaf.core.adapters.outbound.agno.adapter import AgnoAdapter
 
@@ -160,7 +160,7 @@ class TestAdapterMCPToolsDetection:
         assert adapter._is_dcaf_mcp_tools(my_tool) is False
 
     def test_adapter_does_not_detect_other_objects(self):
-        """Adapter should not identify random objects as MCPTools."""
+        """Adapter should not identify random objects as MCPTool."""
         from dcaf.core.adapters.outbound.agno.adapter import AgnoAdapter
 
         adapter = AgnoAdapter()
@@ -172,14 +172,14 @@ class TestAdapterMCPToolsDetection:
         assert adapter._is_dcaf_mcp_tools(lambda x: x) is False
 
 
-class TestMCPToolsRepr:
+class TestMCPToolRepr:
     """Test string representations."""
 
     def test_repr_not_connected(self):
         """Should show not connected status."""
-        from dcaf.mcp import MCPTools
+        from dcaf.mcp import MCPTool
 
-        mcp = MCPTools(url="http://localhost:8000/mcp", transport="streamable-http")
+        mcp = MCPTool(url="http://localhost:8000/mcp", transport="streamable-http")
         repr_str = repr(mcp)
 
         assert "url=http://localhost:8000/mcp" in repr_str
@@ -188,43 +188,43 @@ class TestMCPToolsRepr:
 
     def test_repr_stdio(self):
         """Should show command for stdio transport."""
-        from dcaf.mcp import MCPTools
+        from dcaf.mcp import MCPTool
 
-        mcp = MCPTools(command="python server.py", transport="stdio")
+        mcp = MCPTool(command="python server.py", transport="stdio")
         repr_str = repr(mcp)
 
         assert "command=python server.py" in repr_str
         assert "stdio" in repr_str
 
 
-class TestMCPToolsExport:
-    """Test that MCPTools is properly exported."""
+class TestMCPToolExport:
+    """Test that MCPTool is properly exported."""
 
     def test_import_from_dcaf_mcp(self):
         """Should be importable from dcaf.mcp."""
-        from dcaf.mcp import MCPTools
+        from dcaf.mcp import MCPTool
 
-        assert MCPTools is not None
+        assert MCPTool is not None
 
     def test_in_all(self):
         """Should be in __all__."""
         from dcaf import mcp
 
-        assert "MCPTools" in mcp.__all__
+        assert "MCPTool" in mcp.__all__
 
 
 @pytest.mark.asyncio
-class TestMCPToolsConnection:
-    """Test MCPTools connection behavior (mocked)."""
+class TestMCPToolConnection:
+    """Test MCPTool connection behavior (mocked)."""
 
     async def test_connect_creates_agno_mcp_tools(self):
-        """Connect should create underlying Agno MCPTools."""
-        from dcaf.mcp import MCPTools
+        """Connect should create underlying Agno MCPTool."""
+        from dcaf.mcp import MCPTool
 
-        mcp = MCPTools(url="http://localhost:8000/mcp", transport="streamable-http")
+        mcp = MCPTool(url="http://localhost:8000/mcp", transport="streamable-http")
 
-        # Mock the Agno MCPTools
-        with patch("dcaf.mcp.tools.MCPTools._create_agno_mcp_tools") as mock_create:
+        # Mock the Agno MCPTool
+        with patch("dcaf.mcp.tools.MCPTool._create_agno_mcp_tools") as mock_create:
             mock_agno = AsyncMock()
             mock_agno.connect = AsyncMock()
             mock_agno.initialized = True
@@ -239,11 +239,11 @@ class TestMCPToolsConnection:
 
     async def test_context_manager_connects_and_closes(self):
         """Async context manager should connect on enter and close on exit."""
-        from dcaf.mcp import MCPTools
+        from dcaf.mcp import MCPTool
 
-        mcp = MCPTools(url="http://localhost:8000/mcp", transport="streamable-http")
+        mcp = MCPTool(url="http://localhost:8000/mcp", transport="streamable-http")
 
-        # Mock the Agno MCPTools
+        # Mock the Agno MCPTool
         mock_agno = AsyncMock()
         mock_agno.connect = AsyncMock()
         mock_agno.close = AsyncMock()
@@ -265,9 +265,9 @@ class TestMCPToolsConnection:
 
     async def test_get_tool_names_after_connect(self):
         """Should return tool names after connecting."""
-        from dcaf.mcp import MCPTools
+        from dcaf.mcp import MCPTool
 
-        mcp = MCPTools(url="http://localhost:8000/mcp", transport="streamable-http")
+        mcp = MCPTool(url="http://localhost:8000/mcp", transport="streamable-http")
 
         mock_agno = AsyncMock()
         mock_agno.connect = AsyncMock()
