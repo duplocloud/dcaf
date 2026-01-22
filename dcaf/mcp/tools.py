@@ -60,8 +60,9 @@ import functools
 import inspect
 import logging
 import time
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from typing import Any, Awaitable, Callable, Literal
+from typing import Any, Literal
 
 logger = logging.getLogger(__name__)
 
