@@ -9,13 +9,15 @@ They are implemented by adapters in the adapters layer.
 """
 
 from .agent_runtime import AgentRuntime
-from .conversation_repository import ConversationRepository
 from .approval_callback import ApprovalCallback
+from .conversation_repository import ConversationRepository
 from .event_publisher import EventPublisher
+from .mcp_protocol import MCPToolLike
 
 __all__ = [
     "AgentRuntime",
     "ConversationRepository",
     "ApprovalCallback",
     "EventPublisher",
+    "MCPToolLike",
 ]

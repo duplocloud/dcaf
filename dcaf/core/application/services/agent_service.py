@@ -1,7 +1,8 @@
 """AgentService - main agent execution orchestration."""
 
 import logging
-from collections.abc import Iterator
+from collections.abc import AsyncIterator, Iterator
+from typing import Any
 
 from ...domain.entities import Conversation, Message, MessageRole, ToolCall
 from ...domain.services import ApprovalPolicy
@@ -17,6 +18,7 @@ from ..dto.responses import AgentResponse, DataDTO, StreamEvent, ToolCallDTO
 from ..ports.agent_runtime import AgentRuntime
 from ..ports.conversation_repository import ConversationRepository
 from ..ports.event_publisher import EventPublisher
+from ..ports.mcp_protocol import MCPToolLike
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +73,7 @@ class AgentService:
         self._events = events
         self._policy = approval_policy or ApprovalPolicy()
 
-    def execute(self, request: AgentRequest) -> AgentResponse:
+    async def execute(self, request: AgentRequest) -> AgentResponse:
         """
         Execute an agent turn.
 
@@ -97,8 +99,8 @@ class AgentService:
         # 2. Add user message
         conversation.add_user_message(request.content)
 
-        # 3. Invoke the agent runtime
-        runtime_response = self._runtime.invoke(
+        # 3. Invoke the agent runtime (async)
+        runtime_response = await self._runtime.invoke(
             messages=conversation.messages,
             tools=request.tools,
             system_prompt=request.system_prompt,
@@ -123,7 +125,7 @@ class AgentService:
 
         return response
 
-    def execute_stream(self, request: AgentRequest) -> Iterator[StreamEvent]:
+    async def execute_stream(self, request: AgentRequest) -> AsyncIterator[StreamEvent]:
         """
         Execute an agent turn with streaming response.
 
@@ -147,11 +149,11 @@ class AgentService:
         # 3. Yield message start
         yield StreamEvent.message_start()
 
-        # 4. Stream from runtime
-        collected_text = []
-        collected_tool_calls = []
+        # 4. Stream from runtime (async)
+        collected_text: list[str] = []
+        collected_tool_calls: list[ToolCallDTO] = []
 
-        for event in self._runtime.invoke_stream(
+        async for event in self._runtime.invoke_stream(
             messages=conversation.messages,
             tools=request.tools,
             system_prompt=request.system_prompt,
@@ -395,12 +397,12 @@ class AgentService:
             is_complete=not conversation.has_pending_approvals,
         )
 
-    def _find_tool(self, name: str, tools: list):
+    def _find_tool(self, name: str, tools: list) -> Any:
         """Find a tool by name."""
         for tool in tools:
-            # Skip MCPTool instances - they're toolkit containers, not individual tools.
+            # Skip MCPToolLike instances - they're toolkit containers, not individual tools.
             # MCP tools are handled directly by the runtime adapter (e.g., Agno).
-            if type(tool).__name__ == "MCPTool":
+            if isinstance(tool, MCPToolLike):
                 continue
             if tool.name == name:
                 return tool
