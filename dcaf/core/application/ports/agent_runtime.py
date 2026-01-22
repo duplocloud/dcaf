@@ -1,20 +1,21 @@
 """AgentRuntime port - interface for LLM framework adapters."""
 
-from typing import Protocol, List, Iterator, Optional, runtime_checkable
+from collections.abc import AsyncGenerator
+from typing import Protocol, runtime_checkable
 
-from ..dto.responses import AgentResponse, StreamEvent
 from ...domain.entities import Message
+from ..dto.responses import AgentResponse, StreamEvent
 
 
 class ToolLike(Protocol):
     """Protocol for tool-like objects."""
-    
+
     @property
     def name(self) -> str: ...
-    
+
     @property
     def description(self) -> str: ...
-    
+
     @property
     def requires_approval(self) -> bool: ...
 
@@ -23,74 +24,93 @@ class ToolLike(Protocol):
 class AgentRuntime(Protocol):
     """
     Outbound port for LLM framework adapters.
-    
+
     This protocol defines the interface that framework adapters
     (Agno, LangChain, Strands, etc.) must implement to integrate
     with the DCAF application layer.
-    
+
+    All methods are async since DCAF runs in FastAPI's async context.
+
     Implementations:
         - AgnoAdapter: For Agno framework
         - LangChainAdapter: For LangChain framework
         - BedrockDirectAdapter: For direct Bedrock access
-    
+
     Example:
         class AgnoAdapter(AgentRuntime):
-            def invoke(self, messages, tools) -> AgentResponse:
+            async def invoke(self, messages, tools) -> AgentResponse:
                 # Convert to Agno format
                 # Call Agno SDK
                 # Convert response back
                 pass
     """
-    
-    def invoke(
-        self, 
-        messages: List[Message],
-        tools: List[ToolLike],
-        system_prompt: Optional[str] = None,
-        platform_context: Optional[dict] = None,
+
+    async def invoke(
+        self,
+        messages: list[Message],
+        tools: list[ToolLike],
+        system_prompt: str | None = None,
+        platform_context: dict | None = None,
+        static_system: str | None = None,
+        dynamic_system: str | None = None,
     ) -> AgentResponse:
         """
         Invoke the agent with messages and tools.
-        
-        This is the synchronous entry point for agent execution.
-        The implementation should:
-        1. Convert messages to framework format
-        2. Convert tools to framework format
-        3. Call the framework's invoke method
-        4. Convert the response back to AgentResponse
-        
+
         Args:
             messages: List of messages in the conversation
             tools: List of tools available to the agent
             system_prompt: Optional system prompt to prepend
-            platform_context: Optional platform context (tenant, namespace, etc.)
-                             to inject into tools that require it
-            
+            platform_context: Optional platform context dict containing:
+                - tenant_id, tenant_name: Tenant identification
+                - k8s_namespace, kubeconfig: Kubernetes context
+                - duplo_base_url, duplo_token: DuploCloud credentials
+                - aws_region: AWS configuration
+                - user_id: User identifier for tracing
+                - session_id: Session identifier for grouping runs
+                - run_id: Unique execution run identifier
+                - request_id: HTTP request correlation ID
+            static_system: Optional static system prompt part (for caching)
+            dynamic_system: Optional dynamic system prompt part (for caching)
+
         Returns:
             AgentResponse containing the agent's response and any tool calls
         """
         ...
-    
+
     def invoke_stream(
-        self, 
-        messages: List[Message],
-        tools: List[ToolLike],
-        system_prompt: Optional[str] = None,
-        platform_context: Optional[dict] = None,
-    ) -> Iterator[StreamEvent]:
+        self,
+        messages: list[Message],
+        tools: list[ToolLike],
+        system_prompt: str | None = None,
+        platform_context: dict | None = None,
+        static_system: str | None = None,
+        dynamic_system: str | None = None,
+    ) -> AsyncGenerator[StreamEvent, None]:
         """
         Invoke the agent with streaming response.
-        
-        This is the streaming entry point for agent execution.
+
         Yields StreamEvent objects as the response is generated.
-        
+
+        Note: Implementations should be async generators (async def with yield).
+        The Protocol signature omits 'async' for mypy compatibility with async generators.
+
         Args:
             messages: List of messages in the conversation
             tools: List of tools available to the agent
             system_prompt: Optional system prompt to prepend
-            platform_context: Optional platform context (tenant, namespace, etc.)
-                             to inject into tools that require it
-            
+            platform_context: Optional platform context dict containing:
+                - tenant_id, tenant_name: Tenant identification
+                - k8s_namespace, kubeconfig: Kubernetes context
+                - duplo_base_url, duplo_token: DuploCloud credentials
+                - aws_region: AWS configuration
+                - user_id: User identifier for tracing
+                - session_id: Session identifier for grouping runs
+                - run_id: Unique execution run identifier
+                - request_id: HTTP request correlation ID
+            static_system: Optional static system prompt part (for caching)
+            dynamic_system: Optional dynamic system prompt part (for caching)
+
         Yields:
             StreamEvent objects containing chunks of the response
         """

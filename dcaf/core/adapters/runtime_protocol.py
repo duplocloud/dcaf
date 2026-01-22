@@ -18,69 +18,75 @@ Example:
         return StrandsAdapter(**kwargs)
 """
 
-from typing import Protocol, List, Iterator, Any, Optional, runtime_checkable
+from collections.abc import AsyncGenerator
+from typing import Any, Protocol, runtime_checkable
 
 
 @runtime_checkable
 class RuntimeAdapter(Protocol):
     """
     Protocol that all framework adapters must implement.
-    
+
     This is the contract between DCAF's Agent class and any LLM framework.
     Implementing this protocol allows seamless swapping of frameworks.
-    
+
+    All methods are async since DCAF runs in FastAPI's async context.
+
     Required Methods:
-        invoke: Synchronous request/response
-        invoke_stream: Streaming response
-        
+        invoke: Async request/response
+        invoke_stream: Async streaming response (async generator)
+
     Properties:
         model_id: The model being used
         provider: The provider (for frameworks that support multiple)
     """
-    
+
     @property
     def model_id(self) -> str:
         """Get the model identifier."""
         ...
-    
+
     @property
     def provider(self) -> str:
         """Get the provider name."""
         ...
-    
-    def invoke(
+
+    async def invoke(
         self,
-        messages: List[Any],
-        tools: List[Any],
-        system_prompt: Optional[str] = None,
+        messages: list[Any],
+        tools: list[Any],
+        system_prompt: str | None = None,
     ) -> Any:  # Returns AgentResponse
         """
         Execute a single request and return the response.
-        
+
         Args:
             messages: List of conversation messages
             tools: List of tools available to the agent
             system_prompt: Optional system instructions
-            
+
         Returns:
             AgentResponse with the result
         """
         ...
-    
+
     def invoke_stream(
         self,
-        messages: List[Any],
-        tools: List[Any],
-        system_prompt: Optional[str] = None,
-    ) -> Iterator[Any]:  # Yields StreamEvent
+        messages: list[Any],
+        tools: list[Any],
+        system_prompt: str | None = None,
+    ) -> AsyncGenerator[Any, None]:  # Yields StreamEvent
         """
-        Execute with streaming response.
-        
+        Execute with async streaming response.
+
+        Note: Implementations should be async generators (async def with yield).
+        The Protocol signature omits 'async' for mypy compatibility.
+
         Args:
             messages: List of conversation messages
             tools: List of tools available to the agent
             system_prompt: Optional system instructions
-            
+
         Yields:
             StreamEvent objects
         """
