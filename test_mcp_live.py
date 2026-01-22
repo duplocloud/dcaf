@@ -29,14 +29,14 @@ async def main():
     # 2. Create an agent with the MCP tools
     agent = Agent(
         tools=[mcp_tool],
-        system_prompt="You are a helpful assistant. Use the available tools to answer questions about DuploCloud documentation."
+        system_prompt="You are a helpful assistant. Use the available tools to answer questions about DuploCloud documentation.",
     )
 
     # 3. Run the agent - MCP connection is handled automatically
     logger.info("Running agent with MCP tools...")
-    result = agent.run([
-        {"role": "user", "content": "What tools are available to you? Just list them briefly."}
-    ])
+    result = agent.run(
+        [{"role": "user", "content": "What tools are available to you? Just list them briefly."}]
+    )
 
     logger.info(f"Agent response: {result.text}")
 

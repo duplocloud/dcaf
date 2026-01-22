@@ -1,18 +1,18 @@
 """Configuration management for DCAF Core."""
 
-from dataclasses import dataclass, field
-from typing import Optional, Dict, Any, List
 import os
+from dataclasses import dataclass, field
+from typing import Any
 
 
 @dataclass
 class CoreConfig:
     """
     Configuration for the DCAF Core framework.
-    
+
     This class holds all configuration options for the core abstraction layer.
     Values can be provided directly or loaded from environment variables.
-    
+
     Attributes:
         model_id: The default LLM model ID
         provider: The default LLM provider
@@ -20,71 +20,72 @@ class CoreConfig:
         temperature: Default sampling temperature
         enable_streaming: Whether streaming is enabled by default
         log_level: Logging level
-        
+
     Example:
         # Create with defaults
         config = CoreConfig()
-        
+
         # Create with custom values
         config = CoreConfig(
             model_id="anthropic.claude-3-opus",
             max_tokens=8192,
         )
-        
+
         # Load from environment
         config = CoreConfig.from_env()
     """
-    
+
     # LLM Configuration
     model_id: str = "anthropic.claude-3-sonnet-20240229-v1:0"
     provider: str = "bedrock"
     max_tokens: int = 4096
     temperature: float = 0.7
-    
+
     # Approval Configuration
     always_require_approval: bool = False
-    
+
     # Runtime Configuration
     enable_streaming: bool = True
     conversation_ttl_seconds: int = 3600  # 1 hour
-    
+
     # Logging Configuration
     log_level: str = "INFO"
     log_format: str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    
+
     # Additional configuration
-    extra: Dict[str, Any] = field(default_factory=dict)
-    
+    extra: dict[str, Any] = field(default_factory=dict)
+
     @classmethod
     def from_env(cls, prefix: str = "DCAF_") -> "CoreConfig":
         """
         Load configuration from environment variables.
-        
+
         Environment variables are prefixed with DCAF_ by default.
-        
+
         Args:
             prefix: Prefix for environment variables
-            
+
             Returns:
             CoreConfig instance with values from environment
-            
+
         Example:
             # Set environment variables
             export DCAF_MODEL_ID=anthropic.claude-3-opus
             export DCAF_MAX_TOKENS=8192
-            
+
             # Load config
             config = V2Config.from_env()
         """
-        def get_env(key: str, default: Any = None) -> Optional[str]:
+
+        def get_env(key: str, default: str | None = None) -> str | None:
             return os.environ.get(f"{prefix}{key}", default)
-        
+
         def get_bool(key: str, default: bool = False) -> bool:
             value = get_env(key)
             if value is None:
                 return default
             return value.lower() in ("true", "1", "yes")
-        
+
         def get_int(key: str, default: int = 0) -> int:
             value = get_env(key)
             if value is None:
@@ -93,7 +94,7 @@ class CoreConfig:
                 return int(value)
             except ValueError:
                 return default
-        
+
         def get_float(key: str, default: float = 0.0) -> float:
             value = get_env(key)
             if value is None:
@@ -102,25 +103,25 @@ class CoreConfig:
                 return float(value)
             except ValueError:
                 return default
-        
+
         return cls(
-            model_id=get_env("MODEL_ID", cls.model_id),
-            provider=get_env("PROVIDER", cls.provider),
+            model_id=get_env("MODEL_ID", cls.model_id) or cls.model_id,
+            provider=get_env("PROVIDER", cls.provider) or cls.provider,
             max_tokens=get_int("MAX_TOKENS", cls.max_tokens),
             temperature=get_float("TEMPERATURE", cls.temperature),
             always_require_approval=get_bool("ALWAYS_REQUIRE_APPROVAL", False),
             enable_streaming=get_bool("ENABLE_STREAMING", True),
             conversation_ttl_seconds=get_int("CONVERSATION_TTL", 3600),
-            log_level=get_env("LOG_LEVEL", "INFO"),
+            log_level=get_env("LOG_LEVEL", "INFO") or "INFO",
         )
-    
+
     def with_overrides(self, **kwargs: Any) -> "CoreConfig":
         """
         Create a new config with overrides.
-        
+
         Args:
             **kwargs: Values to override
-            
+
         Returns:
             New CoreConfig with overrides applied
         """
@@ -129,9 +130,13 @@ class CoreConfig:
             provider=kwargs.get("provider", self.provider),
             max_tokens=kwargs.get("max_tokens", self.max_tokens),
             temperature=kwargs.get("temperature", self.temperature),
-            always_require_approval=kwargs.get("always_require_approval", self.always_require_approval),
+            always_require_approval=kwargs.get(
+                "always_require_approval", self.always_require_approval
+            ),
             enable_streaming=kwargs.get("enable_streaming", self.enable_streaming),
-            conversation_ttl_seconds=kwargs.get("conversation_ttl_seconds", self.conversation_ttl_seconds),
+            conversation_ttl_seconds=kwargs.get(
+                "conversation_ttl_seconds", self.conversation_ttl_seconds
+            ),
             log_level=kwargs.get("log_level", self.log_level),
             log_format=kwargs.get("log_format", self.log_format),
             extra={**self.extra, **kwargs.get("extra", {})},

@@ -1,4 +1,5 @@
-from typing import Dict, Any, List
+from typing import Any
+
 from ..agent_server import AgentProtocol
 from ..schemas.messages import AgentMessage
 
@@ -9,14 +10,16 @@ class BoilerplateAgent(AgentProtocol):
     This serves as a starting point for creating new agents.
     """
 
-    def invoke(self, messages: Dict[str, List[Dict[str, Any]]]) -> AgentMessage:
+    def invoke(self, messages: dict[str, list[dict[str, Any]]]) -> AgentMessage:  # noqa: ARG002
         """
         Basic implementation that returns a 'Not Implemented' message.
-        
+
         Args:
-            messages: A dictionary containing the message history in the format {"messages": [...]} 
-            
+            messages: A dictionary containing the message history in the format {"messages": [...]}
+
         Returns:
             An AgentMessage with a 'Not Implemented' response
         """
-        return AgentMessage(content="Not Implemented. Override this method with your agent's logic.")
+        return AgentMessage(
+            content="Not Implemented. Override this method with your agent's logic."
+        )

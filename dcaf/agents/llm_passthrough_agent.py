@@ -1,8 +1,9 @@
-from typing import Dict, Any, List
+from typing import Any
+
 from ..agent_server import AgentProtocol
-from ..schemas.messages import AgentMessage
 from ..llm import BedrockLLM
-import os
+from ..schemas.messages import AgentMessage
+
 
 class LLMPassthroughAgent(AgentProtocol):
     def __init__(self, llm: BedrockLLM):
@@ -13,22 +14,28 @@ class LLMPassthroughAgent(AgentProtocol):
 
     def call_bedrock_anthropic_llm(self, messages: list):
         system_prompt = "You are a helpful assistant name Duplo Dash."
-        return self.llm.invoke(messages=messages, model_id=self.model_id, system_prompt=system_prompt)
+        return self.llm.invoke(
+            messages=messages, model_id=self.model_id, system_prompt=system_prompt
+        )
 
-    def preprocess_messages(self, messages: Dict[str, List[Dict[str, Any]]]):
+    def preprocess_messages(self, messages: dict[str, list[dict[str, Any]]]):
         preprocessed_messages = []
         # Extract the messages list from the dictionary
         messages_list = messages.get("messages", [])
-        
+
         for message in messages_list:
             # Ensure role is one of the allowed values (user or assistant) as per the schema
             if message.get("role") == "user":
-                preprocessed_messages.append({"role": "user", "content": message.get("content", "")})
+                preprocessed_messages.append(
+                    {"role": "user", "content": message.get("content", "")}
+                )
             elif message.get("role") == "assistant":
-                preprocessed_messages.append({"role": "assistant", "content": message.get("content", "")})
+                preprocessed_messages.append(
+                    {"role": "assistant", "content": message.get("content", "")}
+                )
         return preprocessed_messages
-        
-    def invoke(self, messages: Dict[str, List[Dict[str, Any]]]) -> AgentMessage:
+
+    def invoke(self, messages: dict[str, list[dict[str, Any]]]) -> AgentMessage:
         preprocessed_messages = self.preprocess_messages(messages)
         content = self.call_bedrock_anthropic_llm(messages=preprocessed_messages)
         return AgentMessage(content=content)

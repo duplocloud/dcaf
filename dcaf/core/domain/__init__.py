@@ -12,26 +12,26 @@ The domain layer has NO external dependencies - it knows nothing about
 HTTP, databases, or LLM frameworks.
 """
 
-from .entities import Conversation, ToolCall, Message
-from .value_objects import (
-    ConversationId,
-    ToolCallId,
-    ToolInput,
-    MessageContent,
-    PlatformContext,
-)
-from .services import ApprovalPolicy
+from .entities import Conversation, Message, ToolCall
 from .events import (
-    DomainEvent,
     ApprovalRequested,
-    ToolExecuted,
     ConversationStarted,
+    DomainEvent,
+    ToolExecuted,
 )
 from .exceptions import (
-    DomainException,
     ConversationBlocked,
+    DomainException,
     InvalidStateTransition,
     ToolCallNotFound,
+)
+from .services import ApprovalPolicy
+from .value_objects import (
+    ConversationId,
+    MessageContent,
+    PlatformContext,
+    ToolCallId,
+    ToolInput,
 )
 
 __all__ = [

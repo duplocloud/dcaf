@@ -1,12 +1,10 @@
-from typing import Dict, Any, List, Optional
-import os
-import json
 import logging
-from datetime import datetime
+from collections.abc import Callable, Iterator
+from typing import Any
 
 from ..agent_server import AgentProtocol
-from ..schemas.messages import AgentMessage, ExecutedToolCall
 from ..llm import BedrockLLM
+from ..schemas.messages import AgentMessage, ExecutedToolCall
 
 logger = logging.getLogger(__name__)
 
@@ -18,12 +16,12 @@ class ToolCallingCmdAgent(AgentProtocol):
         self.model_id = "us.anthropic.claude-3-sonnet-20240229-v1:0"
         self.tools = self._get_tools()
         self.tool_schemas = self._get_tool_schemas()
-        
+
     # Tool functions - these could be moved to a separate module if needed
     def get_weather(self, location: str, unit: str = "celsius") -> str:
         """Dummy weather function that returns static temperature"""
         return f"The current weather in {location} is 15 degrees {unit}"
-    
+
     def get_stock_price(self, ticker: str) -> str:
         """Dummy stock price function that returns static price"""
         return f"The current stock price of {ticker} is $100"
@@ -32,16 +30,16 @@ class ToolCallingCmdAgent(AgentProtocol):
         """Get the current timestamp"""
         # return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         return "The time is 00:00:00 and the date is 01-01-2025"
-    
-    def _get_tools(self) -> Dict[str, callable]:
+
+    def _get_tools(self) -> dict[str, Callable[..., Any]]:
         """Map tool names to their corresponding functions"""
         return {
             "get_weather": self.get_weather,
             "get_stock_price": self.get_stock_price,
             "get_current_time": self.get_current_time,
         }
-    
-    def _get_tool_schemas(self) -> List[Dict[str, Any]]:
+
+    def _get_tool_schemas(self) -> list[dict[str, Any]]:
         """Define tool schemas for the LLM"""
         return [
             {
@@ -52,16 +50,16 @@ class ToolCallingCmdAgent(AgentProtocol):
                     "properties": {
                         "location": {
                             "type": "string",
-                            "description": "The city and state, e.g. San Francisco, CA"
+                            "description": "The city and state, e.g. San Francisco, CA",
                         },
                         "unit": {
                             "type": "string",
                             "enum": ["celsius", "fahrenheit"],
-                            "description": "The unit of temperature, either 'celsius' or 'fahrenheit'"
-                        }
+                            "description": "The unit of temperature, either 'celsius' or 'fahrenheit'",
+                        },
                     },
-                    "required": ["location"]
-                }
+                    "required": ["location"],
+                },
             },
             {
                 "name": "get_stock_price",
@@ -71,23 +69,21 @@ class ToolCallingCmdAgent(AgentProtocol):
                     "properties": {
                         "ticker": {
                             "type": "string",
-                            "description": "The stock ticker symbol, e.g. AAPL for Apple Inc."
+                            "description": "The stock ticker symbol, e.g. AAPL for Apple Inc.",
                         }
                     },
-                    "required": ["ticker"]
-                }
+                    "required": ["ticker"],
+                },
             },
-
             {
                 "name": "get_current_time",
                 "description": "Get the current date and time",
                 "input_schema": {
                     "type": "object",
                     "properties": {},  # Empty - no inputs needed
-                    "required": []     # No required fields
-                }
+                    "required": [],  # No required fields
+                },
             },
-
             {
                 "name": "return_final_response_to_user",
                 "description": "Use this tool to return the final response that will be shown to the user once you are ready",
@@ -96,7 +92,7 @@ class ToolCallingCmdAgent(AgentProtocol):
                     "properties": {
                         "content": {
                             "type": "string",
-                            "description": "The main response text to display to the user"
+                            "description": "The main response text to display to the user",
                         },
                         "terminal_commands": {
                             "type": "array",
@@ -106,11 +102,11 @@ class ToolCallingCmdAgent(AgentProtocol):
                                 "properties": {
                                     "command": {
                                         "type": "string",
-                                        "description": "The complete terminal command string to be executed"
+                                        "description": "The complete terminal command string to be executed",
                                     },
                                     "explanation": {
                                         "type": "string",
-                                        "description": "A brief explanation of what this command does"
+                                        "description": "A brief explanation of what this command does",
                                     },
                                     "files": {
                                         "type": "array",
@@ -118,30 +114,36 @@ class ToolCallingCmdAgent(AgentProtocol):
                                         "items": {
                                             "type": "object",
                                             "properties": {
-                                                "file_path": {"type": "string", "description": "Path relative to CWD"},
-                                                "file_content": {"type": "string", "description": "Full content of the file"}
+                                                "file_path": {
+                                                    "type": "string",
+                                                    "description": "Path relative to CWD",
+                                                },
+                                                "file_content": {
+                                                    "type": "string",
+                                                    "description": "Full content of the file",
+                                                },
                                             },
-                                            "required": ["file_path", "file_content"]
-                                        }
-                                    }
+                                            "required": ["file_path", "file_content"],
+                                        },
+                                    },
                                 },
-                                "required": ["command"]
-                            }
-                        }
+                                "required": ["command"],
+                            },
+                        },
                     },
-                    "required": ["content"]
-                }
-            }
+                    "required": ["content"],
+                },
+            },
         ]
 
-    def execute_tool(self, tool_name: str, tool_input: Dict[str, Any]) -> str:
+    def execute_tool(self, tool_name: str, tool_input: dict[str, Any]) -> str:
         """Execute a tool function and return the result"""
         if tool_name not in self.tools:
             return f"Error: Tool '{tool_name}' not found"
 
         logger.info("-" * 50)
         logger.info(f"Executing tool '{tool_name}' with input: {tool_input}")
-        
+
         try:
             tool_function = self.tools[tool_name]
             result = tool_function(**tool_input)
@@ -153,60 +155,55 @@ class ToolCallingCmdAgent(AgentProtocol):
         except Exception as e:
             return f"Error executing tool '{tool_name}': {str(e)}"
 
-    def process_tool_calls(self, response_content: List[Dict[str, Any]]) -> List[ExecutedToolCall]:
+    def process_tool_calls(self, response_content: list[dict[str, Any]]) -> list[ExecutedToolCall]:
         """Process tool calls from LLM response and return tool results"""
         executed_tool_calls = []
-        
+
         for content_block in response_content:
             if content_block.get("type") == "tool_use":
                 tool_name = content_block.get("name")
                 tool_input = content_block.get("input", {})
                 tool_use_id = content_block.get("id")
-                
+
                 # Execute the tool
-                result = self.execute_tool(tool_name, tool_input)
-                
+                result = self.execute_tool(tool_name or "", tool_input)
+
                 # Format tool result for next LLM call
                 executed_tool_calls.append(
                     ExecutedToolCall(
-                        id=tool_use_id,
-                        name=tool_name,
-                        input=tool_input,
-                        output=result
+                        id=tool_use_id or "", name=tool_name or "", input=tool_input, output=result
                     )
                 )
-        
+
         return executed_tool_calls
 
-    def _extract_text_from_content(self, response_content: List[Dict[str, Any]]) -> str:
+    def _extract_text_from_content(self, response_content: list[dict[str, Any]]) -> str:
         """
         Extract text content from Bedrock Converse API content blocks.
-        
+
         Args:
             response_content: List of content blocks from Bedrock response
-            
+
         Returns:
             Concatenated text from all text blocks
         """
         text_parts = []
         for block in response_content:
             if isinstance(block, dict):
-                if block.get("type") == "text":
-                    text_parts.append(block.get("text", ""))
-                elif "text" in block:
+                if block.get("type") == "text" or "text" in block:
                     text_parts.append(block.get("text", ""))
             elif isinstance(block, str):
                 text_parts.append(block)
         return " ".join(text_parts) if text_parts else ""
 
-    def call_bedrock_anthropic_llm(self, messages: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def call_bedrock_anthropic_llm(self, messages: list[dict[str, Any]]) -> dict[str, Any]:
         """Call the LLM with tool support"""
         system_prompt = """You are a helpful assistant called Dash. Do not use tools (other than the return_final_response_to_user tool) unless necessary.
-Use the return_final_response_to_user tool once you've used all the other tools you need to use to generate the final answer. 
+Use the return_final_response_to_user tool once you've used all the other tools you need to use to generate the final answer.
 When using the return_final_response_to_user tool, you can return a text response to the user as well as terminal commmands in the 'terminal_commands' field which will be shown to the user in an approval box below the text in the 'content' field. Once approved by the user, the terminal commands will be executed in a non interactive shell using subprocess.run and the results will be provided to you.
-Be extremely critical and ask clarifying questions if needed. 
+Be extremely critical and ask clarifying questions if needed.
 Be surgical, simple and less wordy."""
-        
+
         return self.llm.invoke(
             model_id=self.model_id,
             messages=self.llm.normalize_message_roles(messages),
@@ -214,119 +211,123 @@ Be surgical, simple and less wordy."""
             system_prompt=system_prompt,
             return_raw_api_response=True,
             tools=self.tool_schemas,
-            tool_choice={"type": "any"}
+            tool_choice={"type": "any"},
         )
 
-    def preprocess_messages(self, messages: Dict[str, List[Dict[str, Any]]]) -> List[Dict[str, Any]]:
+    def preprocess_messages(
+        self, messages: dict[str, list[dict[str, Any]]]
+    ) -> list[dict[str, Any]]:
         """Convert input messages to LLM format"""
         preprocessed_messages = []
         messages_list = messages.get("messages", [])
-        
+
         for message in messages_list:
             if message.get("role") == "user":
-                preprocessed_messages.append({
-                    "role": "user", 
-                    "content": message.get("content", "")
-                })
+                preprocessed_messages.append(
+                    {"role": "user", "content": message.get("content", "")}
+                )
             elif message.get("role") == "assistant":
-                preprocessed_messages.append({
-                    "role": "assistant", 
-                    "content": message.get("content", "")
-                })
-        
+                preprocessed_messages.append(
+                    {"role": "assistant", "content": message.get("content", "")}
+                )
+
         return preprocessed_messages
-        
-    def invoke(self, messages: Dict[str, List[Dict[str, Any]]]) -> AgentMessage:
+
+    def invoke(self, messages: dict[str, list[dict[str, Any]]]) -> AgentMessage:
         """Main agent invocation with tool support"""
         conversation_messages = self.preprocess_messages(messages)
-        
+
         while True:
             # Call LLM
             response = self.call_bedrock_anthropic_llm(conversation_messages)
             # Extract content from Bedrock Converse API response structure
             response_content = response.get("output", {}).get("message", {}).get("content", [])
-            
+
             # Check if response contains tool calls
             has_tool_calls = any(block.get("type") == "tool_use" for block in response_content)
-            
+
             if not has_tool_calls:
                 # No tools called, extract text from response content blocks
                 text_content = self._extract_text_from_content(response_content)
                 return AgentMessage(content=text_content)
-            
+
             # Check if final response tool is called
             final_response_call = None
             other_tool_calls = []
-            
+
             for content_block in response_content:
-                if (content_block.get("type") == "tool_use" and 
-                    content_block.get("name") == "return_final_response_to_user"):
+                if (
+                    content_block.get("type") == "tool_use"
+                    and content_block.get("name") == "return_final_response_to_user"
+                ):
                     final_response_call = content_block
                 elif content_block.get("type") == "tool_use":
                     other_tool_calls.append(content_block)
-            
+
             # If final response tool is called, return the structured response
             if final_response_call:
                 final_input = final_response_call.get("input", {})
-                return AgentMessage(
-                    content=final_input.get("content", ""),
-                    terminal_commands=final_input.get("terminal_commands", [])
-                )
-            
+                agent_msg = AgentMessage(content=final_input.get("content", ""))
+                # Terminal commands would be added to data.cmds if needed
+                # terminal_cmds = final_input.get("terminal_commands", [])
+                return agent_msg
+
             # Process other tool calls
             if other_tool_calls:
                 # Add assistant message with tool calls
-                tool_calls_message = 'Making Tool Calls.'
-                conversation_messages.append({
-                    "role": "assistant",
-                    "content": tool_calls_message
-                })
-                
+                tool_calls_message = "Making Tool Calls."
+                conversation_messages.append({"role": "assistant", "content": tool_calls_message})
+
                 # Execute tools and add results
                 executed_tool_calls = self.process_tool_calls(response_content)
                 # If only non-approval tools were called, add results and continue
                 if executed_tool_calls:
                     for executed_tool_call in executed_tool_calls:
                         executed_tool_call_content = f"Tool result for {executed_tool_call.name} with input {executed_tool_call.input}: {executed_tool_call.output}"
-                        conversation_messages.append({
-                            "role": "user",
-                            "content": executed_tool_call_content
-                        })
-                
+                        conversation_messages.append(
+                            {"role": "user", "content": executed_tool_call_content}
+                        )
+
                 # Continue the loop to get next LLM response
                 continue
-            
+
             # Fallback - no tools or final response
             text_content = self._extract_text_from_content(response_content)
             return AgentMessage(content=text_content)
 
+    def invoke_stream(self, messages: dict[str, Any]) -> Iterator[Any]:
+        """Streaming invocation - not implemented, falls back to non-streaming."""
+        # For now, just yield the complete response as a single event
+        response = self.invoke(messages)
+        yield response
+
 
 # Usage example:
 if __name__ == "__main__":
-    from llm import BedrockLLM
     import dotenv
-    
+
     dotenv.load_dotenv(override=True)
-    
-    llm = BedrockLLM()
-    agent = ToolEnabledLLMAgent(llm)
-    
+
+    # Use the already imported BedrockLLM from ..llm
+    llm_instance = BedrockLLM()
+    agent = ToolCallingCmdAgent(llm_instance)
+
     # Test with weather and stock request
     test_messages = {
         "messages": [
             {
-                "role": "user", 
+                "role": "user",
                 # "content": "Hi! What is your name? What is the weather in Hyderabad? What is the stock price of AAPL?"
                 # "content": "List directories in the current directory"
                 # "content": "What is the time?"
-                "content": "Run a terminal command to list directories"
+                "content": "Run a terminal command to list directories",
             }
         ]
     }
-    
+
     result = agent.invoke(test_messages)
     print("Result:", result.content)
-    if hasattr(result, 'terminal_commands') and result.terminal_commands:
+    if hasattr(result, "terminal_commands") and result.terminal_commands:
         print("Terminal commands:", result.terminal_commands)
 
     print()

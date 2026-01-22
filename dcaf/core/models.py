@@ -6,18 +6,18 @@ Fully compatible with the DuploCloud HelpDesk messaging protocol.
 """
 
 from dataclasses import dataclass, field
-from typing import Literal, Any, Optional
+from typing import Any, Literal
 
 
 @dataclass
 class PlatformContext:
     """
     Platform context passed with user messages.
-    
+
     This provides runtime context about the user's environment,
     used by tools and agents to execute operations in the correct
     tenant, namespace, or cloud account.
-    
+
     Attributes:
         tenant_id: Unique tenant identifier (for tenant scoping)
         tenant_name: DuploCloud tenant name (human-readable)
@@ -28,7 +28,7 @@ class PlatformContext:
         duplo_token: DuploCloud authentication token
         aws_credentials: AWS credentials dict (access_key, secret_key, session_token, region)
         aws_region: AWS region (e.g., "us-west-2")
-        
+
     Example:
         context = PlatformContext(
             tenant_id="123",
@@ -37,32 +37,33 @@ class PlatformContext:
             k8s_namespace="default",
             duplo_base_url="https://acme.duplocloud.net",
         )
-        
+
         # Pass with a message
         msg = ChatMessage.user("List pods", context=context.to_dict())
     """
+
     # Tenant identification
-    tenant_id: Optional[str] = None
-    tenant_name: Optional[str] = None
-    
+    tenant_id: str | None = None
+    tenant_name: str | None = None
+
     # User roles for access control
     user_roles: list[str] = field(default_factory=list)
-    
+
     # Kubernetes context
-    k8s_namespace: Optional[str] = None
-    kubeconfig: Optional[str] = None
-    
+    k8s_namespace: str | None = None
+    kubeconfig: str | None = None
+
     # DuploCloud context
-    duplo_base_url: Optional[str] = None
-    duplo_token: Optional[str] = None
-    
+    duplo_base_url: str | None = None
+    duplo_token: str | None = None
+
     # AWS context
-    aws_credentials: Optional[dict[str, Any]] = None
-    aws_region: Optional[str] = None
-    
+    aws_credentials: dict[str, Any] | None = None
+    aws_region: str | None = None
+
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary, excluding None/empty values."""
-        result = {}
+        result: dict[str, Any] = {}
         if self.tenant_id:
             result["tenant_id"] = self.tenant_id
         if self.tenant_name:
@@ -82,7 +83,7 @@ class PlatformContext:
         if self.aws_region:
             result["aws_region"] = self.aws_region
         return result
-    
+
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "PlatformContext":
         """Create from dictionary."""
@@ -97,7 +98,7 @@ class PlatformContext:
             aws_credentials=data.get("aws_credentials"),
             aws_region=data.get("aws_region"),
         )
-    
+
     def get(self, key: str, default: Any = None) -> Any:
         """Get a context value by key (dict-like access)."""
         return self.to_dict().get(key, default)
@@ -107,44 +108,45 @@ class PlatformContext:
 class ChatMessage:
     """
     A single message in a conversation.
-    
+
     This represents one turn in a conversation between a user and an assistant.
     Messages can also be system messages that set the assistant's behavior.
-    
+
     Compatible with the HelpDesk protocol message format.
-    
+
     Attributes:
         role: Who sent the message
             - 'user': Message from the human user
-            - 'assistant': Message from the AI assistant  
+            - 'assistant': Message from the AI assistant
             - 'system': System prompt/instructions
         content: The message text
         context: Optional platform context for this message (tenant, namespace, etc.)
         data: Optional data container (commands, tool calls) for HelpDesk protocol
-        
+
     Example:
         # Create a user message
         msg = ChatMessage(role="user", content="What pods are running?")
-        
+
         # Create with platform context
         msg = ChatMessage(
-            role="user", 
+            role="user",
             content="Delete the nginx pod",
             context=PlatformContext(tenant_name="acme", k8s_namespace="production")
         )
-        
+
     Note:
         You can also use plain dicts anywhere ChatMessage is accepted:
         {"role": "user", "content": "Hello"}
     """
+
     role: Literal["user", "assistant", "system"]
     content: str
     context: PlatformContext | dict[str, Any] | None = None
     data: dict[str, Any] | None = None
-    
+
     def to_dict(self) -> dict[str, Any]:
         """Convert to a plain dictionary (HelpDesk format)."""
-        result = {"role": self.role, "content": self.content}
+        result: dict[str, Any] = {"role": self.role, "content": self.content}
         if self.context:
             if isinstance(self.context, PlatformContext):
                 result["platform_context"] = self.context.to_dict()
@@ -153,18 +155,18 @@ class ChatMessage:
         if self.data:
             result["data"] = self.data
         return result
-    
+
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "ChatMessage":
         """
         Create a ChatMessage from a dictionary.
-        
+
         Args:
             data: Dict with 'role' and 'content' keys
-            
+
         Returns:
             ChatMessage instance
-            
+
         Example:
             msg = ChatMessage.from_dict({"role": "user", "content": "Hello"})
         """
@@ -172,38 +174,38 @@ class ChatMessage:
         context = data.get("platform_context") or data.get("context")
         if isinstance(context, dict):
             context = PlatformContext.from_dict(context)
-        
+
         return cls(
             role=data.get("role", "user"),
             content=data.get("content", ""),
             context=context,
             data=data.get("data"),
         )
-    
+
     @classmethod
     def user(
-        cls, 
-        content: str, 
+        cls,
+        content: str,
         context: PlatformContext | dict | None = None,
         data: dict | None = None,
     ) -> "ChatMessage":
         """Create a user message."""
         return cls(role="user", content=content, context=context, data=data)
-    
+
     @classmethod
     def assistant(
-        cls, 
+        cls,
         content: str,
         data: dict | None = None,
     ) -> "ChatMessage":
         """Create an assistant message."""
         return cls(role="assistant", content=content, data=data)
-    
+
     @classmethod
     def system(cls, content: str) -> "ChatMessage":
         """Create a system message."""
         return cls(role="system", content=content)
-    
+
     def get_platform_context(self) -> PlatformContext | None:
         """Get platform context as PlatformContext object."""
         if isinstance(self.context, PlatformContext):
@@ -216,15 +218,15 @@ class ChatMessage:
 def normalize_messages(messages: list[ChatMessage | dict]) -> list[ChatMessage]:
     """
     Normalize a list of messages to ChatMessage instances.
-    
+
     Accepts either ChatMessage instances or plain dicts.
-    
+
     Args:
         messages: List of ChatMessage or dict objects
-        
+
     Returns:
         List of ChatMessage instances
-        
+
     Example:
         # Mixed input
         messages = [

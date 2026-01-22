@@ -1,11 +1,12 @@
 from abc import ABC, abstractmethod
 
+
 class LLM(ABC):
     """
     Abstract base class for all LLM implementations.
     Forces any inheriting class to implement the core methods.
     """
-    
+
     @abstractmethod
     def invoke(self, *args, **kwargs):
         """

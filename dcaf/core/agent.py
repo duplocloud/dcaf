@@ -6,31 +6,31 @@ All the Clean Architecture complexity is hidden behind this simple facade.
 
 Example:
     from dcaf.core import Agent, ChatMessage
-    
+
     @tool(description="List Kubernetes pods")
     def list_pods(namespace: str = "default") -> str:
         return kubectl(f"get pods -n {namespace}")
-    
+
     agent = Agent(tools=[list_pods])
-    response = agent.run(messages=[
+    response = await agent.run(messages=[
         ChatMessage.user("What pods are running?")
     ])
     print(response.text)
 
 Example with Interceptors:
     from dcaf.core import Agent, LLMRequest, LLMResponse
-    
+
     # Add context before sending to LLM
     def add_tenant_info(request: LLMRequest) -> LLMRequest:
         tenant = request.context.get("tenant_name", "unknown")
         request.add_system_context(f"User's tenant: {tenant}")
         return request
-    
+
     # Clean response before returning to user
     def redact_secrets(response: LLMResponse) -> LLMResponse:
         response.text = response.text.replace("secret123", "[REDACTED]")
         return response
-    
+
     agent = Agent(
         tools=[list_pods],
         request_interceptors=add_tenant_info,
@@ -38,46 +38,47 @@ Example with Interceptors:
     )
 """
 
-from dataclasses import dataclass, field
-from typing import Callable, Any, Iterator, Union, Optional, TYPE_CHECKING
-import asyncio
 import logging
+from collections.abc import AsyncIterator, Callable, Iterator
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
     from dcaf.schemas.messages import AgentMessage
 
-from .models import ChatMessage, normalize_messages
-from .domain.entities import Conversation, ToolCall
-from .domain.events import DomainEvent
-from .application.services import AgentService, ApprovalService
-from .application.dto import AgentRequest, AgentResponse
-from .adapters.loader import load_adapter, list_frameworks
-from .adapters.outbound.persistence import InMemoryConversationRepository
-from .session import Session
-
-# Import interceptor types and utilities
-from .interceptors import (
-    LLMRequest,
-    LLMResponse,
-    InterceptorError,
-    InterceptorPipeline,
-    RequestInterceptorInput,
-    ResponseInterceptorInput,
-    normalize_interceptors,
-    create_request_from_messages,
-    create_response_from_text,
+from ..schemas.events import (
+    DoneEvent,
+    ErrorEvent,
+    TextDeltaEvent,
+    ToolCallsEvent,
 )
 
 # Import stream event types from schemas (server-side types)
 from ..schemas.events import (
     StreamEvent as ServerStreamEvent,
-    TextDeltaEvent,
-    ToolCallsEvent,
-    DoneEvent,
-    ErrorEvent,
 )
 from ..schemas.messages import ToolCall as SchemaToolCall
+from .adapters.loader import load_adapter
+from .adapters.outbound.persistence import InMemoryConversationRepository
+from .application.dto import AgentRequest
+from .application.services import AgentService, ApprovalService
+from .domain.entities import Conversation, ToolCall
+from .domain.events import DomainEvent
 
+# Import interceptor types and utilities
+from .interceptors import (
+    InterceptorError,
+    InterceptorPipeline,
+    LLMRequest,
+    LLMResponse,
+    RequestInterceptorInput,
+    ResponseInterceptorInput,
+    create_request_from_messages,
+    create_response_from_text,
+    normalize_interceptors,
+)
+from .models import ChatMessage, normalize_messages
+from .session import Session
 
 logger = logging.getLogger(__name__)
 
@@ -88,7 +89,7 @@ EventHandler = Callable[[DomainEvent], None]
 # Type alias for request interceptors (for external use)
 RequestInterceptor = Callable[[LLMRequest], LLMRequest]
 
-# Type alias for response interceptors (for external use)  
+# Type alias for response interceptors (for external use)
 ResponseInterceptor = Callable[[LLMResponse], LLMResponse]
 
 
@@ -96,15 +97,15 @@ ResponseInterceptor = Callable[[LLMResponse], LLMResponse]
 class PendingToolCall:
     """
     A tool call awaiting user approval.
-    
+
     This is a simplified view of a ToolCall for the user-facing API.
-    
+
     Attributes:
         id: Unique identifier for this tool call
         name: Name of the tool to execute
         input: Parameters that will be passed to the tool
         description: Human-readable description of what this will do
-        
+
     Example:
         if response.needs_approval:
             for pending in response.pending_tools:
@@ -113,37 +114,31 @@ class PendingToolCall:
                 if confirm():
                     pending.approve()
     """
+
     id: str
     name: str
     input: dict
     description: str = ""
-    _tool_call: ToolCall = field(repr=False, default=None)
+    _tool_call: ToolCall | None = field(repr=False, default=None)
     _conversation_id: str = field(repr=False, default="")
-    _approval_service: ApprovalService = field(repr=False, default=None)
-    
+    _approval_service: ApprovalService | None = field(repr=False, default=None)
+
     def approve(self) -> None:
         """Approve this tool call for execution."""
         if self._approval_service:
-            self._approval_service.approve_single(
-                self._conversation_id, 
-                self.id
-            )
-    
+            self._approval_service.approve_single(self._conversation_id, self.id)
+
     def reject(self, reason: str = "User declined") -> None:
         """Reject this tool call."""
         if self._approval_service:
-            self._approval_service.reject_single(
-                self._conversation_id,
-                self.id,
-                reason
-            )
+            self._approval_service.reject_single(self._conversation_id, self.id, reason)
 
 
 @dataclass
 class AgentResponse:
     """
     Response from an agent execution.
-    
+
     Attributes:
         text: The agent's text response (if any)
         needs_approval: Whether there are pending tool calls needing approval
@@ -151,71 +146,74 @@ class AgentResponse:
         conversation_id: ID of the conversation (for continuing later)
         is_complete: Whether the agent has finished (no pending approvals)
         session: Session data that persists across conversation turns
-        
+
     Example:
         response = agent.run("Delete the failing pods")
-        
+
         if response.needs_approval:
             print("The following actions need your approval:")
             for tool in response.pending_tools:
                 print(f"  - {tool.name}: {tool.input}")
         else:
             print(response.text)
-        
+
         # Access session data
         print(response.session)  # dict of session values
     """
+
     text: str | None = None
     needs_approval: bool = False
     pending_tools: list[PendingToolCall] = field(default_factory=list)
     conversation_id: str = ""
     is_complete: bool = True
     session: dict[str, Any] = field(default_factory=dict)
-    
+
     # Internal reference for continuing
-    _agent: "Agent" = field(repr=False, default=None)
-    
+    _agent: "Agent | None" = field(repr=False, default=None)
+
     def approve_all(self) -> "AgentResponse":
         """Approve all pending tool calls and continue execution."""
         if self._agent and self.pending_tools:
             return self._agent._approve_all_and_continue(self.conversation_id)
         return self
-    
+
     def reject_all(self, reason: str = "User declined") -> "AgentResponse":
         """Reject all pending tool calls."""
         if self._agent and self.pending_tools:
             return self._agent._reject_all(self.conversation_id, reason)
         return self
-    
+
     def to_message(self) -> "AgentMessage":
         """
         Convert to AgentMessage (wire format for HelpDesk).
-        
+
         This creates a Pydantic-validated AgentMessage suitable for
         JSON serialization and the HelpDesk protocol.
-        
+
         Returns:
             AgentMessage ready for serialization
-            
+
         Example:
             response = agent.run(messages)
             message = response.to_message()
             return message.model_dump()  # → JSON for HelpDesk
         """
         from dcaf.schemas.messages import AgentMessage, Data, ToolCall
-        
+
         # Build tool_calls for the Data container
         tool_calls = []
         for tc in self.pending_tools:
-            tool_calls.append(ToolCall(
-                id=tc.id,
-                name=tc.name,
-                input=tc.input,
-                execute=False,  # Pending approval
-                tool_description=tc.description or "",
-                input_description={},
-            ))
-        
+            tool_calls.append(
+                ToolCall(
+                    id=tc.id,
+                    name=tc.name,
+                    input=tc.input,
+                    execute=False,  # Pending approval
+                    tool_description=tc.description or "",
+                    input_description={},
+                )
+            )
+
         # Build Data container with session
         data = Data(
             tool_calls=tool_calls,
@@ -224,13 +222,13 @@ class AgentResponse:
             executed_tool_calls=[],
             session=self.session,
         )
-        
+
         # Build meta_data with useful fields
         meta_data = {
             "has_pending_approvals": self.needs_approval,
             "is_complete": self.is_complete,
         }
-        
+
         return AgentMessage(
             content=self.text or "",
             data=data,
@@ -241,68 +239,68 @@ class AgentResponse:
 class Agent:
     """
     A simple, batteries-included agent.
-    
+
     This is the primary entry point for DCAF. It provides a clean,
-    Pythonic API for creating agents with tool calling and 
+    Pythonic API for creating agents with tool calling and
     human-in-the-loop approval.
-    
+
     BASIC USAGE:
     ============
-    
+
         from dcaf.core import Agent
         from dcaf.tools import tool
-        
+
         @tool(requires_approval=True)
         def delete_pod(name: str) -> str:
             '''Delete a Kubernetes pod.'''
             return kubectl(f"delete pod {name}")
-        
+
         agent = Agent(tools=[delete_pod])
         response = agent.run(messages=[
             {"role": "user", "content": "Delete pod nginx-abc123"}
         ])
-        
+
         if response.needs_approval:
             print("Approve deletion?")
             response = response.approve_all()
-        
+
         print(response.text)
-    
+
     WITH INTERCEPTORS:
     ==================
-    
+
     Interceptors let you modify data before it goes to the LLM and
     after you receive a response. See the interceptors module for details.
-    
+
         from dcaf.core import Agent, LLMRequest, LLMResponse
-        
+
         def add_context(request: LLMRequest) -> LLMRequest:
             '''Add tenant info to help the AI understand the environment.'''
             tenant = request.context.get("tenant_name", "unknown")
             request.add_system_context(f"User's tenant: {tenant}")
             return request
-        
+
         def clean_output(response: LLMResponse) -> LLMResponse:
             '''Remove any sensitive data from the response.'''
             response.text = response.text.replace("secret", "[HIDDEN]")
             return response
-        
+
         agent = Agent(
             tools=[delete_pod],
             request_interceptors=add_context,
             response_interceptors=clean_output,
         )
-    
+
     Args:
         tools: List of tools the agent can use. Create tools with @tool decorator.
-        
+
         model: Model ID to use. Default is Claude 3 Sonnet on Bedrock.
                Examples:
                - Bedrock: "anthropic.claude-3-sonnet-20240229-v1:0"
                - Anthropic: "claude-3-sonnet-20240229"
                - OpenAI: "gpt-4", "gpt-4-turbo"
                - Ollama: "llama2", "mistral"
-        
+
         provider: LLM provider to use (within the framework). Supported values
                  depend on the framework. For Agno:
                  - "bedrock": AWS Bedrock (Claude via AWS) - default
@@ -311,100 +309,100 @@ class Agent:
                  - "azure": Azure OpenAI
                  - "google": Google AI (Gemini)
                  - "ollama": Local Ollama server
-        
+
         framework: LLM orchestration framework to use. Default is "agno".
                   Frameworks are auto-discovered from dcaf/core/adapters/outbound/.
                   Available frameworks:
                   - "agno": Agno SDK (default) - supports many providers
                   - "strands": AWS Strands Agent (future)
                   - "langchain": LangChain (future)
-                  
+
                   Adding a new framework:
                   1. Create folder: dcaf/core/adapters/outbound/{name}/
                   2. Add __init__.py with: def create_adapter(**kwargs) -> Adapter
                   3. Use: Agent(framework="{name}")
-        
+
         system_prompt: Instructions for how the AI should behave.
                       Example: "You are a helpful Kubernetes assistant."
-                      
+
                       Note: When using prompt caching (model_config={'cache_system_prompt': True}),
                       this static system prompt is cached for reuse across requests.
-        
+
         system_context: Dynamic context appended to system prompt. Can be:
                        - A string: Used as-is
                        - A callable: Called with platform_context dict, returns string
-                       
+
                        This content is NOT cached and is evaluated fresh each request.
                        This is useful for separating static instructions from runtime context
                        (tenant, namespace, user, etc.) when using prompt caching.
-                       
+
                        Example:
                            system_context=lambda ctx: f"Tenant: {ctx.get('tenant_name')}"
-        
+
         model_config: Configuration passed to the model adapter. Options:
                      - cache_system_prompt (bool): Enable Bedrock prompt caching.
                        Requires static system prompt ≥1024 tokens.
                        Example: model_config={'cache_system_prompt': True}
-        
+
         on_event: Callback function(s) for domain events. Useful for logging,
                  notifications, or audit trails.
                  Example: on_event=my_logger or on_event=[logger1, logger2]
-        
+
         request_interceptors: Function(s) to run BEFORE sending to the LLM.
                              Use for adding context, validation, or logging.
                              Can be a single function or a list of functions.
                              Functions run in order (first to last).
-        
+
         response_interceptors: Function(s) to run AFTER receiving from the LLM.
                               Use for cleaning output, redacting secrets, etc.
                               Can be a single function or a list of functions.
                               Functions run in order (first to last).
-        
+
         on_interceptor_error: What to do if an interceptor fails unexpectedly.
                              "abort" (default): Stop and return error to user.
                              "continue": Log the error and keep going.
                              Note: InterceptorError always stops processing.
-        
+
         aws_profile: AWS profile name from ~/.aws/credentials.
                     Only used when provider="bedrock".
                     Example: aws_profile="production"
-        
+
         aws_region: AWS region to use (e.g., "us-east-1", "us-west-2").
                    Only used when provider="bedrock".
                    Falls back to AWS_REGION env var.
-        
+
         aws_access_key: AWS access key ID (optional).
                        Prefer using aws_profile instead for better security.
-        
+
         aws_secret_key: AWS secret access key (optional).
                        Prefer using aws_profile instead for better security.
-        
+
         api_key: API key for OpenAI, Anthropic providers.
                 Falls back to provider-specific environment variables:
                 - ANTHROPIC_API_KEY for provider="anthropic"
                 - OPENAI_API_KEY for provider="openai"
-        
+
         google_project_id: Google Cloud project ID (auto-detected on GCP).
                           Falls back to GOOGLE_CLOUD_PROJECT env var.
-        
+
         google_location: Region where Gemini models run (default: us-central1).
                         Falls back to DCAF_GOOGLE_MODEL_LOCATION env var.
                         Note: This is separate from your cluster's region because
                         Gemini is only available in specific regions.
-        
+
         name: Agent name for A2A (Agent-to-Agent) protocol.
              Used as the agent's identity when exposed via A2A.
              Default: "dcaf-agent"
              Example: name="k8s-assistant"
-        
+
         description: Agent description for A2A protocol.
                     Human-readable description of what the agent does.
                     Falls back to system_prompt if not provided.
                     Example: description="Manages Kubernetes clusters"
-    
+
     PROVIDER EXAMPLES:
     ==================
-    
+
         # AWS Bedrock with profile
         agent = Agent(
             provider="bedrock",
@@ -412,34 +410,34 @@ class Agent:
             aws_profile="production",
             aws_region="us-west-2",
         )
-        
+
         # Direct Anthropic API
         agent = Agent(
             provider="anthropic",
             model="claude-3-sonnet-20240229",
             api_key="sk-ant-...",  # or set ANTHROPIC_API_KEY
         )
-        
+
         # OpenAI
         agent = Agent(
             provider="openai",
             model="gpt-4",
             api_key="sk-...",  # or set OPENAI_API_KEY
         )
-        
+
         # Local Ollama
         agent = Agent(
             provider="ollama",
             model="llama2",
         )
-        
+
         # Google Vertex AI (auto-detects project/location on GCP)
         agent = Agent(
             provider="google",
             model="gemini-2.5-flash",
         )
     """
-    
+
     def __init__(
         self,
         tools: list | None = None,
@@ -447,7 +445,7 @@ class Agent:
         provider: str = "bedrock",
         framework: str = "agno",  # LLM framework: "agno", "strands", "langchain"
         system_prompt: str | None = None,
-        system_context: Union[str, Callable[[dict], str]] | None = None,
+        system_context: str | Callable[[dict], str] | None = None,
         model_config: dict | None = None,
         on_event: EventHandler | list[EventHandler] | None = None,
         # Interceptor configuration
@@ -470,7 +468,7 @@ class Agent:
     ) -> None:
         """
         Create a new Agent.
-        
+
         See class docstring for detailed parameter descriptions and examples.
         """
         # Store the basic configuration
@@ -481,47 +479,45 @@ class Agent:
         self.system_prompt = system_prompt
         self._system_context = system_context
         self._model_config = model_config or {}
-        
+
         # A2A identity
         self.name = name or "dcaf-agent"
         self.description = description or system_prompt or "A DCAF agent"
-        
+
         # Store provider-specific configuration
         self._aws_profile = aws_profile
         self._aws_region = aws_region
         self._aws_access_key = aws_access_key
         self._aws_secret_key = aws_secret_key
         self._api_key = api_key
-        
+
         # Google Vertex AI configuration (auto-detected on GCP)
         self._google_project_id = google_project_id
         self._google_location = google_location
-        
+
         # Store interceptor error handling mode
         # "abort" = stop on any error
         # "continue" = log and keep going (except InterceptorError)
         self._on_interceptor_error = on_interceptor_error
-        
+
         # Normalize interceptors to lists
         # This converts: None → [], single_func → [single_func], [a, b] → [a, b]
         self._request_interceptors = normalize_interceptors(request_interceptors)
         self._response_interceptors = normalize_interceptors(response_interceptors)
-        
+
         # Log interceptor configuration for debugging
         if self._request_interceptors:
             interceptor_names = [
-                getattr(f, "__name__", "anonymous") 
-                for f in self._request_interceptors
+                getattr(f, "__name__", "anonymous") for f in self._request_interceptors
             ]
             logger.debug(f"Request interceptors configured: {interceptor_names}")
-        
+
         if self._response_interceptors:
             interceptor_names = [
-                getattr(f, "__name__", "anonymous") 
-                for f in self._response_interceptors
+                getattr(f, "__name__", "anonymous") for f in self._response_interceptors
             ]
             logger.debug(f"Response interceptors configured: {interceptor_names}")
-        
+
         # Normalize event handlers to a list
         if on_event is None:
             self._event_handlers: list[EventHandler] = []
@@ -529,7 +525,7 @@ class Agent:
             self._event_handlers = [on_event]
         else:
             self._event_handlers = list(on_event)
-        
+
         # Create internal services using dynamic adapter loading
         # This enables plugin-style framework support without if-statements
         self._runtime = load_adapter(
@@ -547,7 +543,7 @@ class Agent:
         )
         self._conversations = InMemoryConversationRepository()
         self._agent_service = AgentService(
-            runtime=self._runtime,
+            runtime=self._runtime,  # type: ignore[arg-type]
             conversations=self._conversations,
             events=self._create_event_publisher(),
         )
@@ -555,23 +551,25 @@ class Agent:
             conversations=self._conversations,
             events=self._create_event_publisher(),
         )
-    
-    def _build_system_parts(self, platform_context: dict | None = None) -> tuple[str | None, str | None]:
+
+    def _build_system_parts(
+        self, platform_context: dict | None = None
+    ) -> tuple[str | None, str | None]:
         """
         Build static and dynamic system prompt parts separately.
-        
+
         This separation is useful even without caching - it keeps static
         instructions separate from runtime context. When caching is enabled,
         adapters can place a cache checkpoint between these parts.
-        
+
         Args:
             platform_context: Runtime context (tenant, namespace, etc.)
-            
+
         Returns:
             (static_part, dynamic_part) where either can be None
         """
         static = self.system_prompt
-        
+
         dynamic = None
         if self._system_context:
             if callable(self._system_context):
@@ -580,73 +578,73 @@ class Agent:
             else:
                 # Use the string directly
                 dynamic = self._system_context
-        
+
         return static, dynamic
-    
-    def run(
-        self, 
+
+    async def run(
+        self,
         messages: list[ChatMessage | dict],
         context: dict | None = None,
         session: Session | dict | None = None,
     ) -> AgentResponse:
         """
         Run the agent with a conversation.
-        
+
         This method:
         1. Runs request interceptors (if any) to modify/validate input
         2. Sends the request to the LLM
         3. Runs response interceptors (if any) to modify/clean output
         4. Returns the final response
-        
+
         Args:
             messages: The conversation messages. Can be ChatMessage instances
                      or plain dicts with 'role' and 'content' keys.
-                     
+
                      Roles: 'user', 'assistant', 'system'
-                     
+
                      **IMPORTANT**: The last message in the list is assumed to be
                      the current user message. All previous messages are treated
                      as conversation history.
-                     
+
             context: Optional platform context (tenant, namespace, etc.)
                      This is merged with any context in individual messages.
                      Common fields: tenant_name, k8s_namespace, user_id
-                     
+
             session: Optional session data that persists across conversation turns.
                      Can be a Session instance or a dict. Session data is available
                      in interceptors and tools, and is returned in the response.
-            
+
         Returns:
             AgentResponse with the result and updated session
-            
+
         Raises:
             InterceptorError: If a request interceptor blocks the request.
                             The error's user_message will be returned to the user.
             ValueError: If messages is empty.
-            
+
         Example - Basic usage:
-            response = agent.run(messages=[
+            response = await agent.run(messages=[
                 {"role": "user", "content": "What pods are running?"}
             ])
             print(response.text)
-            
+
         Example - With context:
-            response = agent.run(
+            response = await agent.run(
                 messages=[{"role": "user", "content": "List my pods"}],
                 context={"tenant_name": "production", "k8s_namespace": "web"},
             )
-            
+
         Example - With session:
-            response = agent.run(
+            response = await agent.run(
                 messages=[{"role": "user", "content": "Continue wizard"}],
                 session={"wizard_step": 2, "user_name": "Alice"},
             )
             # Session updates are in response.session
             print(response.session)
-            
+
         Example - Handling interceptor errors:
             try:
-                response = agent.run(messages=[...])
+                response = await agent.run(messages=[...])
             except InterceptorError as error:
                 # The interceptor blocked the request
                 print(f"Blocked: {error.user_message}")
@@ -654,7 +652,7 @@ class Agent:
         # Validate input
         if not messages:
             raise ValueError("messages cannot be empty")
-        
+
         # === HYDRATE SESSION ===
         # Convert dict to Session if needed, or create empty Session
         if session is None:
@@ -663,19 +661,19 @@ class Agent:
             effective_session = Session.from_dict(session)
         else:
             effective_session = session
-        
+
         # Normalize to ChatMessage instances (accepts both dicts and ChatMessage)
         normalized_messages = normalize_messages(messages)
-        
+
         # Extract the current message (last one) - this is the user's latest message
         current_user_message = normalized_messages[-1].content
-        
+
         # Convert to dict format for processing
         messages_as_dicts = [msg.to_dict() for msg in normalized_messages]
-        
+
         # === RUN REQUEST INTERCEPTORS ===
         # These can modify the request or block it entirely
-        
+
         if self._request_interceptors:
             # Create the normalized LLMRequest for interceptors
             llm_request = create_request_from_messages(
@@ -685,10 +683,10 @@ class Agent:
                 context=context or {},
                 session=effective_session,
             )
-            
+
             # Run the request interceptor pipeline
             try:
-                llm_request = self._run_request_interceptors(llm_request)
+                llm_request = await self._run_request_interceptors(llm_request)
             except InterceptorError:
                 # InterceptorError is intentional - let it propagate to caller
                 raise
@@ -698,10 +696,8 @@ class Agent:
                     raise
                 else:
                     # Log and continue with original request
-                    logger.warning(
-                        f"Request interceptor error (continuing): {unexpected_error}"
-                    )
-            
+                    logger.warning(f"Request interceptor error (continuing): {unexpected_error}")
+
             # Use the potentially modified values from interceptors
             messages_as_dicts = llm_request.messages
             current_user_message = llm_request.get_latest_user_message()
@@ -711,19 +707,16 @@ class Agent:
         else:
             # No interceptors - use original values
             effective_system_prompt = self.system_prompt
-            effective_context = context
-        
+            effective_context = context or {}
+
         # === CALL THE LLM ===
-        
+
         # Build system prompt parts for caching
         static_system, dynamic_system = self._build_system_parts(effective_context)
-        
+
         # If we have separate parts, use them; otherwise use effective_system_prompt
-        if static_system or dynamic_system:
-            final_system_prompt = None  # Will be built by adapter from parts
-        else:
-            final_system_prompt = effective_system_prompt
-        
+        final_system_prompt = None if static_system or dynamic_system else effective_system_prompt
+
         # Create the internal request
         internal_request = AgentRequest(
             content=current_user_message,
@@ -735,13 +728,13 @@ class Agent:
             context=effective_context,
             session=effective_session.to_dict(),
         )
-        
+
         # Execute the agent service (calls the LLM)
-        internal_response = self._agent_service.execute(internal_request)
-        
+        internal_response = await self._agent_service.execute(internal_request)
+
         # === RUN RESPONSE INTERCEPTORS ===
         # These can modify the response before returning to the user
-        
+
         if self._response_interceptors and internal_response.text:
             # Create the normalized LLMResponse for interceptors
             llm_response = create_response_from_text(
@@ -750,10 +743,10 @@ class Agent:
                 raw=internal_response,
                 session=effective_session,
             )
-            
+
             # Run the response interceptor pipeline
             try:
-                llm_response = self._run_response_interceptors(llm_response)
+                llm_response = await self._run_response_interceptors(llm_response)
             except InterceptorError as interceptor_error:
                 # Response interceptor blocked - return the error message
                 return AgentResponse(
@@ -770,20 +763,18 @@ class Agent:
                     raise
                 else:
                     # Log and continue with original response
-                    logger.warning(
-                        f"Response interceptor error (continuing): {unexpected_error}"
-                    )
+                    logger.warning(f"Response interceptor error (continuing): {unexpected_error}")
             else:
                 # Update the internal response with the modified text
                 # We create a modified version since the original may be immutable
                 internal_response.text = llm_response.text
                 # Update session from response interceptors if modified
-                effective_session = llm_response.session
-        
+                effective_session = llm_response.session or Session()
+
         # Convert to the user-facing response format
         return self._convert_response(internal_response, session=effective_session)
-    
-    def chat(
+
+    async def chat(
         self,
         messages: list[ChatMessage | dict],
         context: dict | None = None,
@@ -791,54 +782,54 @@ class Agent:
     ) -> "AgentMessage":
         """
         Run the agent and return AgentMessage directly (wire format).
-        
+
         This is the primary method for HelpDesk and API integrations.
         It returns an AgentMessage ready for JSON serialization.
-        
+
         Args:
             messages: The conversation messages (same format as run())
             context: Optional platform context (tenant, namespace, etc.)
             session: Optional session data that persists across conversation turns.
                      Can be a Session instance or a dict.
-            
+
         Returns:
             AgentMessage ready for JSON serialization
-            
+
         Example - HelpDesk integration:
             agent = Agent(tools=[...])
-            message = agent.chat(messages)
+            message = await agent.chat(messages)
             return message.model_dump()  # → JSON response
-            
+
         Example - Check for pending approvals:
-            message = agent.chat(messages)
+            message = await agent.chat(messages)
             if message.meta_data.get('has_pending_approvals'):
                 # HelpDesk will show approval UI
                 pass
-                
+
         Example - With session:
-            message = agent.chat(messages, session={"user_id": "123"})
+            message = await agent.chat(messages, session={"user_id": "123"})
             # Session data is in message.data.session
-                
+
         See Also:
             run(): Returns AgentResponse with behavioral methods
                    (approve_all, reject_all) for programmatic use.
         """
-        response = self.run(messages=messages, context=context, session=session)
+        response = await self.run(messages=messages, context=context, session=session)
         return response.to_message()
-    
-    def _run_request_interceptors(self, llm_request: LLMRequest) -> LLMRequest:
+
+    async def _run_request_interceptors(self, llm_request: LLMRequest) -> LLMRequest:
         """
         Run all request interceptors on the LLM request.
-        
+
         This method runs each request interceptor in order. Each interceptor
         receives the output of the previous one, allowing them to be chained.
-        
+
         Args:
             llm_request: The initial LLM request to process
-            
+
         Returns:
             The processed LLM request (may be modified by interceptors)
-            
+
         Raises:
             InterceptorError: If any interceptor intentionally blocks the request
             Exception: If any interceptor fails unexpectedly
@@ -848,41 +839,24 @@ class Agent:
             interceptors=self._request_interceptors,
             pipeline_name="request",
         )
-        
-        # Run the pipeline (handles both sync and async interceptors)
-        # We need to run this in an event loop since interceptors can be async
-        try:
-            # Try to get the current event loop
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                # We're in an async context - this shouldn't normally happen
-                # in the sync run() method, but handle it gracefully
-                import concurrent.futures
-                with concurrent.futures.ThreadPoolExecutor() as executor:
-                    future = executor.submit(
-                        asyncio.run, 
-                        request_pipeline.run(llm_request)
-                    )
-                    return future.result()
-            else:
-                return loop.run_until_complete(request_pipeline.run(llm_request))
-        except RuntimeError:
-            # No event loop exists, create one
-            return asyncio.run(request_pipeline.run(llm_request))
-    
-    def _run_response_interceptors(self, llm_response: LLMResponse) -> LLMResponse:
+
+        # Run the pipeline
+        result = await request_pipeline.run(llm_request)
+        return cast(LLMRequest, result)
+
+    async def _run_response_interceptors(self, llm_response: LLMResponse) -> LLMResponse:
         """
         Run all response interceptors on the LLM response.
-        
+
         This method runs each response interceptor in order. Each interceptor
         receives the output of the previous one, allowing them to be chained.
-        
+
         Args:
             llm_response: The initial LLM response to process
-            
+
         Returns:
             The processed LLM response (may be modified by interceptors)
-            
+
         Raises:
             InterceptorError: If any interceptor intentionally blocks the response
             Exception: If any interceptor fails unexpectedly
@@ -892,49 +866,37 @@ class Agent:
             interceptors=self._response_interceptors,
             pipeline_name="response",
         )
-        
-        # Run the pipeline (handles both sync and async interceptors)
-        try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                import concurrent.futures
-                with concurrent.futures.ThreadPoolExecutor() as executor:
-                    future = executor.submit(
-                        asyncio.run, 
-                        response_pipeline.run(llm_response)
-                    )
-                    return future.result()
-            else:
-                return loop.run_until_complete(response_pipeline.run(llm_response))
-        except RuntimeError:
-            return asyncio.run(response_pipeline.run(llm_response))
-    
+
+        # Run the pipeline
+        result = await response_pipeline.run(llm_response)
+        return cast(LLMResponse, result)
+
     def resume(self, conversation_id: str) -> AgentResponse:
         """
         Resume a conversation after approving/rejecting tool calls.
-        
+
         Use this method after manually handling tool approvals to continue
         the agent's execution with the approved tools.
-        
+
         Args:
             conversation_id: The conversation to resume
-            
+
         Returns:
             AgentResponse with the continued result
-            
+
         Example:
             response = agent.run(messages)
-            
+
             if response.needs_approval:
                 for tool in response.pending_tools:
                     if should_approve(tool):
                         tool.approve()
                     else:
                         tool.reject("Not allowed")
-                
+
                 # Resume execution with the approval decisions
                 response = agent.resume(response.conversation_id)
-            
+
             print(response.text)
         """
         internal_response = self._agent_service.resume(
@@ -942,47 +904,47 @@ class Agent:
             tools=self.tools,
         )
         return self._convert_response(internal_response)
-    
-    def run_stream(
+
+    async def run_stream(
         self,
         messages: list[ChatMessage | dict],
         context: dict | None = None,
-    ) -> Iterator[ServerStreamEvent]:
+    ) -> AsyncIterator[ServerStreamEvent]:
         """
         Run the agent with streaming response.
-        
+
         This method yields stream events as they are generated,
         providing real-time feedback to the user. Events include
         text deltas (token-by-token text), tool calls, and completion.
-        
+
         Args:
             messages: The conversation messages (same format as run())
             context: Optional platform context (tenant, namespace, etc.)
-            
+
         Yields:
             StreamEvent objects for NDJSON streaming:
             - TextDeltaEvent: Text token(s) from the LLM
             - ToolCallsEvent: Tool calls needing approval
             - DoneEvent: Stream finished successfully
             - ErrorEvent: An error occurred
-            
+
         Example - Basic streaming:
-            for event in agent.run_stream(messages=[
+            async for event in agent.run_stream(messages=[
                 ChatMessage.user("Tell me about Kubernetes")
             ]):
                 if isinstance(event, TextDeltaEvent):
                     print(event.text, end="", flush=True)
                 elif isinstance(event, DoneEvent):
                     print("\\nDone!")
-                    
+
         Example - Handling tool approvals:
-            for event in agent.run_stream(messages=[...]):
+            async for event in agent.run_stream(messages=[...]):
                 if isinstance(event, ToolCallsEvent):
                     for tool_call in event.tool_calls:
                         print(f"Approve {tool_call.name}?")
                 elif isinstance(event, TextDeltaEvent):
                     print(event.text, end="")
-                    
+
         Note:
             The last message in the messages list is the current user
             message. All previous messages are conversation history.
@@ -990,40 +952,40 @@ class Agent:
         if not messages:
             yield ErrorEvent(error="messages cannot be empty")
             return
-        
+
         try:
             # Normalize to ChatMessage instances
             normalized = normalize_messages(messages)
-            
+
             # Extract the current message (last one)
             current_message = normalized[-1].content
-            
+
             # Convert to dict format for the internal request
             messages_as_dicts = [m.to_dict() for m in normalized]
-            
-            request = AgentRequest(
+
+            AgentRequest(
                 content=current_message,
                 messages=messages_as_dicts,
                 tools=self.tools,
                 system_prompt=self.system_prompt,
                 context=context,
             )
-            
+
             # Use the streaming version of the agent service
             # For now, we'll use the runtime's stream capability directly
             # and handle the event conversion here
-            
+
             # Get or create conversation for this request
             # (Similar logic to AgentService.execute but for streaming)
             from .domain.value_objects import PlatformContext
-            
+
             platform_context = PlatformContext.from_dict(context or {})
-            
+
             # Create conversation from message history
             conversation = Conversation.create(context=platform_context)
             if self.system_prompt:
                 conversation = conversation.with_system_prompt(self.system_prompt)
-            
+
             # Add messages from history
             for msg in messages_as_dicts[:-1]:  # All except last
                 role = msg.get("role")
@@ -1032,14 +994,14 @@ class Agent:
                     conversation.add_user_message(content)
                 elif role == "assistant":
                     conversation.add_assistant_message(content)
-            
+
             # Add current message
             conversation.add_user_message(current_message)
-            
+
             # Stream from the runtime
-            pending_tool_calls = []
-            
-            for event in self._runtime.invoke_stream(
+            pending_tool_calls: list[SchemaToolCall] = []
+
+            async for event in self._runtime.invoke_stream(
                 messages=conversation.messages,
                 tools=self.tools,
                 system_prompt=self.system_prompt,
@@ -1048,26 +1010,27 @@ class Agent:
                 server_event = self._convert_stream_event(event, pending_tool_calls)
                 if server_event:
                     yield server_event
-            
+
             # If there are pending tool calls that need approval, yield them
             if pending_tool_calls:
                 yield ToolCallsEvent(tool_calls=pending_tool_calls)
-            
+
             # Always end with a done event
             yield DoneEvent()
-            
+
         except Exception as e:
             logger.error(f"Streaming error: {e}")
             yield ErrorEvent(error=str(e))
-    
+
     def _convert_stream_event(
-        self, 
-        internal_event, 
-        pending_tool_calls: list,
+        self,
+        internal_event: Any,
+        pending_tool_calls: list[SchemaToolCall],
     ) -> ServerStreamEvent | None:
         """Convert internal stream event to server stream event."""
-        from .application.dto.responses import StreamEvent as CoreStreamEvent, StreamEventType
-        
+        from .application.dto.responses import StreamEvent as CoreStreamEvent
+        from .application.dto.responses import StreamEventType
+
         if isinstance(internal_event, CoreStreamEvent):
             if internal_event.event_type == StreamEventType.TEXT_DELTA:
                 text = internal_event.data.get("text", "")
@@ -1076,98 +1039,102 @@ class Agent:
                 # Accumulate tool calls for later
                 tool_call_id = internal_event.data.get("tool_call_id", "")
                 tool_name = internal_event.data.get("tool_name", "")
-                pending_tool_calls.append(SchemaToolCall(
-                    id=tool_call_id,
-                    name=tool_name,
-                    input={},
-                    tool_description="",
-                    input_description={},
-                ))
+                pending_tool_calls.append(
+                    SchemaToolCall(
+                        id=tool_call_id,
+                        name=tool_name,
+                        input={},
+                        tool_description="",
+                        input_description={},
+                    )
+                )
                 return None  # Don't yield yet, wait for complete tool call
             elif internal_event.event_type == StreamEventType.ERROR:
                 return ErrorEvent(error=internal_event.data.get("message", "Unknown error"))
-        
+
         # Handle dict events from mock/Bedrock
         if isinstance(internal_event, dict):
             event_type = internal_event.get("type")
-            
+
             if event_type == "content_block_delta":
                 delta = internal_event.get("delta", {})
                 if delta.get("type") == "text_delta":
                     return TextDeltaEvent(text=delta.get("text", ""))
-            
+
             # message_start and message_stop don't need to be forwarded
-            
+
         return None
-    
+
     # Private methods
-    
+
     def _convert_response(self, internal: Any, session: Session | None = None) -> AgentResponse:
         """Convert internal response to simple AgentResponse."""
         pending_tools = []
-        
-        for tc in getattr(internal, 'tool_calls', []):
-            if getattr(tc, 'requires_approval', False) and getattr(tc, 'status', '') == 'pending':
-                pending_tools.append(PendingToolCall(
-                    id=tc.id,
-                    name=tc.name,
-                    input=tc.input,
-                    description=getattr(tc, 'description', ''),
-                    _conversation_id=internal.conversation_id,
-                    _approval_service=self._approval_service,
-                ))
-        
+
+        for tc in getattr(internal, "tool_calls", []):
+            if getattr(tc, "requires_approval", False) and getattr(tc, "status", "") == "pending":
+                pending_tools.append(
+                    PendingToolCall(
+                        id=tc.id,
+                        name=tc.name,
+                        input=tc.input,
+                        description=getattr(tc, "description", ""),
+                        _conversation_id=internal.conversation_id,
+                        _approval_service=self._approval_service,
+                    )
+                )
+
         # Get session data - prefer from internal response, fall back to passed session
-        session_data = getattr(internal, 'session', None) or {}
+        session_data = getattr(internal, "session", None) or {}
         if not session_data and session is not None:
             session_data = session.to_dict() if isinstance(session, Session) else session
-        
+
         return AgentResponse(
             text=internal.text,
-            needs_approval=getattr(internal, 'has_pending_approvals', False),
+            needs_approval=getattr(internal, "has_pending_approvals", False),
             pending_tools=pending_tools,
             conversation_id=internal.conversation_id,
-            is_complete=getattr(internal, 'is_complete', True),
+            is_complete=getattr(internal, "is_complete", True),
             session=session_data,
             _agent=self,
         )
-    
+
     def _approve_all_and_continue(self, conversation_id: str) -> AgentResponse:
         """Approve all pending and continue."""
         self._approval_service.approve_all(conversation_id)
         return self.resume(conversation_id)
-    
+
     def _reject_all(self, conversation_id: str, reason: str) -> AgentResponse:
         """Reject all pending tool calls."""
         internal = self._approval_service.reject_all(conversation_id, reason)
         return self._convert_response(internal)
-    
-    def _create_event_publisher(self):
+
+    def _create_event_publisher(self) -> Any:
         """Create an event publisher that calls our handlers."""
         if not self._event_handlers:
             return None
-        
+
         class CallbackEventPublisher:
             def __init__(self, handlers: list[EventHandler]):
                 self.handlers = handlers
-            
+
             def publish(self, event: DomainEvent) -> None:
                 for handler in self.handlers:
                     try:
                         handler(event)
                     except Exception as e:
                         logger.warning(f"Event handler error: {e}")
-            
+
             def publish_all(self, events: list[DomainEvent]) -> None:
                 for event in events:
                     self.publish(event)
-        
+
         return CallbackEventPublisher(self._event_handlers)
-    
-    def _check_requires_approval(self, tool_name: str, tool_requires: bool) -> bool:
+
+    def _check_requires_approval(self, tool_name: str, tool_requires: bool) -> bool:  # noqa: ARG002
         """
         Check if a tool requires approval.
-        
+
         Returns True if the tool has requires_approval=True.
         """
         return tool_requires

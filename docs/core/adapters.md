@@ -141,6 +141,65 @@ class AgnoAdapter:
     async def cleanup(self) -> None: ...
 ```
 
+### Tracing and Observability
+
+The Agno adapter supports distributed tracing through the `platform_context` parameter. Tracing IDs are passed to the Agno SDK and included in response metadata.
+
+**Supported Tracing Fields:**
+
+| Field | Agno Parameter | Description |
+|-------|----------------|-------------|
+| `user_id` | `user_id` | User identifier |
+| `session_id` | `session_id` | Session grouping runs |
+| `run_id` | `run_id` | Unique execution ID |
+| `request_id` | `metadata.request_id` | HTTP correlation ID |
+| `tenant_id` | `metadata.tenant_id` | Tenant identifier |
+
+**Usage:**
+
+```python
+# Via AgentRequest (recommended)
+request = AgentRequest(
+    content="What pods are running?",
+    user_id="user-123",
+    session_id="session-abc",
+    run_id="run-xyz",
+    request_id="req-456",
+    tools=[kubectl_tool],
+)
+
+# Via platform_context dict
+response = await adapter.ainvoke(
+    messages=messages,
+    tools=tools,
+    platform_context={
+        "user_id": "user-123",
+        "session_id": "session-abc",
+        "run_id": "run-xyz",
+        "request_id": "req-456",
+        "tenant_id": "tenant-1",
+    },
+)
+
+# Tracing IDs returned in response metadata
+print(response.metadata)
+# {'run_id': 'run-xyz', 'session_id': 'session-abc', ...}
+```
+
+**Debug Mode:**
+
+Enable Agno's verbose debug logging:
+
+```bash
+# Option 1: Set Python log level to DEBUG
+LOG_LEVEL=DEBUG python your_agent.py
+
+# Option 2: Set AGNO_DEBUG directly
+AGNO_DEBUG=true python your_agent.py
+```
+
+See [Tracing and Observability Guide](../guides/tracing-observability.md) for complete documentation.
+
 ### Environment Variables
 
 The adapter supports configuration via environment variables:
@@ -151,6 +210,8 @@ The adapter supports configuration via environment variables:
 | `AGNO_TOOL_CALL_LIMIT` | `1` | Max concurrent tool calls |
 | `AGNO_DISABLE_HISTORY` | `false` | Disable message history |
 | `DISABLE_TOOL_FILTERING` | `false` | Disable tool message filtering |
+| `LOG_LEVEL` | `INFO` | Python log level (`DEBUG` enables Agno verbose mode) |
+| `AGNO_DEBUG` | `false` | Enable Agno debug mode directly |
 
 ### Bedrock Compatibility
 

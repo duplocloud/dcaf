@@ -2,29 +2,28 @@
 
 import pytest
 
-from dcaf.core.domain.value_objects import (
-    ToolCallId,
-    ConversationId,
-    ToolInput,
-    PlatformContext,
-)
 from dcaf.core.domain.entities import (
-    ToolCall,
-    ToolCallStatus,
+    Conversation,
     Message,
     MessageRole,
-    Conversation,
+    ToolCall,
+    ToolCallStatus,
 )
 from dcaf.core.domain.exceptions import (
-    InvalidStateTransition,
     ConversationBlocked,
+    InvalidStateTransition,
     ToolCallNotFound,
 )
-
+from dcaf.core.domain.value_objects import (
+    PlatformContext,
+    ToolCallId,
+    ToolInput,
+)
 
 # =============================================================================
 # Value Object Tests
 # =============================================================================
+
 
 class TestToolCallId:
     """Tests for ToolCallId value object."""
@@ -94,6 +93,7 @@ class TestPlatformContext:
 # =============================================================================
 # Entity Tests
 # =============================================================================
+
 
 class TestToolCall:
     """Tests for ToolCall entity."""
@@ -189,10 +189,10 @@ class TestConversation:
 
     def test_add_messages(self):
         conv = Conversation.create()
-        
+
         conv.add_user_message("Hello")
         conv.add_assistant_message("Hi!")
-        
+
         assert conv.message_count == 2
 
     def test_blocks_on_pending_approval(self):
@@ -204,7 +204,7 @@ class TestConversation:
             requires_approval=True,
         )
         conv.request_tool_approval([tc])
-        
+
         assert conv.is_blocked
         assert conv.has_pending_approvals
 
@@ -217,7 +217,7 @@ class TestConversation:
             requires_approval=True,
         )
         conv.request_tool_approval([tc])
-        
+
         with pytest.raises(ConversationBlocked):
             conv.add_user_message("Another message")
 
@@ -230,7 +230,7 @@ class TestConversation:
             requires_approval=True,
         )
         conv.request_tool_approval([tc])
-        
+
         conv.approve_tool_call("tc-1")
         assert not conv.has_pending_approvals
 

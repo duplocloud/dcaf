@@ -9,18 +9,18 @@ Google's A2A protocol. Agents can:
 
 Example - Server (exposing an agent):
     from dcaf.core import Agent, serve
-    
+
     agent = Agent(
         name="k8s-assistant",
         description="Kubernetes helper",
         tools=[list_pods, delete_pod],
     )
-    
+
     serve(agent, port=8000, a2a=True)
 
 Example - Client (calling remote agents):
     from dcaf.core.a2a import RemoteAgent
-    
+
     k8s = RemoteAgent(url="http://k8s-agent:8000")
     result = k8s.send("List failing pods")
     print(result.text)
@@ -28,20 +28,20 @@ Example - Client (calling remote agents):
 Example - Orchestration (agent calling agents):
     from dcaf.core import Agent
     from dcaf.core.a2a import RemoteAgent
-    
+
     k8s = RemoteAgent(url="http://k8s-agent:8000")
     aws = RemoteAgent(url="http://aws-agent:8000")
-    
+
     orchestrator = Agent(
         tools=[k8s.as_tool(), aws.as_tool()],
         system="Route to specialist agents"
     )
 """
 
-from .models import AgentCard, Task, TaskResult, Artifact
 from .client import RemoteAgent
-from .server import create_a2a_routes, generate_agent_card
+from .models import AgentCard, Artifact, Task, TaskResult
 from .protocols import A2AClientAdapter, A2AServerAdapter
+from .server import create_a2a_routes, generate_agent_card
 
 __all__ = [
     # Data models
@@ -58,4 +58,3 @@ __all__ = [
     "A2AClientAdapter",
     "A2AServerAdapter",
 ]
-

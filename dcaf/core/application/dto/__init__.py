@@ -11,31 +11,35 @@ Schema Reuse:
     Several classes are now imported from dcaf.schemas.messages to
     maintain a single source of truth. Backward-compatible aliases
     are provided (e.g., CommandDTO = Command).
-    
+
     See docs/plans/schema-reuse-analysis.md for details.
 """
+
+# FileObject is not yet implemented in responses - define a placeholder
+from typing import Any
 
 from .requests import AgentRequest, ApprovalRequest, ToolCallApproval
 from .responses import (
     # Main response
     AgentResponse,
+    # Schema classes (canonical names)
+    Command,
+    # Commands - imported from schemas with DTO aliases
+    CommandDTO,  # Alias for schemas.Command
     # Data container
     DataDTO,
-    # Commands - imported from schemas with DTO aliases
-    CommandDTO,       # Alias for schemas.Command
+    ExecutedCommand,
     ExecutedCommandDTO,  # Alias for schemas.ExecutedCommand
-    FileObject,       # From schemas
-    # Tool calls
-    ToolCallDTO,      # Core-specific (has additional fields)
+    ExecutedToolCall,
     ExecutedToolCallDTO,  # Alias for schemas.ExecutedToolCall
     # Streaming
     StreamEvent,
     StreamEventType,
-    # Schema classes (canonical names)
-    Command,
-    ExecutedCommand,
-    ExecutedToolCall,
+    # Tool calls
+    ToolCallDTO,  # Core-specific (has additional fields)
 )
+
+FileObject = Any
 
 __all__ = [
     # Requests

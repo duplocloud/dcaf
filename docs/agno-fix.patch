@@ -1,0 +1,14 @@
+diff --git a/libs/agno/agno/models/message.py b/libs/agno/agno/models/message.py
+--- a/libs/agno/agno/models/message.py
++++ b/libs/agno/agno/models/message.py
+@@ -124,7 +124,9 @@ class Message(BaseModel):
+         if isinstance(self.content, str):
+             return self.content
+         if isinstance(self.content, list):
+-            if len(self.content) > 0 and isinstance(self.content[0], dict) and "text" in self.content[0]:
++            if len(self.content) == 0:
++                return ""  # Return empty string for empty list, not "[]"
++            if isinstance(self.content[0], dict) and "text" in self.content[0]:
+                 return self.content[0].get("text", "")
+             else:
+                 return json.dumps(self.content)

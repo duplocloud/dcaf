@@ -6,9 +6,9 @@ Two entities with the same attributes but different IDs are different entities.
 Entities have lifecycle and can change state over time.
 """
 
-from .tool_call import ToolCall, ToolCallStatus
-from .message import Message, MessageRole
 from .conversation import Conversation
+from .message import Message, MessageRole
+from .tool_call import ToolCall, ToolCallStatus
 
 __all__ = [
     "ToolCall",

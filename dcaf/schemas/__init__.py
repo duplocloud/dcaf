@@ -6,32 +6,32 @@ They are the canonical source of truth for protocol-level data structures.
 """
 
 from .messages import (
+    Agent,
     # Message types
     AgentMessage,
-    UserMessage,
-    Message,
-    Messages,
+    AmbientContext,
     # Commands
     Command,
-    ExecutedCommand,
-    FileObject,
-    # Tool calls
-    ToolCall,
-    ExecutedToolCall,
     # Data containers
     Data,
+    ExecutedCommand,
+    ExecutedToolCall,
+    FileObject,
+    Message,
+    Messages,
     PlatformContext,
-    AmbientContext,
+    # Tool calls
+    ToolCall,
     URLConfig,
     # Identity
     User,
-    Agent,
+    UserMessage,
 )
 
 __all__ = [
     # Message types
     "AgentMessage",
-    "UserMessage", 
+    "UserMessage",
     "Message",
     "Messages",
     # Commands (reusable in core)

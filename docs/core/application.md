@@ -218,12 +218,28 @@ request = AgentRequest(
     tools=[kubectl_tool, aws_tool],
     system_prompt="You are a helpful DevOps assistant.",
     stream=False,
+    # Tracing fields (optional)
+    user_id="user-123",
+    session_id="session-abc",
+    run_id="run-xyz",
+    request_id="req-456",
 )
 
 # Access helpers
 conv_id = request.get_conversation_id()  # ConversationId value object
-context = request.get_platform_context()  # PlatformContext value object
+context = request.get_platform_context()  # PlatformContext with tracing merged in
 ```
+
+**Tracing Fields:**
+
+| Field | Description |
+|-------|-------------|
+| `user_id` | User identifier for tracking and analytics |
+| `session_id` | Groups related runs into a session |
+| `run_id` | Unique identifier for this execution |
+| `request_id` | HTTP request correlation ID |
+
+See [Tracing and Observability Guide](../guides/tracing-observability.md) for details.
 
 ### AgentResponse
 

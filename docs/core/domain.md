@@ -213,13 +213,55 @@ All events have:
 
 ---
 
+## PlatformContext
+
+The `PlatformContext` value object carries runtime context through the system, including tenant information, credentials, and tracing identifiers.
+
+### Tracing Fields
+
+| Field | Description |
+|-------|-------------|
+| `user_id` | User identifier for tracking and analytics |
+| `session_id` | Groups related runs into a session |
+| `run_id` | Unique identifier for this execution |
+| `request_id` | HTTP request correlation ID |
+
+### Usage
+
+```python
+from dcaf.core.domain.value_objects import PlatformContext
+
+# Create with tracing
+context = PlatformContext(
+    tenant_id="tenant-1",
+    user_id="user-123",
+    session_id="session-abc",
+    run_id="run-xyz",
+)
+
+# Add tracing to existing context
+context = PlatformContext.from_dict({"tenant_id": "tenant-1"})
+context = context.with_tracing(
+    user_id="user-123",
+    session_id="session-abc",
+)
+
+# Get only tracing fields (safe to log)
+tracing = context.get_tracing_dict()
+# {'user_id': 'user-123', 'session_id': 'session-abc'}
+```
+
+See [Tracing and Observability Guide](../guides/tracing-observability.md) for details.
+
+---
+
 ## Advanced: Direct Domain Access
 
 For advanced use cases, you can work with domain objects directly:
 
 ```python
 from dcaf.core.domain.entities import Conversation, ToolCall, Message
-from dcaf.core.domain.value_objects import ToolCallId, ToolInput
+from dcaf.core.domain.value_objects import ToolCallId, ToolInput, PlatformContext
 from dcaf.core.domain.events import ApprovalRequested
 from dcaf.core.domain.services import ApprovalPolicy
 from dcaf.core.domain.exceptions import ConversationBlocked, ToolCallNotFound

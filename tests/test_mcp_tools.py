@@ -7,8 +7,9 @@ These tests verify:
 3. MCPTool can be used alongside regular DCAF tools
 """
 
+from unittest.mock import AsyncMock, Mock, patch
+
 import pytest
-from unittest.mock import Mock, AsyncMock, patch, MagicMock
 
 
 class TestMCPToolInitialization:
@@ -114,8 +115,8 @@ class TestMCPToolAutoConnect:
 
     def test_adapter_handles_uninitialized_mcp_tools(self):
         """Adapter should accept uninitialized MCPTool and let Agno manage lifecycle."""
-        from dcaf.mcp import MCPTool
         from dcaf.core.adapters.outbound.agno.adapter import AgnoAdapter
+        from dcaf.mcp import MCPTool
 
         mcp = MCPTool(url="http://localhost:8000/mcp", transport="streamable-http")
 
@@ -139,8 +140,8 @@ class TestAdapterMCPToolDetection:
 
     def test_adapter_detects_mcp_tools(self):
         """Adapter should identify DCAF MCPTool instances."""
-        from dcaf.mcp import MCPTool
         from dcaf.core.adapters.outbound.agno.adapter import AgnoAdapter
+        from dcaf.mcp import MCPTool
 
         mcp = MCPTool(url="http://localhost:8000/mcp", transport="streamable-http")
         adapter = AgnoAdapter()
@@ -149,8 +150,8 @@ class TestAdapterMCPToolDetection:
 
     def test_adapter_does_not_detect_regular_tools(self):
         """Adapter should not identify regular tools as MCPTool."""
-        from dcaf.tools import tool
         from dcaf.core.adapters.outbound.agno.adapter import AgnoAdapter
+        from dcaf.tools import tool
 
         @tool(description="A regular tool")
         def my_tool(x: str) -> str:

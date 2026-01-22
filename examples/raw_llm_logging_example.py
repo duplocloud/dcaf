@@ -62,14 +62,12 @@ async def simple_example():
     )
 
     # Simple question
-    response = await adapter.ainvoke(
-        messages=[
-            {"role": "user", "content": "What is the capital of France?"}
-        ],
+    response = await adapter.invoke(
+        messages=[{"role": "user", "content": "What is the capital of France?"}],
         system="You are a helpful geography assistant.",
     )
 
-    print(f"\n📤 User: What is the capital of France?")
+    print("\n📤 User: What is the capital of France?")
     print(f"📥 Assistant: {response.text}")
 
 
@@ -94,15 +92,13 @@ async def example_with_tools():
         return f"The weather in {location} is sunny and 72°F"
 
     # Ask a question that might trigger tool use
-    response = await adapter.ainvoke(
-        messages=[
-            {"role": "user", "content": "What's the weather in Paris?"}
-        ],
+    response = await adapter.invoke(
+        messages=[{"role": "user", "content": "What's the weather in Paris?"}],
         system="You are a helpful assistant with access to weather data.",
         tools=[get_weather],
     )
 
-    print(f"\n📤 User: What's the weather in Paris?")
+    print("\n📤 User: What's the weather in Paris?")
     print(f"📥 Assistant: {response.text}")
 
     if response.tool_calls:
@@ -126,7 +122,8 @@ async def example_cache_performance():
     )
 
     # Long system prompt to trigger caching (needs 1024+ tokens)
-    long_system_prompt = """
+    long_system_prompt = (
+        """
 You are an expert software engineer specializing in Python, JavaScript, and cloud architecture.
 You have deep knowledge of AWS, GCP, and Azure services.
 You understand best practices for microservices, event-driven architecture, and distributed systems.
@@ -138,17 +135,19 @@ You are familiar with modern frameworks like React, FastAPI, Django, and Express
 You understand databases including PostgreSQL, MongoDB, Redis, and DynamoDB.
 You can help with CI/CD pipelines, Docker, Kubernetes, and infrastructure as code.
 You stay up-to-date with the latest technology trends and best practices.
-    """ * 10  # Repeat to ensure we exceed 1024 tokens
+    """
+        * 10
+    )  # Repeat to ensure we exceed 1024 tokens
 
     print("First call (CACHE MISS - will create cache):")
-    response1 = await adapter.ainvoke(
+    response1 = await adapter.invoke(
         messages=[{"role": "user", "content": "What is a microservice?"}],
         system=long_system_prompt,
     )
     print(f"📥 Response: {response1.text[:100]}...")
 
     print("\nSecond call with same system prompt (CACHE HIT):")
-    response2 = await adapter.ainvoke(
+    response2 = await adapter.invoke(
         messages=[{"role": "user", "content": "What is event-driven architecture?"}],
         system=long_system_prompt,
     )

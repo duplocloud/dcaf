@@ -6,12 +6,12 @@ domain experts care about. They are immutable and timestamped.
 """
 
 from .domain_events import (
-    DomainEvent,
-    ConversationStarted,
     ApprovalRequested,
-    ToolExecuted,
+    ConversationStarted,
+    DomainEvent,
     ToolCallApproved,
     ToolCallRejected,
+    ToolExecuted,
 )
 
 __all__ = [

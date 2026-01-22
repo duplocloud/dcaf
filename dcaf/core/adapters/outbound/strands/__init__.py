@@ -13,7 +13,7 @@ To complete this adapter:
 
 Usage:
     from dcaf.core import Agent
-    
+
     agent = Agent(
         framework="strands",
         model="anthropic.claude-3-sonnet-20240229-v1:0",
@@ -21,34 +21,33 @@ Usage:
     )
 """
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from .adapter import StrandsAdapter
 
 
-def create_adapter(**kwargs) -> "StrandsAdapter":
+def create_adapter(**kwargs: Any) -> "StrandsAdapter":
     """
     Factory function for creating a StrandsAdapter.
-    
+
     This function is REQUIRED by the adapter loader convention.
-    
+
     Args:
         **kwargs: Passed to StrandsAdapter constructor:
             - model_id: Model identifier
             - aws_profile: AWS profile name
             - aws_region: AWS region
-            
+
     Returns:
         Configured StrandsAdapter instance
-        
+
     Raises:
         NotImplementedError: Until the adapter is implemented
     """
     # TODO: Implement StrandsAdapter
     raise NotImplementedError(
-        "Strands adapter is not yet implemented. "
-        "Use framework='agno' for now."
+        "Strands adapter is not yet implemented. Use framework='agno' for now."
     )
 
 

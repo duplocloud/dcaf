@@ -1,27 +1,29 @@
 """pytest fixtures for DCAF Core testing."""
 
-from typing import Generator
+from collections.abc import Generator
+from typing import Any
+
 import pytest
 
-from .fakes import (
-    FakeAgentRuntime,
-    FakeConversationRepository,
-    FakeApprovalCallback,
-    FakeEventPublisher,
-)
+from ..application.services import AgentService, ApprovalService
+from ..domain.services import ApprovalPolicy
 from .builders import (
     ConversationBuilder,
     MessageBuilder,
-    ToolCallBuilder,
     ToolBuilder,
+    ToolCallBuilder,
 )
-from ..application.services import AgentService, ApprovalService
-from ..domain.services import ApprovalPolicy
-
+from .fakes import (
+    FakeAgentRuntime,
+    FakeApprovalCallback,
+    FakeConversationRepository,
+    FakeEventPublisher,
+)
 
 # ============================================================================
 # Fake Fixtures
 # ============================================================================
+
 
 @pytest.fixture
 def fake_runtime() -> FakeAgentRuntime:
@@ -51,6 +53,7 @@ def fake_events() -> FakeEventPublisher:
 # Service Fixtures
 # ============================================================================
 
+
 @pytest.fixture
 def agent_service(
     fake_runtime: FakeAgentRuntime,
@@ -59,7 +62,7 @@ def agent_service(
 ) -> AgentService:
     """Provide an AgentService with fake dependencies."""
     return AgentService(
-        runtime=fake_runtime,
+        runtime=fake_runtime,  # type: ignore[arg-type]
         conversations=fake_conversations,
         events=fake_events,
         approval_policy=ApprovalPolicy(),
@@ -81,6 +84,7 @@ def approval_service(
 # ============================================================================
 # Builder Fixtures
 # ============================================================================
+
 
 @pytest.fixture
 def message_builder() -> MessageBuilder:
@@ -110,6 +114,7 @@ def tool_builder() -> ToolBuilder:
 # Domain Object Fixtures
 # ============================================================================
 
+
 @pytest.fixture
 def sample_conversation() -> Generator:
     """Provide a sample conversation with one turn."""
@@ -117,19 +122,19 @@ def sample_conversation() -> Generator:
 
 
 @pytest.fixture
-def sample_kubectl_tool():
+def sample_kubectl_tool() -> Any:
     """Provide a sample kubectl tool."""
     return ToolBuilder.kubectl_tool()
 
 
 @pytest.fixture
-def sample_user_message():
+def sample_user_message() -> Any:
     """Provide a sample user message."""
     return MessageBuilder.user_message("Hello, can you help me?")
 
 
 @pytest.fixture
-def sample_pending_tool_call():
+def sample_pending_tool_call() -> Any:
     """Provide a sample pending tool call."""
     return ToolCallBuilder.pending_kubectl_call()
 
@@ -137,6 +142,7 @@ def sample_pending_tool_call():
 # ============================================================================
 # Integration Test Fixtures
 # ============================================================================
+
 
 @pytest.fixture
 def approval_required_runtime(fake_runtime: FakeAgentRuntime) -> FakeAgentRuntime:
@@ -149,7 +155,7 @@ def approval_required_runtime(fake_runtime: FakeAgentRuntime) -> FakeAgentRuntim
     return fake_runtime
 
 
-@pytest.fixture  
+@pytest.fixture
 def auto_approve_callback(fake_approval_callback: FakeApprovalCallback) -> FakeApprovalCallback:
     """Provide a callback configured to auto-approve."""
     return fake_approval_callback.will_approve_all()
