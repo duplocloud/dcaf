@@ -10,11 +10,12 @@ This guide covers how to use external MCP (Model Context Protocol) servers with 
 2. [Quick Start](#quick-start)
 3. [Transport Protocols](#transport-protocols)
 4. [Tool Filtering](#tool-filtering)
-5. [Using with Agents](#using-with-agents)
-6. [Connection Management](#connection-management)
-7. [Logging and Monitoring](#logging-and-monitoring)
-8. [Error Handling](#error-handling)
-9. [Best Practices](#best-practices)
+5. [Tool Hooks](#tool-hooks)
+6. [Using with Agents](#using-with-agents)
+7. [Connection Management](#connection-management)
+8. [Logging and Monitoring](#logging-and-monitoring)
+9. [Error Handling](#error-handling)
+10. [Best Practices](#best-practices)
 
 ---
 
@@ -219,6 +220,218 @@ db_mcp = MCPTool(
 agent = Agent(tools=[search_mcp, db_mcp])
 result = await agent.arun("Search and query")
 # Agent sees: search_query, search_fetch, db_query, db_insert, etc.
+```
+
+---
+
+## Tool Hooks
+
+DCAF allows you to intercept MCP tool calls using **pre-hooks** and **post-hooks**. This is useful for logging, validation, transformation, telemetry, or modifying tool results.
+
+### MCPToolCall Context Object
+
+Both hooks receive an `MCPToolCall` object containing information about the tool call:
+
+```python
+from dcaf.mcp import MCPToolCall
+
+# MCPToolCall attributes:
+# - tool_name: str           - Name of the MCP tool being called
+# - arguments: dict          - Arguments passed to the tool
+# - result: Any              - Tool result (only in post-hook)
+# - duration: float | None   - Execution time in seconds (only in post-hook)
+# - error: Exception | None  - Exception if tool failed (only in post-hook)
+# - metadata: dict           - Additional info (target URL/command, transport)
+```
+
+### Pre-Hook
+
+A pre-hook runs **before** each MCP tool execution. Use it for:
+
+- Logging tool calls
+- Validating arguments
+- Modifying arguments (though the object is informational; modify kwargs in advanced use)
+- Access control checks
+
+```python
+from dcaf.mcp import MCPTool, MCPToolCall
+
+async def log_tool_calls(call: MCPToolCall) -> None:
+    """Log every MCP tool call before execution."""
+    print(f"Calling tool: {call.tool_name}")
+    print(f"Arguments: {call.arguments}")
+    print(f"Target: {call.metadata.get('target')}")
+
+mcp_tool = MCPTool(
+    url="http://localhost:8000/mcp",
+    transport="streamable-http",
+    pre_hook=log_tool_calls,
+)
+```
+
+Pre-hooks can be sync or async:
+
+```python
+# Sync pre-hook
+def sync_pre_hook(call: MCPToolCall) -> None:
+    print(f"Tool: {call.tool_name}")
+
+# Async pre-hook
+async def async_pre_hook(call: MCPToolCall) -> None:
+    await log_to_external_service(call.tool_name, call.arguments)
+```
+
+### Post-Hook
+
+A post-hook runs **after** each MCP tool execution. Use it for:
+
+- Logging results
+- Transforming or filtering results
+- Recording metrics/telemetry
+- Error handling
+
+#### What is `call.result`?
+
+The `call.result` attribute contains **whatever the MCP tool returned** - it's the raw result from the MCP server's tool execution. The type is `Any` because different MCP tools return different types:
+
+| Result Type | Example |
+|-------------|---------|
+| `str` | `"Found 5 results for 'python tutorials'"` (most common) |
+| `dict` | `{"status": "success", "count": 5, "items": [...]}` |
+| `list` | `["result1", "result2", "result3"]` |
+| `None` | Tools with side effects that don't return data |
+
+In practice, most MCP tools return **strings** containing the tool's text output. If the tool returns structured data, it's often a JSON string that you'd parse if needed.
+
+```python
+from dcaf.mcp import MCPTool, MCPToolCall
+
+async def process_results(call: MCPToolCall):
+    """Process and optionally transform tool results."""
+    print(f"Tool {call.tool_name} completed in {call.duration:.3f}s")
+
+    if call.error:
+        print(f"Tool failed with: {call.error}")
+        # You can return a fallback value
+        return "Tool execution failed, please try again"
+
+    print(f"Result: {call.result}")
+
+    # Return the result (or a transformed version)
+    return call.result
+
+mcp_tool = MCPTool(
+    url="http://localhost:8000/mcp",
+    transport="streamable-http",
+    post_hook=process_results,
+)
+```
+
+**Important**: The post-hook's return value replaces the tool's result. Return `call.result` to keep the original, or return a modified value to transform it.
+
+### Transforming Results
+
+Post-hooks can transform tool results before they reach the agent:
+
+```python
+async def sanitize_results(call: MCPToolCall):
+    """Remove sensitive data from tool results."""
+    result = call.result
+
+    if isinstance(result, str):
+        # Redact API keys or sensitive patterns
+        result = re.sub(r'api_key=\w+', 'api_key=REDACTED', result)
+
+    return result
+
+mcp_tool = MCPTool(
+    url="http://localhost:8000/mcp",
+    transport="streamable-http",
+    post_hook=sanitize_results,
+)
+```
+
+### Error Handling in Hooks
+
+Post-hooks are called even when tools fail, with `call.error` populated:
+
+```python
+async def handle_errors(call: MCPToolCall):
+    """Handle tool errors gracefully."""
+    if call.error:
+        # Log the error
+        logger.error(f"Tool {call.tool_name} failed: {call.error}")
+
+        # Return a user-friendly message instead of raising
+        return f"The {call.tool_name} operation failed. Please try again."
+
+    return call.result
+
+mcp_tool = MCPTool(
+    url="http://localhost:8000/mcp",
+    transport="streamable-http",
+    post_hook=handle_errors,
+)
+```
+
+### Complete Example: Logging and Metrics
+
+Here's a complete example combining pre and post hooks for observability:
+
+```python
+import time
+from dcaf.core import Agent
+from dcaf.mcp import MCPTool, MCPToolCall
+
+# Track metrics
+tool_metrics = {"calls": 0, "errors": 0, "total_duration": 0.0}
+
+async def pre_hook(call: MCPToolCall) -> None:
+    """Log before each tool call."""
+    print(f">>> Calling {call.tool_name}")
+    print(f"    Args: {call.arguments}")
+    tool_metrics["calls"] += 1
+
+async def post_hook(call: MCPToolCall):
+    """Log after each tool call and collect metrics."""
+    if call.error:
+        print(f"<<< {call.tool_name} FAILED: {call.error}")
+        tool_metrics["errors"] += 1
+    else:
+        print(f"<<< {call.tool_name} completed in {call.duration:.3f}s")
+        tool_metrics["total_duration"] += call.duration or 0
+
+    return call.result
+
+# Create MCP tool with hooks
+mcp_tool = MCPTool(
+    url="http://localhost:8000/mcp",
+    transport="streamable-http",
+    pre_hook=pre_hook,
+    post_hook=post_hook,
+)
+
+async def main():
+    agent = Agent(tools=[mcp_tool])
+    result = await agent.arun("Search for Python tutorials")
+
+    print(f"\nMetrics: {tool_metrics}")
+    # Output: Metrics: {'calls': 2, 'errors': 0, 'total_duration': 0.456}
+```
+
+### Hook Type Signatures
+
+For type checking, use these signatures:
+
+```python
+from typing import Any, Awaitable, Callable
+from dcaf.mcp import MCPToolCall
+
+# Pre-hook: receives MCPToolCall, returns None
+PreHookFunc = Callable[[MCPToolCall], Awaitable[None] | None]
+
+# Post-hook: receives MCPToolCall, returns transformed result (or original)
+PostHookFunc = Callable[[MCPToolCall], Awaitable[Any] | Any]
 ```
 
 ---
@@ -673,6 +886,8 @@ class MCPTool:
         exclude_tools: Optional[List[str]] = None,
         tool_name_prefix: Optional[str] = None,
         refresh_connection: bool = False,
+        pre_hook: Optional[Callable[[MCPToolCall], Awaitable[None] | None]] = None,
+        post_hook: Optional[Callable[[MCPToolCall], Awaitable[Any] | Any]] = None,
     ): ...
 ```
 
@@ -691,6 +906,19 @@ class MCPTool:
 | `async close()` | Close the connection |
 | `async is_alive()` | Check if connection is healthy |
 | `get_tool_names()` | Get list of available tool names |
+
+### MCPToolCall Class
+
+```python
+@dataclass
+class MCPToolCall:
+    tool_name: str                    # Name of the MCP tool
+    arguments: dict[str, Any]         # Arguments passed to the tool
+    result: Any = None                # Tool result (post-hook only)
+    duration: float | None = None     # Execution time in seconds (post-hook only)
+    error: Exception | None = None    # Exception if failed (post-hook only)
+    metadata: dict[str, Any]          # Additional info (target, transport)
+```
 
 ### Context Manager
 

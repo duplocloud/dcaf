@@ -32,14 +32,68 @@ Example (stdio transport):
         command="python my_mcp_server.py",
         transport="stdio",
     )
+
+Example (With Hooks - Intercept Tool Calls):
+    from dcaf.mcp import MCPTool, MCPToolCall
+
+    # Pre-hook: called before each MCP tool execution
+    async def my_pre_hook(call: MCPToolCall) -> None:
+        print(f"About to call: {call.tool_name}")
+        print(f"Arguments: {call.arguments}")
+
+    # Post-hook: called after each MCP tool execution
+    # Can modify and return a different result
+    async def my_post_hook(call: MCPToolCall) -> Any:
+        print(f"Tool {call.tool_name} returned: {call.result}")
+        # Optionally transform the result
+        return call.result
+
+    mcp_tool = MCPTool(
+        url="http://localhost:8000/mcp",
+        transport="streamable-http",
+        pre_hook=my_pre_hook,
+        post_hook=my_post_hook,
+    )
 """
 
 import functools
+import inspect
 import logging
 import time
-from typing import Any, Literal
+from dataclasses import dataclass, field
+from typing import Any, Awaitable, Callable, Literal
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class MCPToolCall:
+    """
+    Context object passed to MCP tool hooks.
+
+    This provides information about the tool being called, its arguments,
+    and (for post-hooks) the result of the tool execution.
+
+    Attributes:
+        tool_name: Name of the MCP tool being called.
+        arguments: Dictionary of arguments passed to the tool.
+        result: The result from the tool (only populated in post-hooks).
+        duration: Execution time in seconds (only populated in post-hooks).
+        error: Exception if the tool failed (only populated in post-hooks on error).
+        metadata: Additional metadata (target URL/command, transport type).
+    """
+
+    tool_name: str
+    arguments: dict[str, Any]
+    result: Any = None
+    duration: float | None = None
+    error: Exception | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+
+# Type aliases for hook functions
+PreHookFunc = Callable[[MCPToolCall], Awaitable[None] | None]
+PostHookFunc = Callable[[MCPToolCall], Awaitable[Any] | Any]
 
 
 class MCPTool:
@@ -99,6 +153,8 @@ class MCPTool:
         exclude_tools: list[str] | None = None,
         tool_name_prefix: str | None = None,
         refresh_connection: bool = False,
+        pre_hook: PreHookFunc | None = None,
+        post_hook: PostHookFunc | None = None,
     ):
         """
         Initialize the MCP toolkit.
@@ -115,6 +171,12 @@ class MCPTool:
             exclude_tools: List of tool names to exclude (if None, excludes none).
             tool_name_prefix: Prefix to add to all tool names (e.g., "mcp" -> "mcp_toolname").
             refresh_connection: If True, refresh connection and tools on each agent run.
+            pre_hook: Async or sync function called before each tool execution.
+                     Receives MCPToolCall with tool_name and arguments.
+                     Use for logging, validation, or modifying arguments.
+            post_hook: Async or sync function called after each tool execution.
+                      Receives MCPToolCall with tool_name, arguments, result, and duration.
+                      Return value replaces the tool result (return call.result to keep original).
 
         Raises:
             ValueError: If required parameters are missing for the transport type.
@@ -142,6 +204,8 @@ class MCPTool:
         self._exclude_tools = exclude_tools
         self._tool_name_prefix = tool_name_prefix
         self._refresh_connection = refresh_connection
+        self._pre_hook = pre_hook
+        self._post_hook = post_hook
 
         # Internal state
         self._agno_mcp_tools: Any = None
@@ -232,11 +296,12 @@ class MCPTool:
         self._agno_mcp_tools.build_tools = wrapped_build_tools
 
     def _wrap_function_entrypoints(self) -> None:
-        """Wrap each function's entrypoint with logging."""
+        """Wrap each function's entrypoint with logging and hooks."""
         if self._agno_mcp_tools is None:
             return
 
         target = self._url or self._command
+        metadata = {"target": target, "transport": self._transport}
 
         for func_name, func in self._agno_mcp_tools.functions.items():
             if not hasattr(func, "entrypoint") or func.entrypoint is None:
@@ -244,12 +309,19 @@ class MCPTool:
 
             original_entrypoint = func.entrypoint
 
-            # Create a logging wrapper for async functions
+            # Create a wrapper for async functions with logging and hooks
             @functools.wraps(original_entrypoint)
-            async def logged_entrypoint(
-                *args, _tool_name=func_name, _target=target, _original=original_entrypoint, **kwargs
+            async def hooked_entrypoint(
+                *args,
+                _tool_name=func_name,
+                _target=target,
+                _original=original_entrypoint,
+                _metadata=metadata,
+                _pre_hook=self._pre_hook,
+                _post_hook=self._post_hook,
+                **kwargs,
             ):
-                """Wrapper that logs MCP tool execution."""
+                """Wrapper that logs MCP tool execution and invokes hooks."""
                 # Log tool call start
                 logger.info(f"🔧 MCP Tool Call: {_tool_name} (target={_target})")
                 if kwargs:
@@ -262,6 +334,24 @@ class MCPTool:
                         else:
                             logged_kwargs[k] = v
                     logger.info(f"🔧 MCP Tool Args: {logged_kwargs}")
+
+                # Create the tool call context for hooks
+                tool_call = MCPToolCall(
+                    tool_name=_tool_name,
+                    arguments=dict(kwargs),
+                    metadata=dict(_metadata),
+                )
+
+                # Invoke pre-hook if provided
+                if _pre_hook is not None:
+                    try:
+                        logger.debug(f"🔧 MCP Pre-Hook: invoking for {_tool_name}")
+                        hook_result = _pre_hook(tool_call)
+                        if inspect.isawaitable(hook_result):
+                            await hook_result
+                    except Exception as e:
+                        logger.error(f"🔧 MCP Pre-Hook Error: {type(e).__name__}: {e}")
+                        raise
 
                 start_time = time.time()
                 try:
@@ -278,6 +368,22 @@ class MCPTool:
                     logger.info(f"🔧 MCP Tool Result: {_tool_name} completed in {duration:.3f}s")
                     logger.debug(f"🔧 MCP Tool Result Preview: {result_preview}")
 
+                    # Invoke post-hook if provided
+                    if _post_hook is not None:
+                        try:
+                            logger.debug(f"🔧 MCP Post-Hook: invoking for {_tool_name}")
+                            tool_call.result = result
+                            tool_call.duration = duration
+                            hook_result = _post_hook(tool_call)
+                            if inspect.isawaitable(hook_result):
+                                hook_result = await hook_result
+                            # Post-hook can transform the result
+                            if hook_result is not None:
+                                result = hook_result
+                        except Exception as e:
+                            logger.error(f"🔧 MCP Post-Hook Error: {type(e).__name__}: {e}")
+                            raise
+
                     return result
 
                 except Exception as e:
@@ -285,10 +391,22 @@ class MCPTool:
                     logger.error(
                         f"🔧 MCP Tool Error: {_tool_name} failed after {duration:.3f}s - {type(e).__name__}: {e}"
                     )
+
+                    # Invoke post-hook with error info if provided
+                    if _post_hook is not None:
+                        try:
+                            tool_call.error = e
+                            tool_call.duration = duration
+                            hook_result = _post_hook(tool_call)
+                            if inspect.isawaitable(hook_result):
+                                await hook_result
+                        except Exception as hook_error:
+                            logger.error(f"🔧 MCP Post-Hook Error (on tool error): {type(hook_error).__name__}: {hook_error}")
+
                     raise
 
             # Replace the entrypoint
-            func.entrypoint = logged_entrypoint
+            func.entrypoint = hooked_entrypoint
 
     async def connect(self, force: bool = False) -> None:
         """
