@@ -18,8 +18,15 @@ import dotenv
 
 dotenv.load_dotenv(override=True)
 
-from dcaf.core import Agent, ChatMessage, DoneEvent, ErrorEvent, TextDeltaEvent, ToolCallsEvent
-from dcaf.tools import tool
+from dcaf.core import (  # noqa: E402
+    Agent,
+    ChatMessage,
+    DoneEvent,
+    ErrorEvent,
+    TextDeltaEvent,
+    ToolCallsEvent,
+)
+from dcaf.tools import tool  # noqa: E402
 
 
 @tool(description="Get information about a topic")

@@ -25,8 +25,8 @@ import dotenv
 
 dotenv.load_dotenv(override=True)
 
-from dcaf.core import Agent, serve
-from dcaf.tools import tool
+from dcaf.core import Agent, serve  # noqa: E402
+from dcaf.tools import tool  # noqa: E402
 
 
 # Define some example tools

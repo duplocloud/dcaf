@@ -1,7 +1,7 @@
 """AgentService - main agent execution orchestration."""
 
 import logging
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import AsyncIterator
 from typing import Any
 
 from ...domain.entities import Conversation, Message, MessageRole, ToolCall

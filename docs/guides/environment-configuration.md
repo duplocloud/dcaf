@@ -604,9 +604,6 @@ Complete examples in the repository:
 
 ## Resources
 
-- [Configuration API Reference](../api-reference/config.md)
-- [Working with Bedrock](working-with-bedrock.md)
-- [Working with Gemini](working-with-gemini.md)
 - [12-Factor App Methodology](https://12factor.net/config)
 
 ## Next Steps

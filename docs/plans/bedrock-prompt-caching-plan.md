@@ -1318,9 +1318,7 @@ This is a temporary implementation. Once Agno adds native prompt caching support
 
 ## Related Documentation
 
-- [Agent API Reference](../api-reference/agent.md)
-- [Creating Custom Agents](./custom-agents.md)
-- [AWS Bedrock Guide](./working-with-bedrock.md)
+See the [DCAF documentation](../index.md) for more information.
 ```
 
 **File**: `docs/api-reference/agents.md` (update)
@@ -1475,8 +1473,6 @@ agent = Agent(
 
 - [AWS Bedrock Prompt Caching Docs](https://docs.aws.amazon.com/bedrock/latest/userguide/prompt-caching.html)
 - [Agno AwsBedrock Source](https://github.com/agno-agi/agno/blob/main/agno/models/aws/bedrock.py)
-- [DCAF Agent Class](../../dcaf/core/agent.py)
-- [DCAF AgnoAdapter](../../dcaf/core/adapters/outbound/agno/adapter.py)
 
 ---
 

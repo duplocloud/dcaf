@@ -10,7 +10,7 @@ handling, providing a clean interface for model creation.
 
 import logging
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 from .caching_bedrock import CachingAwsBedrock

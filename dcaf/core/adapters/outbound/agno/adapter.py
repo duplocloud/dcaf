@@ -32,7 +32,7 @@ from ....application.ports.mcp_protocol import MCPToolLike
 from .gcp_metadata import GCPMetadataManager, get_default_gcp_metadata_manager
 from .message_converter import AgnoMessageConverter
 from .model_factory import AgnoModelFactory, ModelConfig
-from .response_converter import AgnoMetrics, AgnoResponseConverter
+from .response_converter import AgnoResponseConverter
 from .tool_converter import AgnoToolConverter
 from .types import DEFAULT_MAX_TOKENS, DEFAULT_MODEL_ID, DEFAULT_PROVIDER
 

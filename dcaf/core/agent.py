@@ -39,7 +39,7 @@ Example with Interceptors:
 """
 
 import logging
-from collections.abc import AsyncIterator, Callable, Iterator
+from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, cast
 

@@ -273,7 +273,7 @@ Logs the complete request and complete response.
 
 ## Implementation Details
 
-The logging is implemented in [caching_bedrock.py](../dcaf/core/adapters/outbound/agno/caching_bedrock.py) by overriding:
+The logging is implemented in `dcaf/core/adapters/outbound/agno/caching_bedrock.py` by overriding:
 - `ainvoke()` - Async non-streaming invocation
 - `ainvoke_stream()` - Async streaming invocation
 
@@ -353,6 +353,4 @@ Potential improvements for the future:
 
 ## Related Documentation
 
-- [Prompt Caching](./prompt-caching.md) - How DCAF's caching works
-- [Agno Adapter](../dcaf/core/adapters/outbound/agno/adapter.py) - Main Agno integration
 - [AWS Bedrock Documentation](https://docs.aws.amazon.com/bedrock/latest/userguide/conversation-inference.html)

@@ -257,7 +257,7 @@ class TestContentTypeInspection:
     """Tests that inspect the type and structure of response content."""
 
     @pytest.mark.asyncio
-    async def test_inspect_run_output_content_type(self, agno_adapter, tools):
+    async def test_inspect_run_output_content_type(self, agno_adapter, tools):  # noqa: ARG002
         """
         Inspect the actual type of run_output.content.
 

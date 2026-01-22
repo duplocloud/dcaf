@@ -155,7 +155,7 @@ class GCPMetadataManager:
         """Try to get project and location from GCP metadata service."""
         logger.info("GCP auto-detect: Attempting GCP metadata service...")
         try:
-            import requests
+            import requests  # noqa: F401 - availability check only
 
             headers = {"Metadata-Flavor": "Google"}
             timeout = 2

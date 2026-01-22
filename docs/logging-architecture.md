@@ -671,8 +671,6 @@ print(f"Agno debug_level: {debug_level}") # Should be 2 if LOG_LEVEL=DEBUG
 ## Related Documentation
 
 - [raw-llm-logging.md](./raw-llm-logging.md) - User guide for enabling and using raw LLM logging
-- [prompt-caching.md](./prompt-caching.md) - How DCAF's prompt caching works
-- [examples/raw_llm_logging_example.py](../examples/raw_llm_logging_example.py) - Working examples
 
 ## Future Enhancements
 

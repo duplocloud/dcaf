@@ -105,10 +105,7 @@ class AgentRequest:
         on the request, they will be automatically merged into the platform
         context for propagation to the agent runtime.
         """
-        if self.context:
-            ctx = PlatformContext.from_dict(self.context)
-        else:
-            ctx = PlatformContext.empty()
+        ctx = PlatformContext.from_dict(self.context) if self.context else PlatformContext.empty()
 
         # Merge tracing fields into platform context if provided
         if any([self.user_id, self.session_id, self.run_id, self.request_id]):
