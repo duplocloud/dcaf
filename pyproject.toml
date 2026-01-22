@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "dcaf"
-version = "0.0.1"
+version = "2.0.0"
 description = "DuploCloud Agent Builder (DAB) - A framework for building LLM powered AI agents and workflows that integrate with the DuploCloud Help Desk."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -36,7 +36,7 @@ dependencies = [
     "langchain_community",
     "duplocloud-client",
     # LLM provider dependencies (all included by default)
-    "agno>=2.0.0",                # Agno SDK for multi-provider LLM support
+    "agno==2.3.21",               # Agno SDK - pinned to avoid [] bug in 2.3.26
     "aioboto3>=13.0.0",           # AWS Bedrock async support
     "httpx>=0.27.0",              # A2A protocol, HTTP client
     "google-generativeai==0.8.6", # Google Gemini support (pinned)
@@ -173,3 +173,8 @@ python_files = ["test_*.py", "*_test.py"]
 python_functions = ["test_*"]
 addopts = "-v --tb=short"
 asyncio_mode = "auto"
+
+[dependency-groups]
+dev = [
+    "types-requests>=2.32.4.20260107",
+]

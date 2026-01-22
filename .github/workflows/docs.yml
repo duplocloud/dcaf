@@ -28,7 +28,7 @@ jobs:
           python-version: "3.11"
 
       - name: Install dependencies
-        run: pip install -r requirements-docs.txt
+        run: pip install -e ".[docs]"
 
       - name: Configure git for mike
         run: |
