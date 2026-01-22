@@ -402,7 +402,9 @@ class MCPTool:
                             if inspect.isawaitable(hook_result):
                                 await hook_result
                         except Exception as hook_error:
-                            logger.error(f"🔧 MCP Post-Hook Error (on tool error): {type(hook_error).__name__}: {hook_error}")
+                            logger.error(
+                                f"🔧 MCP Post-Hook Error (on tool error): {type(hook_error).__name__}: {hook_error}"
+                            )
 
                     raise
 

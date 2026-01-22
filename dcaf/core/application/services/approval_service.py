@@ -105,7 +105,10 @@ class ApprovalService:
 
         # 5. Build response
         from ..dto.responses import DataDTO
-        data = DataDTO(tool_calls=[ToolCallDTO.from_tool_call(tc) for tc in conversation.all_tool_calls])
+
+        data = DataDTO(
+            tool_calls=[ToolCallDTO.from_tool_call(tc) for tc in conversation.all_tool_calls]
+        )
         return AgentResponse(
             conversation_id=str(conv_id),
             data=data,
@@ -206,7 +209,10 @@ class ApprovalService:
         if not approvals:
             # No pending approvals, return current state
             from ..dto.responses import DataDTO
-            data = DataDTO(tool_calls=[ToolCallDTO.from_tool_call(tc) for tc in conversation.all_tool_calls])
+
+            data = DataDTO(
+                tool_calls=[ToolCallDTO.from_tool_call(tc) for tc in conversation.all_tool_calls]
+            )
             return AgentResponse(
                 conversation_id=conversation_id,
                 data=data,
@@ -254,7 +260,10 @@ class ApprovalService:
         if not approvals:
             # No pending approvals, return current state
             from ..dto.responses import DataDTO
-            data = DataDTO(tool_calls=[ToolCallDTO.from_tool_call(tc) for tc in conversation.all_tool_calls])
+
+            data = DataDTO(
+                tool_calls=[ToolCallDTO.from_tool_call(tc) for tc in conversation.all_tool_calls]
+            )
             return AgentResponse(
                 conversation_id=conversation_id,
                 data=data,

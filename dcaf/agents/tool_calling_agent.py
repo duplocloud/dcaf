@@ -256,8 +256,12 @@ class ToolCallingAgent:
 
         # State tracking for context changes across user messages
         last_context: dict[str, Any] = {}
-        user_message_positions: list[int] = []  # Track where user messages are in preprocessed array
-        original_user_messages: list[dict[str, Any]] = []  # Keep reference to original user messages
+        user_message_positions: list[
+            int
+        ] = []  # Track where user messages are in preprocessed array
+        original_user_messages: list[
+            dict[str, Any]
+        ] = []  # Keep reference to original user messages
 
         for message in messages_list:
             role = message.get("role")

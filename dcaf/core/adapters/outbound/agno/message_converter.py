@@ -85,6 +85,7 @@ class AgnoMessageConverter:
 
         # Build DataDTO with tool calls
         from ....application.dto.responses import DataDTO
+
         data = DataDTO(tool_calls=tool_calls)
 
         return AgentResponse(

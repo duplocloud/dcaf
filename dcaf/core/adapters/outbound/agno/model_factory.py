@@ -70,14 +70,16 @@ class AgnoModelFactory:
     """
 
     # Supported providers
-    SUPPORTED_PROVIDERS = frozenset({
-        "bedrock",
-        "anthropic",
-        "openai",
-        "azure",
-        "google",
-        "ollama",
-    })
+    SUPPORTED_PROVIDERS = frozenset(
+        {
+            "bedrock",
+            "anthropic",
+            "openai",
+            "azure",
+            "google",
+            "ollama",
+        }
+    )
 
     def __init__(
         self,
@@ -138,8 +140,7 @@ class AgnoModelFactory:
         else:
             supported = ", ".join(sorted(self.SUPPORTED_PROVIDERS))
             raise ValueError(
-                f"Unsupported provider: '{provider}'. "
-                f"Supported providers: {supported}"
+                f"Unsupported provider: '{provider}'. Supported providers: {supported}"
             )
 
         return self._model
@@ -159,10 +160,7 @@ class AgnoModelFactory:
         config = self._config
 
         # Infer region from model ID if it's an ARN
-        region = self._infer_region_from_model_id(
-            config.model_id,
-            config.aws_region or "us-east-1"
-        )
+        region = self._infer_region_from_model_id(config.model_id, config.aws_region or "us-east-1")
 
         # Create async session with profile if specified
         if config.aws_profile:
@@ -243,8 +241,7 @@ class AgnoModelFactory:
             from agno.models.openai import OpenAIChat
         except ImportError as e:
             raise ImportError(
-                "OpenAI provider requires the 'openai' package. "
-                "Install it with: pip install openai"
+                "OpenAI provider requires the 'openai' package. Install it with: pip install openai"
             ) from e
 
         config = self._config
@@ -266,8 +263,7 @@ class AgnoModelFactory:
             from agno.models.azure import AzureOpenAI
         except ImportError as e:
             raise ImportError(
-                "Azure provider requires the 'openai' package. "
-                "Install it with: pip install openai"
+                "Azure provider requires the 'openai' package. Install it with: pip install openai"
             ) from e
 
         config = self._config

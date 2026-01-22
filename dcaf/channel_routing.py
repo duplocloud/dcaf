@@ -106,7 +106,11 @@ Focus primarily on the LATEST message, but use thread context to understand if t
             # Extract relevant information from Slack message
             if msg.get("role") == "user":
                 user_info = msg.get("user", {})
-                user = user_info.get("name", "Unknown User") if isinstance(user_info, dict) else "Unknown User"
+                user = (
+                    user_info.get("name", "Unknown User")
+                    if isinstance(user_info, dict)
+                    else "Unknown User"
+                )
                 content = msg.get("content", "")
                 timestamp = msg.get("timestamp", "")
 
@@ -119,7 +123,11 @@ Focus primarily on the LATEST message, but use thread context to understand if t
 
             elif msg.get("role") == "assistant":
                 assistant_info = msg.get("assistant", {})
-                assistant = assistant_info.get("name", "Assistant") if isinstance(assistant_info, dict) else "Assistant"
+                assistant = (
+                    assistant_info.get("name", "Assistant")
+                    if isinstance(assistant_info, dict)
+                    else "Assistant"
+                )
                 content = msg.get("content", "")
                 timestamp = msg.get("timestamp", "")
 

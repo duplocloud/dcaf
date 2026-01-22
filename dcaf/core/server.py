@@ -336,7 +336,9 @@ def create_app(
 
             # A2A only works with Agent instances, not callables
             if not isinstance(agent, Agent):
-                logger.warning("A2A protocol requires an Agent instance, not a callable. A2A disabled.")
+                logger.warning(
+                    "A2A protocol requires an Agent instance, not a callable. A2A disabled."
+                )
             else:
                 a2a_routers = create_a2a_routes(agent)
                 for router in a2a_routers:

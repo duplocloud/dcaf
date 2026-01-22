@@ -245,7 +245,9 @@ class Tool(BaseModel):
         print(f"Has Platform Context: {self.requires_platform_context}")
         print(f"Schema: {json.dumps(self.input_schema, indent=2)}")
 
-    def execute(self, input_args: dict[str, Any], platform_context: dict[str, Any] | None = None) -> str:
+    def execute(
+        self, input_args: dict[str, Any], platform_context: dict[str, Any] | None = None
+    ) -> str:
         """
         Execute the tool with given input and optional platform context.
 

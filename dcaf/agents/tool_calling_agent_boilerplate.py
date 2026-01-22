@@ -70,7 +70,9 @@ class ToolCallingBoilerplateAgent(AgentProtocol):
         """Get set of tool names that require approval"""
         approval_tools: set[str] = set()
         for tool_name, tool_func in self.tools.items():
-            if hasattr(tool_func, "_requires_approval") and getattr(tool_func, "_requires_approval", False):
+            if hasattr(tool_func, "_requires_approval") and getattr(
+                tool_func, "_requires_approval", False
+            ):
                 approval_tools.add(tool_name)
         return approval_tools
 
@@ -311,7 +313,10 @@ class ToolCallingBoilerplateAgent(AgentProtocol):
                     # Format tool result for next LLM call
                     executed_tool_calls.append(
                         ExecutedToolCall(
-                            id=tool_use_id or "", name=tool_name or "", input=tool_input, output=result
+                            id=tool_use_id or "",
+                            name=tool_name or "",
+                            input=tool_input,
+                            output=result,
                         )
                     )
 

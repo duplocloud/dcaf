@@ -56,12 +56,18 @@ class K8sAgent(AgentProtocol):
         def convert_files(raw_files: Any) -> list[FileObject] | None:
             if not raw_files or not isinstance(raw_files, list):
                 return None
-            return [FileObject(file_path=f.get("file_path", ""), file_content=f.get("file_content", "")) for f in raw_files]
+            return [
+                FileObject(file_path=f.get("file_path", ""), file_content=f.get("file_content", ""))
+                for f in raw_files
+            ]
 
         return AgentMessage(
             content=llm_response.get("content", "I'm unable to provide a response at this time."),
             data=Data(
-                cmds=[Command(command=cmd["command"], files=convert_files(cmd.get("files"))) for cmd in commands],
+                cmds=[
+                    Command(command=cmd["command"], files=convert_files(cmd.get("files")))
+                    for cmd in commands
+                ],
                 executed_cmds=[
                     ExecutedCommand(command=cmd["command"], output=cmd["output"])
                     for cmd in executed_commands
@@ -166,15 +172,21 @@ class K8sAgent(AgentProtocol):
                             logger.info("Executing approved command: %s", cmd_str)
                             files = c.get("files")
 
-                            duplo_base_url = platform_context.get("duplo_base_url") if platform_context else None
+                            duplo_base_url = (
+                                platform_context.get("duplo_base_url") if platform_context else None
+                            )
 
                             if duplo_base_url and not str(duplo_base_url).startswith("https://"):
                                 duplo_base_url = "https://" + str(duplo_base_url)
 
                             ctl_tokens = {
                                 "DUPLO_HOST": str(duplo_base_url) if duplo_base_url else "",
-                                "DUPLO_TOKEN": str(platform_context.get("duplo_token", "")) if platform_context else "",
-                                "DUPLO_TENANT": str(platform_context.get("tenant_name", "")) if platform_context else "",
+                                "DUPLO_TOKEN": str(platform_context.get("duplo_token", ""))
+                                if platform_context
+                                else "",
+                                "DUPLO_TENANT": str(platform_context.get("tenant_name", ""))
+                                if platform_context
+                                else "",
                             }
 
                             output = self.execute_cmd(cmd_str, kubeconfig_path, files, ctl_tokens)

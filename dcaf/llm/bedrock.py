@@ -167,7 +167,11 @@ class BedrockLLM(LLM):
             request["system"] = [{"text": system_prompt}]
 
         # Add inference configuration
-        inference_config: dict[str, Any] = {"maxTokens": max_tokens, "temperature": temperature, "topP": top_p}
+        inference_config: dict[str, Any] = {
+            "maxTokens": max_tokens,
+            "temperature": temperature,
+            "topP": top_p,
+        }
         request["inferenceConfig"] = inference_config  # type: ignore[assignment]
 
         # Add tool configuration if provided

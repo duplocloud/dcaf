@@ -230,7 +230,9 @@ class AgnoA2AServer(A2AServerAdapter):
             return card.to_dict()
 
         @router.post("/a2a/tasks/send")
-        async def send_task(task_data: dict[str, Any], request: Request, async_mode: bool = False) -> dict[str, Any]:
+        async def send_task(
+            task_data: dict[str, Any], request: Request, async_mode: bool = False
+        ) -> dict[str, Any]:
             """
             Receive and execute an A2A task.
 

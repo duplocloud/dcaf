@@ -317,7 +317,9 @@ class AgnoAdapter:
             run_output = await agno_agent.arun(messages_to_send, **tracing_kwargs)
 
             # Generate a conversation ID (prefer our run_id if provided)
-            conversation_id = tracing_kwargs.get("run_id") or getattr(run_output, "run_id", None) or ""
+            conversation_id = (
+                tracing_kwargs.get("run_id") or getattr(run_output, "run_id", None) or ""
+            )
 
             # Extract and log metrics
             metrics = self._response_converter.extract_metrics(run_output)
@@ -419,7 +421,11 @@ class AgnoAdapter:
                 # Capture final output if available
                 if hasattr(event, "run_output") and event.run_output:
                     # Prefer our run_id if provided
-                    conv_id = tracing_kwargs.get("run_id") or getattr(event.run_output, "run_id", "") or ""
+                    conv_id = (
+                        tracing_kwargs.get("run_id")
+                        or getattr(event.run_output, "run_id", "")
+                        or ""
+                    )
                     response = self._response_converter.convert_run_output(
                         run_output=event.run_output,
                         conversation_id=conv_id,

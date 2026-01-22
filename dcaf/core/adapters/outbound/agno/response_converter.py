@@ -324,9 +324,9 @@ class AgnoResponseConverter:
             return tool_calls, has_pending
 
         for tool_exec in run_output.tools:
-            needs_confirmation = getattr(
-                tool_exec, "requires_confirmation", False
-            ) and not getattr(tool_exec, "confirmed", False)
+            needs_confirmation = getattr(tool_exec, "requires_confirmation", False) and not getattr(
+                tool_exec, "confirmed", False
+            )
 
             tool_call_dto = ToolCallDTO(
                 id=getattr(tool_exec, "tool_call_id", "") or "",
@@ -347,9 +347,7 @@ class AgnoResponseConverter:
 
         return tool_calls, has_pending
 
-    def _build_response_metadata(
-        self, tracing_context: dict[str, Any] | None
-    ) -> dict[str, Any]:
+    def _build_response_metadata(self, tracing_context: dict[str, Any] | None) -> dict[str, Any]:
         """Build response metadata from tracing context."""
         response_metadata: dict[str, Any] = {}
 

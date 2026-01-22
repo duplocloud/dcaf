@@ -149,7 +149,9 @@ class GCPMetadataManager:
                 "GCP auto-detect: google-auth package not installed, skipping ADC detection"
             )
         except Exception as e:
-            logger.warning(f"GCP auto-detect: google.auth.default() failed: {type(e).__name__}: {e}")
+            logger.warning(
+                f"GCP auto-detect: google.auth.default() failed: {type(e).__name__}: {e}"
+            )
 
     def _try_metadata_service(self) -> None:
         """Try to get project and location from GCP metadata service."""

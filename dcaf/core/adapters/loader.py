@@ -114,6 +114,7 @@ def load_adapter(framework: str, **kwargs: Any) -> RuntimeAdapter:
 
     # Cast to satisfy type checker - the isinstance check above validates this
     from typing import cast
+
     return cast(RuntimeAdapter, adapter)
 
 

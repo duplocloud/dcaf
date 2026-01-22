@@ -374,11 +374,13 @@ class TestMCPToolHooks:
         hook_calls = []
 
         async def pre_hook(call: MCPToolCall) -> None:
-            hook_calls.append({
-                "tool_name": call.tool_name,
-                "arguments": call.arguments,
-                "has_result": call.result is not None,
-            })
+            hook_calls.append(
+                {
+                    "tool_name": call.tool_name,
+                    "arguments": call.arguments,
+                    "has_result": call.result is not None,
+                }
+            )
 
         mcp = MCPTool(
             url="http://localhost:8000/mcp",
@@ -416,12 +418,14 @@ class TestMCPToolHooks:
         hook_calls = []
 
         async def post_hook(call: MCPToolCall):
-            hook_calls.append({
-                "tool_name": call.tool_name,
-                "arguments": call.arguments,
-                "result": call.result,
-                "has_duration": call.duration is not None,
-            })
+            hook_calls.append(
+                {
+                    "tool_name": call.tool_name,
+                    "arguments": call.arguments,
+                    "result": call.result,
+                    "has_duration": call.duration is not None,
+                }
+            )
             return call.result
 
         mcp = MCPTool(
@@ -516,11 +520,13 @@ class TestMCPToolHooks:
         hook_calls = []
 
         async def post_hook(call: MCPToolCall):
-            hook_calls.append({
-                "tool_name": call.tool_name,
-                "error": call.error,
-                "has_duration": call.duration is not None,
-            })
+            hook_calls.append(
+                {
+                    "tool_name": call.tool_name,
+                    "error": call.error,
+                    "has_duration": call.duration is not None,
+                }
+            )
             # Don't return anything - let the error propagate
 
         mcp = MCPTool(
