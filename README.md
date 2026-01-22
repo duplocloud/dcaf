@@ -23,29 +23,29 @@
 
 #### Base Installation
 ```bash
-pip install git+https://github.com/duplocloud/service-desk-agents.git
+pip install git+https://github.com/duplocloud/dcaf.git
 ```
 
 #### With Provider Support
 
 ```bash
 # Google Gemini
-pip install "git+https://github.com/duplocloud/service-desk-agents.git#egg=dcaf[google]"
+pip install "git+https://github.com/duplocloud/dcaf.git#egg=dcaf[google]"
 
 # AWS Bedrock (included by default)
-pip install "git+https://github.com/duplocloud/service-desk-agents.git#egg=dcaf[bedrock]"
+pip install "git+https://github.com/duplocloud/dcaf.git#egg=dcaf[bedrock]"
 
 # Anthropic Direct
-pip install "git+https://github.com/duplocloud/service-desk-agents.git#egg=dcaf[anthropic]"
+pip install "git+https://github.com/duplocloud/dcaf.git#egg=dcaf[anthropic]"
 
 # OpenAI
-pip install "git+https://github.com/duplocloud/service-desk-agents.git#egg=dcaf[openai]"
+pip install "git+https://github.com/duplocloud/dcaf.git#egg=dcaf[openai]"
 
 # All providers
-pip install "git+https://github.com/duplocloud/service-desk-agents.git#egg=dcaf[providers]"
+pip install "git+https://github.com/duplocloud/dcaf.git#egg=dcaf[providers]"
 
 # Everything (providers + docs + dev)
-pip install "git+https://github.com/duplocloud/service-desk-agents.git#egg=dcaf[all]"
+pip install "git+https://github.com/duplocloud/dcaf.git#egg=dcaf[all]"
 ```
 
 ### 2. Create an Agent
@@ -272,7 +272,7 @@ agent = Agent(provider="anthropic", model="claude-3-sonnet-20240229", api_key=os
 
 ## Documentation
 
-Full documentation is available at the [DCAF Documentation Site](https://duplocloud.github.io/dcaf/).
+Full documentation is available at **[https://duplocloud.github.io/dcaf/](https://duplocloud.github.io/dcaf/)**
 
 ### View Locally
 
@@ -434,8 +434,8 @@ For migrating from v1 to Core API, see the [Migration Guide](docs/guides/migrati
 
 ```bash
 # Clone the repo
-git clone https://github.com/duplocloud/service-desk-agents.git
-cd service-desk-agents
+git clone https://github.com/duplocloud/dcaf.git
+cd dcaf
 
 # Install with dev dependencies
 pip install -e ".[dev]"
@@ -460,5 +460,5 @@ MIT License - See [LICENSE](LICENSE) for details.
 
 ## Support
 
-- **GitHub Issues**: [service-desk-agents](https://github.com/duplocloud/service-desk-agents/issues)
+- **GitHub Issues**: [dcaf](https://github.com/duplocloud/dcaf/issues)
 - **DuploCloud Support**: support@duplocloud.com
