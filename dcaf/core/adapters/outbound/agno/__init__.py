@@ -15,34 +15,39 @@ Components:
 
 Usage:
     from dcaf.core.adapters.outbound.agno import AgnoAdapter
-    
+
     adapter = AgnoAdapter(
         model_id="anthropic.claude-3-sonnet",
         provider="bedrock",
         aws_profile="production",
     )
-    
+
     response = adapter.invoke(messages, tools)
 
 Dynamic Loading:
     The create_adapter() function enables convention-based discovery:
-    
+
     from dcaf.core.adapters.loader import load_adapter
     adapter = load_adapter("agno", model_id="...", provider="bedrock")
 """
 
+from typing import Any
+
 from .adapter import AgnoAdapter
-from .tool_converter import AgnoToolConverter
+from .gcp_metadata import GCPMetadataManager, get_default_gcp_metadata_manager
 from .message_converter import AgnoMessageConverter
+from .model_factory import AgnoModelFactory, ModelConfig
+from .response_converter import AgnoMetrics, AgnoResponseConverter
+from .tool_converter import AgnoToolConverter
 
 
-def create_adapter(**kwargs) -> AgnoAdapter:
+def create_adapter(**kwargs: Any) -> AgnoAdapter:
     """
     Factory function for creating an AgnoAdapter.
-    
+
     This function is REQUIRED by the adapter loader convention.
     It enables dynamic discovery and loading of this adapter.
-    
+
     Args:
         **kwargs: Passed directly to AgnoAdapter constructor:
             - model_id: Model identifier (e.g., "anthropic.claude-3-sonnet...")
@@ -54,10 +59,10 @@ def create_adapter(**kwargs) -> AgnoAdapter:
             - google_location: Google Cloud region (auto-detected, defaults to us-central1)
             - max_tokens: Maximum response tokens
             - temperature: Sampling temperature
-            
+
     Returns:
         Configured AgnoAdapter instance
-        
+
     Example:
         adapter = create_adapter(
             model_id="anthropic.claude-3-sonnet-20240229-v1:0",
@@ -70,7 +75,13 @@ def create_adapter(**kwargs) -> AgnoAdapter:
 
 __all__ = [
     "AgnoAdapter",
-    "AgnoToolConverter",
+    "AgnoMetrics",
     "AgnoMessageConverter",
+    "AgnoModelFactory",
+    "AgnoResponseConverter",
+    "AgnoToolConverter",
+    "GCPMetadataManager",
+    "ModelConfig",
     "create_adapter",
+    "get_default_gcp_metadata_manager",
 ]

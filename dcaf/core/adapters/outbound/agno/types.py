@@ -1,11 +1,12 @@
 """Agno-specific type definitions and constants."""
 
-from typing import TypedDict, Optional, List, Any, Dict
 from enum import Enum
+from typing import Any, TypedDict
 
 
 class AgnoRole(Enum):
     """Message roles in Agno format."""
+
     USER = "user"
     ASSISTANT = "assistant"
     SYSTEM = "system"
@@ -13,6 +14,7 @@ class AgnoRole(Enum):
 
 class AgnoContentType(Enum):
     """Content block types in Agno format."""
+
     TEXT = "text"
     TOOL_USE = "tool_use"
     TOOL_RESULT = "tool_result"
@@ -20,20 +22,23 @@ class AgnoContentType(Enum):
 
 class AgnoTextBlock(TypedDict):
     """Text content block in Agno format."""
+
     type: str  # "text"
     text: str
 
 
 class AgnoToolUseBlock(TypedDict):
     """Tool use content block in Agno format."""
+
     type: str  # "tool_use"
     id: str
     name: str
-    input: Dict[str, Any]
+    input: dict[str, Any]
 
 
 class AgnoToolResultBlock(TypedDict):
     """Tool result content block in Agno format."""
+
     type: str  # "tool_result"
     tool_use_id: str
     content: str
@@ -45,23 +50,26 @@ AgnoContentBlock = AgnoTextBlock | AgnoToolUseBlock | AgnoToolResultBlock
 
 class AgnoMessage(TypedDict):
     """Message in Agno format."""
+
     role: str
-    content: List[AgnoContentBlock] | str
+    content: list[AgnoContentBlock] | str
 
 
 class AgnoToolDefinition(TypedDict):
     """Tool definition in Agno format."""
+
     name: str
     description: str
-    input_schema: Dict[str, Any]
+    input_schema: dict[str, Any]
 
 
 class AgnoStreamEvent(TypedDict, total=False):
     """Streaming event from Agno."""
+
     type: str
     index: int
-    delta: Dict[str, Any]
-    content_block: Dict[str, Any]
+    delta: dict[str, Any]
+    content_block: dict[str, Any]
 
 
 # Default configuration values

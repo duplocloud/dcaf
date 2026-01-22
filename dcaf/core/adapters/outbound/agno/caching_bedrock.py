@@ -9,15 +9,15 @@ Once Agno supports caching natively, this module should be removed.
 """
 
 import json
-from typing import Any, AsyncIterator, Dict, Iterator, List, Optional, Tuple, Type, Union
 import logging
-
-from pydantic import BaseModel
+from collections.abc import AsyncIterator
+from typing import Any
 
 from agno.models.aws import AwsBedrock
 from agno.models.message import Message
 from agno.models.response import ModelResponse
 from agno.run.agent import RunOutput
+from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 
@@ -25,18 +25,18 @@ logger = logging.getLogger(__name__)
 class CachingAwsBedrock(AwsBedrock):
     """
     AWS Bedrock model with prompt caching support.
-    
+
     This class extends AwsBedrock to add cache checkpoints to the system
     prompt, enabling Bedrock's prompt caching feature for reduced latency
     and cost.
-    
+
     TEMPORARY: Remove once Agno adds native caching support.
-    
+
     Attributes:
         cache_system_prompt: Whether to add cache checkpoint to system prompt
         static_system: Static portion of system prompt (cached)
         dynamic_system: Dynamic portion of system prompt (not cached)
-        
+
     Example:
         model = CachingAwsBedrock(
             id="anthropic.claude-3-7-sonnet-20250219-v1:0",
@@ -45,21 +45,21 @@ class CachingAwsBedrock(AwsBedrock):
             dynamic_system="Tenant: acme-corp",
         )
     """
-    
+
     # Minimum tokens required for caching (varies by model)
     # Claude 3.7 Sonnet: 1024, Claude 3.5 Haiku: 2048
     MIN_CACHE_TOKENS = 1024
-    
+
     def __init__(
         self,
         cache_system_prompt: bool = False,
-        static_system: Optional[str] = None,
-        dynamic_system: Optional[str] = None,
+        static_system: str | None = None,
+        dynamic_system: str | None = None,
         **kwargs: Any,
     ) -> None:
         """
         Initialize the caching Bedrock model.
-        
+
         Args:
             cache_system_prompt: Whether to add cache checkpoint to system prompt
             static_system: Static portion (cached)
@@ -70,30 +70,26 @@ class CachingAwsBedrock(AwsBedrock):
         self._cache_system_prompt = cache_system_prompt
         self._static_system = static_system
         self._dynamic_system = dynamic_system
-        
+
         if cache_system_prompt:
-            logger.info(
-                f"CachingAwsBedrock: Prompt caching enabled for model {self.id}"
-            )
-    
+            logger.info(f"CachingAwsBedrock: Prompt caching enabled for model {self.id}")
+
     def _format_messages(
-        self, 
-        messages: List[Message], 
-        compress_tool_results: bool = False
-    ) -> Tuple[List[Dict[str, Any]], Optional[List[Dict[str, Any]]]]:
+        self, messages: list[Message], compress_tool_results: bool = False
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]] | None]:
         """
         Format messages for the request, adding cache checkpoints.
-        
+
         This overrides the parent method to add a cachePoint to the
         system message when caching is enabled.
-        
+
         Note: This override may be fragile if Agno updates their implementation.
         Last verified compatible with: agno==0.6.x
-        
+
         Args:
             messages: List of messages to format
             compress_tool_results: Whether to compress tool results
-            
+
         Returns:
             Tuple of (formatted_messages, system_message_with_cache)
         """
@@ -101,32 +97,32 @@ class CachingAwsBedrock(AwsBedrock):
         formatted_messages, system_message = super()._format_messages(
             messages, compress_tool_results
         )
-        
+
         # If we have static/dynamic parts, build custom system message
         if self._static_system or self._dynamic_system:
             system_message = self._build_cached_system_message()
         elif self._cache_system_prompt and system_message:
             # Just add checkpoint to existing system message
             system_message = self._add_cache_checkpoint(system_message)
-        
+
         return formatted_messages, system_message
-    
-    def _build_cached_system_message(self) -> Optional[List[Dict[str, Any]]]:
+
+    def _build_cached_system_message(self) -> list[dict[str, Any]] | None:
         """
         Build system message with cache checkpoint between static and dynamic parts.
-        
+
         Structure:
         [
             {"text": "static content..."},
             {"cachePoint": {"type": "default"}},  # ← Cache everything above
             {"text": "dynamic content..."}
         ]
-        
+
         Returns:
             System message content blocks, or None if no content
         """
-        parts = []
-        
+        parts: list[dict[str, Any]] = []
+
         # Add static part
         if self._static_system:
             # Check if it meets minimum token threshold
@@ -136,80 +132,71 @@ class CachingAwsBedrock(AwsBedrock):
                     "Caching disabled for this request."
                 )
                 # Disable caching for this request, just concatenate
-                combined = "\n\n".join([p for p in [self._static_system, self._dynamic_system] if p])
+                combined = "\n\n".join(
+                    [p for p in [self._static_system, self._dynamic_system] if p]
+                )
                 return [{"text": combined}] if combined else None
-            
+
             parts.append({"text": self._static_system})
-        
+
         # Add cache checkpoint (only if we have static content to cache)
         if self._static_system and self._cache_system_prompt:
             parts.append({"cachePoint": {"type": "default"}})
             logger.debug(
                 f"Added cache checkpoint after static system prompt "
-                f"(~{len(self._static_system)//4} tokens)"
+                f"(~{len(self._static_system) // 4} tokens)"
             )
-        
+
         # Add dynamic part
         if self._dynamic_system:
             parts.append({"text": self._dynamic_system})
-            logger.debug(
-                f"Added dynamic system context "
-                f"(~{len(self._dynamic_system)//4} tokens)"
-            )
-        
+            logger.debug(f"Added dynamic system context (~{len(self._dynamic_system) // 4} tokens)")
+
         return parts if parts else None
-    
-    def _add_cache_checkpoint(
-        self, 
-        system_message: List[Dict[str, Any]]
-    ) -> List[Dict[str, Any]]:
+
+    def _add_cache_checkpoint(self, system_message: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """
         Add a cache checkpoint to the system message.
-        
+
         The checkpoint is added after the text content, marking everything
         before it as cacheable.
-        
+
         Args:
             system_message: The system message content blocks
-            
+
         Returns:
             System message with cache checkpoint appended
-            
+
         Example:
             Input:  [{"text": "You are a helpful assistant..."}]
-            Output: [{"text": "You are a helpful assistant..."}, 
+            Output: [{"text": "You are a helpful assistant..."},
                      {"cachePoint": {"type": "default"}}]
         """
         # Create a copy to avoid mutating the original
         cached_system = list(system_message)
-        
+
         # Add the cache checkpoint at the end
-        cached_system.append({
-            "cachePoint": {
-                "type": "default"
-            }
-        })
-        
+        cached_system.append({"cachePoint": {"type": "default"}})
+
         logger.debug(
-            f"Added cache checkpoint to system message "
-            f"({len(system_message)} content blocks)"
+            f"Added cache checkpoint to system message ({len(system_message)} content blocks)"
         )
-        
+
         return cached_system
-    
+
     def _check_token_threshold(self, text: str) -> bool:
         """
         Check if text meets minimum caching threshold.
-        
+
         Args:
             text: The text to check
-            
+
         Returns:
             True if text is long enough to cache, False otherwise
         """
         # Rough estimate: 4 chars ≈ 1 token
         estimated_tokens = len(text) // 4
-        
+
         if estimated_tokens < self.MIN_CACHE_TOKENS:
             logger.warning(
                 f"System prompt (~{estimated_tokens} tokens) below minimum "
@@ -217,13 +204,11 @@ class CachingAwsBedrock(AwsBedrock):
                 f"Consider longer instructions or disable caching."
             )
             return False
-        
-        logger.info(
-            f"System prompt (~{estimated_tokens} tokens) meets caching threshold"
-        )
+
+        logger.info(f"System prompt (~{estimated_tokens} tokens) meets caching threshold")
         return True
-    
-    def _log_cache_metrics(self, response: Dict[str, Any]) -> None:
+
+    def _log_cache_metrics(self, response: dict[str, Any]) -> None:
         """
         Log cache performance metrics from Bedrock response.
 
@@ -240,13 +225,11 @@ class CachingAwsBedrock(AwsBedrock):
 
         if cache_hit > 0:
             logger.info(
-                f"✅ Cache HIT: {cache_hit} tokens reused "
-                f"(~{cache_hit * 0.9:.0f}% cost reduction)"
+                f"✅ Cache HIT: {cache_hit} tokens reused (~{cache_hit * 0.9:.0f}% cost reduction)"
             )
         elif cache_miss > 0:
             logger.info(
-                f"📝 Cache MISS: {cache_miss} tokens cached for next request "
-                f"(cache created)"
+                f"📝 Cache MISS: {cache_miss} tokens cached for next request (cache created)"
             )
         elif self._cache_system_prompt:
             logger.warning(
@@ -257,12 +240,12 @@ class CachingAwsBedrock(AwsBedrock):
 
     async def ainvoke(
         self,
-        messages: List[Message],
+        messages: list[Message],
         assistant_message: Message,
-        response_format: Optional[Union[Dict, Type[BaseModel]]] = None,
-        tools: Optional[List[Dict[str, Any]]] = None,
-        tool_choice: Optional[Union[str, Dict[str, Any]]] = None,
-        run_response: Optional[RunOutput] = None,
+        response_format: dict | type[BaseModel] | None = None,
+        tools: list[dict[str, Any]] | None = None,
+        tool_choice: str | dict[str, Any] | None = None,  # noqa: ARG002
+        run_response: RunOutput | None = None,
         compress_tool_results: bool = False,
     ) -> ModelResponse:
         """
@@ -305,7 +288,7 @@ class CachingAwsBedrock(AwsBedrock):
         logger.info(f"  Model ID: {self.id}")
         logger.info(f"  Messages ({len(formatted_messages)} total):")
         logger.info(f"{json.dumps(formatted_messages, indent=4, default=str)}")
-        logger.info(f"  Request Body:")
+        logger.info("  Request Body:")
         logger.info(f"{json.dumps(body, indent=4, default=str)}")
 
         if run_response and run_response.metrics:
@@ -333,12 +316,12 @@ class CachingAwsBedrock(AwsBedrock):
 
     async def ainvoke_stream(
         self,
-        messages: List[Message],
+        messages: list[Message],
         assistant_message: Message,
-        response_format: Optional[Union[Dict, Type[BaseModel]]] = None,
-        tools: Optional[List[Dict[str, Any]]] = None,
-        tool_choice: Optional[Union[str, Dict[str, Any]]] = None,
-        run_response: Optional[RunOutput] = None,
+        response_format: dict | type[BaseModel] | None = None,
+        tools: list[dict[str, Any]] | None = None,
+        tool_choice: str | dict[str, Any] | None = None,  # noqa: ARG002
+        run_response: RunOutput | None = None,
         compress_tool_results: bool = False,
     ) -> AsyncIterator[ModelResponse]:
         """
@@ -381,7 +364,7 @@ class CachingAwsBedrock(AwsBedrock):
         logger.info(f"  Model ID: {self.id}")
         logger.info(f"  Messages ({len(formatted_messages)} total):")
         logger.info(f"{json.dumps(formatted_messages, indent=4, default=str)}")
-        logger.info(f"  Request Body:")
+        logger.info("  Request Body:")
         logger.info(f"{json.dumps(body, indent=4, default=str)}")
 
         if run_response and run_response.metrics:
@@ -391,31 +374,36 @@ class CachingAwsBedrock(AwsBedrock):
 
         # Make the actual Bedrock streaming API call
         async with self.get_async_client() as client:
-            response = await client.converse_stream(modelId=self.id, messages=formatted_messages, **body)
+            response = await client.converse_stream(
+                modelId=self.id, messages=formatted_messages, **body
+            )
 
             # 🔍 Log that we're starting to receive chunks
-            logger.info("🔍 RAW LLM RESPONSE FROM BEDROCK (STREAMING): Starting to receive chunks...")
+            logger.info(
+                "🔍 RAW LLM RESPONSE FROM BEDROCK (STREAMING): Starting to receive chunks..."
+            )
 
             chunk_count = 0
             async for chunk in response.get("stream"):
                 chunk_count += 1
                 # Log each chunk at INFO level
-                logger.info(f"🔍 Stream chunk #{chunk_count}: {json.dumps(chunk, indent=2, default=str)}")
+                logger.info(
+                    f"🔍 Stream chunk #{chunk_count}: {json.dumps(chunk, indent=2, default=str)}"
+                )
 
-                model_response = self._parse_provider_response_chunk(
-                    chunk,
-                    assistant_message,
-                    response_format=response_format
+                model_response = self._parse_provider_response_chunk(  # type: ignore[attr-defined]
+                    chunk, assistant_message, response_format=response_format
                 )
 
                 if model_response:
                     yield model_response
 
-            logger.info(f"🔍 RAW LLM RESPONSE FROM BEDROCK (STREAMING): Received {chunk_count} total chunks")
+            logger.info(
+                f"🔍 RAW LLM RESPONSE FROM BEDROCK (STREAMING): Received {chunk_count} total chunks"
+            )
 
         assistant_message.metrics.stop_timer()
 
 
 # Note: We intentionally don't export a create_caching_model() factory
 # to keep the public API simple. Adapter handles instantiation.
-
