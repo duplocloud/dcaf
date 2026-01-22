@@ -35,6 +35,10 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
+      - name: Fetch gh-pages branch
+        run: |
+          git fetch origin gh-pages:gh-pages || echo "gh-pages branch doesn't exist yet, will be created"
+
       - name: Deploy versioned docs (for tags)
         if: startsWith(github.ref, 'refs/tags/v')
         run: |
