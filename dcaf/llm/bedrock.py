@@ -9,7 +9,7 @@ import boto3
 import time
 import logging
 import os
-from typing import Dict, Any, Optional, List, Union, Literal
+from typing import Dict, Any, Optional, List, Union
 from botocore.config import Config
 from botocore.exceptions import ClientError
 from dcaf.llm.base import LLM
@@ -132,7 +132,6 @@ class BedrockLLM(LLM):
         temperature: float = 0.0,
         additional_params: Optional[Dict[str, Any]] = None,
         cache_system_prompt: bool = False,
-        cache_system_prompt_ttl: Optional[Literal["5m", "1h"]] = None,
     ):
         """
         Stream response from Bedrock Converse API.
@@ -148,8 +147,7 @@ class BedrockLLM(LLM):
             additional_params: Additional inference config
             cache_system_prompt: If True, enable caching for the system prompt.
                                  Requires minimum token count based on model.
-            cache_system_prompt_ttl: TTL for cached system prompt. 
-                                     "5m" (default) or "1h" (Claude 4.5 models only)
+                                 Cache TTL is 5 minutes (resets on each cache hit).
             
         Yields:
             Dict events from the stream
@@ -168,16 +166,16 @@ class BedrockLLM(LLM):
         if system_prompt:
             system_content = [{"text": system_prompt}]
             if cache_system_prompt:
+                # Note: TTL parameter requires newer boto3 version (1.35+)
+                # Default TTL is 5 minutes, which resets on each cache hit
                 cache_point = {"cachePoint": {"type": "default"}}
-                if cache_system_prompt_ttl:
-                    cache_point["cachePoint"]["ttl"] = cache_system_prompt_ttl
                 system_content.append(cache_point)
                 
                 # Log cache configuration
                 min_tokens = self._get_cache_min_tokens(model_id)
                 logger.info(
                     f"[CACHE CONFIG] System prompt caching enabled for {model_id}. "
-                    f"Min tokens required: {min_tokens}, TTL: {cache_system_prompt_ttl or '5m (default)'}"
+                    f"Min tokens required: {min_tokens}, TTL: 5m (default)"
                 )
             request["system"] = system_content
         
@@ -242,7 +240,6 @@ class BedrockLLM(LLM):
         additional_model_request_fields: Optional[Dict[str, Any]] = None,
         performance_config: Optional[Dict[str, str]] = None,
         cache_system_prompt: bool = False,
-        cache_system_prompt_ttl: Optional[Literal["5m", "1h"]] = None,
         **kwargs
     ) -> Dict[str, Any]:
         """
@@ -260,14 +257,12 @@ class BedrockLLM(LLM):
             additional_model_request_fields: Model-specific parameters
             performance_config: Performance configuration (e.g., {'latency': 'optimized'})
             cache_system_prompt: If True, enable caching for the system prompt.
+                                 Cache TTL is 5 minutes (resets on each cache hit).
                                  Requires minimum token count based on model:
                                  - Claude Sonnet 4.5/4, Claude 3.7 Sonnet: 1,024 tokens
                                  - Claude 3.5 Haiku: 2,048 tokens  
                                  - Claude Haiku 4.5: 4,096 tokens
                                  - Amazon Nova models: 1,000 tokens
-            cache_system_prompt_ttl: TTL for cached system prompt.
-                                     "5m" (default, 5 minutes) or "1h" (1 hour).
-                                     Note: "1h" is only supported by Claude 4.5 models.
             **kwargs: Additional parameters for compatibility
             
         Returns:
@@ -291,16 +286,16 @@ class BedrockLLM(LLM):
         if system_prompt:
             system_content = [{'text': system_prompt}]
             if cache_system_prompt:
+                # Note: TTL parameter requires newer boto3 version (1.35+)
+                # Default TTL is 5 minutes, which resets on each cache hit
                 cache_point = {'cachePoint': {'type': 'default'}}
-                if cache_system_prompt_ttl:
-                    cache_point['cachePoint']['ttl'] = cache_system_prompt_ttl
                 system_content.append(cache_point)
                 
                 # Log cache configuration with model requirements
                 min_tokens = self._get_cache_min_tokens(model_id)
                 logger.info(
                     f"[CACHE CONFIG] System prompt caching enabled for {model_id}. "
-                    f"Min tokens required: {min_tokens}, TTL: {cache_system_prompt_ttl or '5m (default)'}"
+                    f"Min tokens required: {min_tokens}, TTL: 5m (default)"
                 )
             request['system'] = system_content
         
