@@ -209,3 +209,6 @@ qa-build-and-push.sh
 # MCP tools
 .playwright-mcp/
 .serena/
+
+# Git worktrees
+.worktrees/
