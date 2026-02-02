@@ -1,8 +1,9 @@
 import asyncio
+import inspect
 import logging
 import os
 import traceback
-from collections.abc import Iterator
+from collections.abc import AsyncIterator, Iterator
 from typing import Any, Protocol, runtime_checkable
 
 from fastapi import Body, FastAPI, HTTPException
@@ -85,9 +86,12 @@ def create_chat_app(agent: AgentProtocol, router: ChannelResponseRouter | None =
             msgs_dict = msgs_obj.model_dump()
             logger.info("Invoking agent with messages: %s", msgs_dict)
 
-            # Run sync agent.invoke() in a thread pool
-            # This prevents blocking the event loop so health checks stay responsive
-            assistant_msg = await asyncio.to_thread(agent.invoke, msgs_dict)
+            # If the agent's invoke is async, await it directly;
+            # otherwise run it in a thread pool so it doesn't block the event loop.
+            if inspect.iscoroutinefunction(agent.invoke):
+                assistant_msg = await agent.invoke(msgs_dict)
+            else:
+                assistant_msg = await asyncio.to_thread(agent.invoke, msgs_dict)
 
             logger.info("Assistant message: %s", assistant_msg)
 
@@ -154,13 +158,18 @@ def create_chat_app(agent: AgentProtocol, router: ChannelResponseRouter | None =
         # Async generator function that yields events
         async def event_generator():
             try:
-                # Run the sync invoke_stream in a thread pool
-                def run_stream():
-                    return list(agent.invoke_stream(msgs_obj.model_dump()))
+                if inspect.iscoroutinefunction(agent.invoke_stream) or inspect.isasyncgenfunction(agent.invoke_stream):
+                    # Async streaming: await each event directly
+                    async for event in agent.invoke_stream(msgs_obj.model_dump()):
+                        yield event.model_dump_json() + "\n"
+                else:
+                    # Sync streaming: run in thread pool
+                    def run_stream():
+                        return list(agent.invoke_stream(msgs_obj.model_dump()))
 
-                events = await asyncio.to_thread(run_stream)
-                for event in events:
-                    yield event.model_dump_json() + "\n"
+                    events = await asyncio.to_thread(run_stream)
+                    for event in events:
+                        yield event.model_dump_json() + "\n"
             except Exception as e:
                 logger.error("Stream error: %s", str(e), exc_info=True)
                 error_event = ErrorEvent(error=str(e))
