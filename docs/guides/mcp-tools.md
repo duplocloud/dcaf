@@ -10,12 +10,13 @@ This guide covers how to use external MCP (Model Context Protocol) servers with 
 2. [Quick Start](#quick-start)
 3. [Transport Protocols](#transport-protocols)
 4. [Tool Filtering](#tool-filtering)
-5. [Tool Hooks](#tool-hooks)
-6. [Using with Agents](#using-with-agents)
-7. [Connection Management](#connection-management)
-8. [Logging and Monitoring](#logging-and-monitoring)
-9. [Error Handling](#error-handling)
-10. [Best Practices](#best-practices)
+5. [Tool Approval](#tool-approval)
+6. [Tool Hooks](#tool-hooks)
+7. [Using with Agents](#using-with-agents)
+8. [Connection Management](#connection-management)
+9. [Logging and Monitoring](#logging-and-monitoring)
+10. [Error Handling](#error-handling)
+11. [Best Practices](#best-practices)
 
 ---
 
@@ -178,13 +179,14 @@ mcp_tool = MCPTool(
 
 ### Exclude Specific Tools
 
-Exclude tools you don't want:
+Exclude tools you don't want. Supports both exact names and glob patterns:
 
 ```python
 mcp_tool = MCPTool(
     url="http://localhost:8000/mcp",
     transport="streamable-http",
-    exclude_tools=["dangerous_delete", "admin_reset"],
+    # Exact names and glob patterns both work
+    exclude_tools=["admin_*", "*_delete*", "drop_database"],
 )
 ```
 
@@ -220,6 +222,166 @@ db_mcp = MCPTool(
 agent = Agent(tools=[search_mcp, db_mcp])
 result = await agent.arun("Search and query")
 # Agent sees: search_query, search_fetch, db_query, db_insert, etc.
+```
+
+---
+
+## Tool Approval
+
+DCAF provides a built-in tool approval system that lets you require user confirmation before executing tools. This applies to both local DCAF tools and MCP tools.
+
+### Marking Tools as Requiring Approval
+
+Use the `requires_approval` parameter on local tools:
+
+```python
+from dcaf.tools import tool
+
+# This tool executes immediately (default)
+@tool(description="List files in a directory")
+def list_files(path: str) -> str:
+    return "\n".join(os.listdir(path))
+
+# This tool pauses for user approval before execution
+@tool(requires_approval=True, description="Delete a file")
+def delete_file(path: str) -> str:
+    os.remove(path)
+    return f"Deleted {path}"
+```
+
+For MCP tools, the underlying Agno framework's `requires_confirmation` flag is automatically mapped to DCAF's approval system. When an MCP tool has `requires_confirmation=True`, it will pause for user approval just like local tools with `requires_approval=True`.
+
+### How Tool Approval Works
+
+1. **Agent requests a tool call** — The LLM decides to use a tool based on the conversation
+2. **DCAF checks approval requirements** — If the tool has `requires_approval=True`, execution pauses
+3. **Response includes pending tools** — The response has `needs_approval=True` and a list of `pending_tools`
+4. **User approves or rejects** — Via the programmatic API or UI
+5. **Agent resumes** — Executes approved tools or handles rejections
+
+### Handling Approval in Code
+
+```python
+from dcaf.core import Agent
+
+agent = Agent(tools=[list_files, delete_file, mcp_tool])
+response = await agent.run(messages=[
+    {"role": "user", "content": "Delete the old backup files"}
+])
+
+if response.needs_approval:
+    # Agent is paused, waiting for approval
+    for tool_call in response.pending_tools:
+        print(f"Tool: {tool_call.name}")
+        print(f"Arguments: {tool_call.input}")
+
+        if should_approve(tool_call):
+            tool_call.approve()
+        else:
+            tool_call.reject("Too risky, use a safer approach")
+
+    # Resume execution with the approval decisions
+    response = agent.resume(response.conversation_id)
+
+print(response.text)
+```
+
+### Batch Approval
+
+When multiple tools require approval, you can approve or reject them all at once:
+
+```python
+response = await agent.run(messages=[...])
+
+if response.needs_approval:
+    # Approve all pending tool calls and continue
+    response = response.approve_all()
+
+    # Or reject all
+    # response = response.reject_all("Not authorized")
+```
+
+### Approval Response Format
+
+When tools require approval, the response includes pending tool calls in the HelpDesk protocol format:
+
+```json
+{
+  "content": "I'll delete those files for you. Please approve this action.",
+  "data": {
+    "tool_calls": [
+      {
+        "id": "tc_abc123",
+        "name": "delete_file",
+        "input": {"path": "/var/log/old.log"},
+        "requires_approval": true,
+        "status": "pending"
+      }
+    ]
+  },
+  "has_pending_approvals": true,
+  "is_complete": false
+}
+```
+
+### MCP Auto-Approve with Glob Patterns
+
+The `auto_approve_tools` parameter on `MCPTool` enables glob-pattern-based approval tiers for MCP tools:
+
+```python
+mcp_tool = MCPTool(
+    url="http://localhost:8000/mcp",
+    transport="streamable-http",
+    # Block dangerous tools entirely
+    exclude_tools=["*_delete*", "*_drop*", "admin_*"],
+    # Auto-approve safe read-only tools (glob patterns)
+    auto_approve_tools=["*_list*", "*_get*", "*_read*", "*_describe*"],
+    # Everything else requires user approval before execution
+)
+```
+
+This classifies MCP tools into three tiers automatically:
+
+| Tier | Description |
+|------|-------------|
+| **Blocked** | Tools matching `exclude_tools` patterns (exact names or globs) — never available to the agent |
+| **Auto-Approved** | Tools matching `auto_approve_tools` glob patterns — execute immediately |
+| **Requires Approval** | Everything else — agent pauses for user approval |
+
+When `auto_approve_tools` is not set (the default), all MCP tools execute without requiring approval. When set, only tools matching the patterns execute freely — all others require confirmation.
+
+The patterns use Python's `fnmatch` glob syntax:
+
+| Pattern | Matches |
+|---------|---------|
+| `*_get*` | `user_get`, `data_get_all`, `get_item` |
+| `read_*` | `read_file`, `read_config` |
+| `get_?` | `get_a`, `get_1` (single character after `get_`) |
+| `*` | Everything (auto-approve all tools) |
+
+### Combining with Tool Filtering
+
+Use `exclude_tools` to completely block dangerous tools, `auto_approve_tools` for safe MCP tools, and `requires_approval` on local tools that need oversight. Both parameters support glob patterns using Python's `fnmatch` syntax:
+
+```python
+from dcaf.mcp import MCPTool
+
+mcp_tool = MCPTool(
+    url="http://localhost:8000/mcp",
+    transport="streamable-http",
+    # Completely block these tools - agent never sees them (glob patterns supported)
+    exclude_tools=["admin_*", "*_delete*", "drop_database"],
+    # Auto-approve read-only MCP tools
+    auto_approve_tools=["*_list*", "*_get*", "*_read*"],
+)
+
+agent = Agent(
+    tools=[
+        mcp_tool,
+        # Local tool with approval required
+        delete_file,  # has requires_approval=True
+    ],
+)
 ```
 
 ---
@@ -790,23 +952,36 @@ result = await agent.arun("...")
 # Forgot to close!
 ```
 
-### 2. Filter Tools for Security
+### 2. Filter and Approve Tools for Security
 
-Only expose necessary tools to the agent:
+Use a defense-in-depth approach with both filtering and approval:
 
 ```python
-# ✅ Good - explicit allowlist
+# ✅ Good - block dangerous tools with glob patterns, require approval for sensitive ones
 mcp_tool = MCPTool(
     url="http://localhost:8000/mcp",
     transport="streamable-http",
-    include_tools=["search", "read"],  # Only safe, read-only tools
+    exclude_tools=["admin_*", "*_delete*", "drop_database"],
 )
 
-# ❌ Risky - all tools exposed
+@tool(requires_approval=True, description="Delete a resource")
+def delete_resource(id: str) -> str:
+    ...
+
+agent = Agent(tools=[mcp_tool, delete_resource])
+
+# ✅ Even better - whitelist specific tools
 mcp_tool = MCPTool(
     url="http://localhost:8000/mcp",
     transport="streamable-http",
-    # No filtering - agent can use any tool
+    include_tools=["search", "query", "get_document"],
+)
+
+# ❌ Risky - no filtering or approval
+mcp_tool = MCPTool(
+    url="http://localhost:8000/mcp",
+    transport="streamable-http",
+    # Agent can use any tool the server exposes, no approval required
 )
 ```
 
@@ -886,10 +1061,28 @@ class MCPTool:
         exclude_tools: Optional[List[str]] = None,
         tool_name_prefix: Optional[str] = None,
         refresh_connection: bool = False,
+        auto_approve_tools: Optional[List[str]] = None,
         pre_hook: Optional[Callable[[MCPToolCall], Awaitable[None] | None]] = None,
         post_hook: Optional[Callable[[MCPToolCall], Awaitable[Any] | Any]] = None,
     ): ...
 ```
+
+### Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `command` | `str` | Command to run for stdio transport |
+| `url` | `str` | URL for HTTP-based transports |
+| `env` | `Dict[str, str]` | Environment variables for stdio transport |
+| `transport` | `Literal["stdio", "sse", "streamable-http"]` | Transport protocol |
+| `timeout_seconds` | `int` | Connection timeout (default: 10) |
+| `include_tools` | `List[str]` | Only include these tools (exact names) |
+| `exclude_tools` | `List[str]` | Exclude these tools (exact names or glob patterns) |
+| `tool_name_prefix` | `str` | Prefix to add to all tool names |
+| `refresh_connection` | `bool` | Reconnect on each agent run |
+| `auto_approve_tools` | `List[str]` | Glob patterns for tools that execute without approval |
+| `pre_hook` | `Callable` | Function called before each tool execution |
+| `post_hook` | `Callable` | Function called after each tool execution |
 
 ### Properties
 
