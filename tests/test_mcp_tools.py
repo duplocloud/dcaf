@@ -653,3 +653,269 @@ class TestMCPToolHooks:
         await mock_func.entrypoint()
 
         assert call_order == ["pre", "tool", "post"]
+
+
+class TestMCPToolAutoApprove:
+    """Test auto_approve_tools glob pattern functionality."""
+
+    def test_auto_approve_tools_stored(self):
+        """Should store auto_approve_tools parameter."""
+        from dcaf.mcp import MCPTool
+
+        patterns = ["*_get*", "*_list*"]
+        mcp = MCPTool(
+            url="http://localhost:8000/mcp",
+            transport="streamable-http",
+            auto_approve_tools=patterns,
+        )
+        assert mcp._auto_approve_tools == patterns
+
+    def test_auto_approve_tools_defaults_to_none(self):
+        """auto_approve_tools should default to None."""
+        from dcaf.mcp import MCPTool
+
+        mcp = MCPTool(url="http://localhost:8000/mcp", transport="streamable-http")
+        assert mcp._auto_approve_tools is None
+
+    def test_apply_patterns_marks_non_matching_tools(self):
+        """Tools not matching auto_approve_tools should get requires_confirmation=True."""
+        from dcaf.mcp import MCPTool
+
+        mcp = MCPTool(
+            url="http://localhost:8000/mcp",
+            transport="streamable-http",
+            auto_approve_tools=["*_get*", "*_list*"],
+        )
+
+        # Create mock functions
+        func_get = Mock()
+        func_get.requires_confirmation = None
+        func_delete = Mock()
+        func_delete.requires_confirmation = None
+        func_list = Mock()
+        func_list.requires_confirmation = None
+
+        mock_agno = Mock()
+        mock_agno.functions = {
+            "user_get": func_get,
+            "user_delete": func_delete,
+            "items_list": func_list,
+        }
+        mcp._agno_mcp_tools = mock_agno
+
+        mcp._apply_approval_patterns()
+
+        # Matching tools should NOT have requires_confirmation set
+        assert func_get.requires_confirmation is None
+        assert func_list.requires_confirmation is None
+        # Non-matching tools should require confirmation
+        assert func_delete.requires_confirmation is True
+
+    def test_apply_patterns_skips_when_none(self):
+        """When auto_approve_tools is None, no tools should get requires_confirmation."""
+        from dcaf.mcp import MCPTool
+
+        mcp = MCPTool(url="http://localhost:8000/mcp", transport="streamable-http")
+
+        func = Mock()
+        func.requires_confirmation = None
+
+        mock_agno = Mock()
+        mock_agno.functions = {"some_tool": func}
+        mcp._agno_mcp_tools = mock_agno
+
+        mcp._apply_approval_patterns()
+
+        assert func.requires_confirmation is None
+
+    def test_glob_patterns_with_wildcards(self):
+        """Glob patterns should support fnmatch wildcards."""
+        from dcaf.mcp import MCPTool
+
+        mcp = MCPTool(
+            url="http://localhost:8000/mcp",
+            transport="streamable-http",
+            auto_approve_tools=["read_*", "*_describe*", "get_?"],
+        )
+
+        funcs = {
+            "read_file": Mock(requires_confirmation=None),
+            "read_database": Mock(requires_confirmation=None),
+            "aws_describe_instances": Mock(requires_confirmation=None),
+            "get_a": Mock(requires_confirmation=None),  # matches get_?
+            "get_all": Mock(requires_confirmation=None),  # does NOT match get_?
+            "write_file": Mock(requires_confirmation=None),
+        }
+
+        mock_agno = Mock()
+        mock_agno.functions = funcs
+        mcp._agno_mcp_tools = mock_agno
+
+        mcp._apply_approval_patterns()
+
+        assert funcs["read_file"].requires_confirmation is None
+        assert funcs["read_database"].requires_confirmation is None
+        assert funcs["aws_describe_instances"].requires_confirmation is None
+        assert funcs["get_a"].requires_confirmation is None
+        assert funcs["get_all"].requires_confirmation is True
+        assert funcs["write_file"].requires_confirmation is True
+
+    def test_all_tools_auto_approved(self):
+        """When pattern matches all tools, none should require confirmation."""
+        from dcaf.mcp import MCPTool
+
+        mcp = MCPTool(
+            url="http://localhost:8000/mcp",
+            transport="streamable-http",
+            auto_approve_tools=["*"],
+        )
+
+        funcs = {
+            "tool_a": Mock(requires_confirmation=None),
+            "tool_b": Mock(requires_confirmation=None),
+        }
+
+        mock_agno = Mock()
+        mock_agno.functions = funcs
+        mcp._agno_mcp_tools = mock_agno
+
+        mcp._apply_approval_patterns()
+
+        assert funcs["tool_a"].requires_confirmation is None
+        assert funcs["tool_b"].requires_confirmation is None
+
+    def test_empty_patterns_requires_all_approval(self):
+        """Empty auto_approve_tools list means all tools require approval."""
+        from dcaf.mcp import MCPTool
+
+        mcp = MCPTool(
+            url="http://localhost:8000/mcp",
+            transport="streamable-http",
+            auto_approve_tools=[],
+        )
+
+        funcs = {
+            "tool_a": Mock(requires_confirmation=None),
+            "tool_b": Mock(requires_confirmation=None),
+        }
+
+        mock_agno = Mock()
+        mock_agno.functions = funcs
+        mcp._agno_mcp_tools = mock_agno
+
+        mcp._apply_approval_patterns()
+
+        assert funcs["tool_a"].requires_confirmation is True
+        assert funcs["tool_b"].requires_confirmation is True
+
+
+@pytest.mark.asyncio
+class TestMCPToolAutoApproveConnect:
+    """Test auto_approve_tools integration with connect lifecycle."""
+
+    async def test_connect_applies_patterns(self):
+        """After connect(), auto_approve_tools patterns should be applied."""
+        from dcaf.mcp import MCPTool
+
+        mcp = MCPTool(
+            url="http://localhost:8000/mcp",
+            transport="streamable-http",
+            auto_approve_tools=["*_read*"],
+        )
+
+        func_read = Mock(requires_confirmation=None)
+        func_write = Mock(requires_confirmation=None)
+
+        mock_agno = AsyncMock()
+        mock_agno.connect = AsyncMock()
+        mock_agno.initialized = True
+        mock_agno.functions = {
+            "file_read": func_read,
+            "file_write": func_write,
+        }
+
+        def create_mock():
+            mcp._agno_mcp_tools = mock_agno
+            return mock_agno
+
+        with patch.object(mcp, "_create_agno_mcp_tools", side_effect=create_mock):
+            await mcp.connect()
+
+        assert func_read.requires_confirmation is None
+        assert func_write.requires_confirmation is True
+
+    async def test_build_tools_wrapper_applies_patterns(self):
+        """The wrapped build_tools should apply patterns after Agno registers tools."""
+        from dcaf.mcp import MCPTool
+
+        mcp = MCPTool(
+            url="http://localhost:8000/mcp",
+            transport="streamable-http",
+            auto_approve_tools=["safe_*"],
+        )
+
+        # Simulate what happens when Agno internally calls build_tools
+        func_safe = Mock(requires_confirmation=None)
+        func_dangerous = Mock(requires_confirmation=None)
+        functions_dict = {}
+
+        original_build_tools_called = []
+
+        async def fake_build_tools():
+            original_build_tools_called.append(True)
+            # Simulate Agno registering tools during build_tools
+            functions_dict["safe_query"] = func_safe
+            functions_dict["dangerous_delete"] = func_dangerous
+
+        mock_agno = Mock()
+        mock_agno.functions = functions_dict
+        mock_agno.build_tools = fake_build_tools
+
+        mcp._agno_mcp_tools = mock_agno
+        mcp._wrap_build_tools_for_patterns()
+
+        # Call the wrapped build_tools (as Agno's lifecycle would)
+        await mock_agno.build_tools()
+
+        assert original_build_tools_called == [True]
+        assert func_safe.requires_confirmation is None
+        assert func_dangerous.requires_confirmation is True
+
+    async def test_create_agno_mcp_tools_wraps_when_patterns_set(self):
+        """_create_agno_mcp_tools should wrap build_tools when auto_approve_tools is set."""
+        from dcaf.mcp import MCPTool
+
+        mcp = MCPTool(
+            url="http://localhost:8000/mcp",
+            transport="streamable-http",
+            auto_approve_tools=["*_get*"],
+        )
+
+        with patch("dcaf.mcp.tools.MCPTool._wrap_build_tools_for_patterns") as mock_wrap:
+            with patch("agno.tools.mcp.MCPTools") as MockAgnoMCPTools:
+                mock_instance = Mock()
+                mock_instance.functions = {}
+                MockAgnoMCPTools.return_value = mock_instance
+
+                mcp._create_agno_mcp_tools()
+
+                mock_wrap.assert_called_once()
+
+    async def test_create_agno_mcp_tools_skips_wrap_without_patterns(self):
+        """_create_agno_mcp_tools should NOT wrap build_tools when auto_approve_tools is None."""
+        from dcaf.mcp import MCPTool
+
+        mcp = MCPTool(
+            url="http://localhost:8000/mcp",
+            transport="streamable-http",
+        )
+
+        with patch("dcaf.mcp.tools.MCPTool._wrap_build_tools_for_patterns") as mock_wrap:
+            with patch("agno.tools.mcp.MCPTools") as MockAgnoMCPTools:
+                mock_instance = Mock()
+                mock_instance.functions = {}
+                MockAgnoMCPTools.return_value = mock_instance
+
+                mcp._create_agno_mcp_tools()
+
+                mock_wrap.assert_not_called()

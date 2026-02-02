@@ -56,6 +56,7 @@ Example (With Hooks - Intercept Tool Calls):
     )
 """
 
+import fnmatch
 import functools
 import inspect
 import logging
@@ -154,6 +155,7 @@ class MCPTool:
         exclude_tools: list[str] | None = None,
         tool_name_prefix: str | None = None,
         refresh_connection: bool = False,
+        auto_approve_tools: list[str] | None = None,
         pre_hook: PreHookFunc | None = None,
         post_hook: PostHookFunc | None = None,
     ):
@@ -172,6 +174,10 @@ class MCPTool:
             exclude_tools: List of tool names to exclude (if None, excludes none).
             tool_name_prefix: Prefix to add to all tool names (e.g., "mcp" -> "mcp_toolname").
             refresh_connection: If True, refresh connection and tools on each agent run.
+            auto_approve_tools: List of glob patterns for tools that should execute without
+                approval. Tools matching any pattern run immediately; all other tools
+                require user confirmation before execution. Uses fnmatch glob syntax
+                (e.g., "*_get*", "*_list*", "read_*").
             pre_hook: Async or sync function called before each tool execution.
                      Receives MCPToolCall with tool_name and arguments.
                      Use for logging, validation, or modifying arguments.
@@ -205,6 +211,7 @@ class MCPTool:
         self._exclude_tools = exclude_tools
         self._tool_name_prefix = tool_name_prefix
         self._refresh_connection = refresh_connection
+        self._auto_approve_tools = auto_approve_tools
         self._pre_hook = pre_hook
         self._post_hook = post_hook
 
@@ -221,6 +228,8 @@ class MCPTool:
             logger.info(f"🔌 MCP: Tool filter - exclude: {exclude_tools}")
         if tool_name_prefix:
             logger.info(f"🔌 MCP: Tool name prefix: {tool_name_prefix}")
+        if auto_approve_tools:
+            logger.info(f"🔌 MCP: Auto-approve patterns: {auto_approve_tools}")
 
     @property
     def initialized(self) -> bool:
@@ -253,6 +262,13 @@ class MCPTool:
                 "MCP tools require the 'mcp' package. Install it with: pip install mcp"
             ) from e
 
+        # Separate exclude_tools into exact names (for Agno) and glob patterns (for DCAF).
+        # Agno only supports exact name matching, so patterns with wildcards are handled
+        # post-connect by DCAF's _apply_exclusion_patterns().
+        agno_exclude = None
+        if self._exclude_tools:
+            agno_exclude = [name for name in self._exclude_tools if not any(c in name for c in "*?[]")]
+
         # Create the Agno MCPTools with our configuration
         self._agno_mcp_tools = AgnoMCPTools(
             command=self._command,
@@ -261,13 +277,20 @@ class MCPTool:
             transport=self._transport,
             timeout_seconds=self._timeout_seconds,
             include_tools=self._include_tools,
-            exclude_tools=self._exclude_tools,
+            exclude_tools=agno_exclude or None,
             tool_name_prefix=self._tool_name_prefix,
             refresh_connection=self._refresh_connection,
         )
 
         target = self._url or self._command
         logger.info(f"🔌 MCP: Agno MCPTools created (target={target})")
+
+        # Wrap build_tools to apply exclusion and approval patterns after tool registration
+        has_glob_excludes = self._exclude_tools and any(
+            any(c in p for c in "*?[]") for p in self._exclude_tools
+        )
+        if has_glob_excludes or self._auto_approve_tools is not None:
+            self._wrap_build_tools_for_patterns()
 
         # Wrap the toolkit to add logging for tool execution
         self._wrap_tools_with_logging()
@@ -436,6 +459,9 @@ class MCPTool:
             logger.info(f"🔌 MCP: Available tools: {tool_names}")
             for name in tool_names:
                 logger.debug(f"🔌 MCP:   - {name}")
+            # Apply DCAF-layer glob exclusions, then auto-approve patterns
+            self._apply_exclusion_patterns()
+            self._apply_approval_patterns()
         else:
             logger.warning("🔌 MCP: ⚠️ Connection completed but not initialized")
 
@@ -453,6 +479,78 @@ class MCPTool:
             logger.info("🔌 MCP: ✅ Connection closed successfully")
         else:
             logger.debug(f"🔌 MCP: No connection to close (target={target})")
+
+    def _apply_approval_patterns(self) -> None:
+        """Apply auto_approve_tools glob patterns to connected MCP tools.
+
+        Tools matching any auto_approve_tools pattern execute without approval.
+        All other tools require user confirmation before execution.
+        When auto_approve_tools is None, no confirmation is required (default behavior).
+        """
+        if self._auto_approve_tools is None or self._agno_mcp_tools is None:
+            return
+
+        auto_approved = 0
+        requires_approval = 0
+
+        for tool_name, func in self._agno_mcp_tools.functions.items():
+            is_auto_approved = any(
+                fnmatch.fnmatch(tool_name, pattern)
+                for pattern in self._auto_approve_tools
+            )
+            if is_auto_approved:
+                auto_approved += 1
+            else:
+                func.requires_confirmation = True
+                requires_approval += 1
+
+        logger.info(
+            f"🔌 MCP: Applied auto_approve_tools patterns — "
+            f"{auto_approved} auto-approved, {requires_approval} require approval"
+        )
+
+    def _apply_exclusion_patterns(self) -> None:
+        """Apply exclude_tools glob patterns to remove matching tools after connection.
+
+        Agno handles exact-name exclusions during tool loading. This method handles
+        glob patterns (containing *, ?, or []) by removing matching tools from the
+        functions dict post-connect.
+        """
+        if self._exclude_tools is None or self._agno_mcp_tools is None:
+            return
+
+        glob_patterns = [p for p in self._exclude_tools if any(c in p for c in "*?[]")]
+        if not glob_patterns:
+            return
+
+        to_remove = [
+            tool_name
+            for tool_name in self._agno_mcp_tools.functions
+            if any(fnmatch.fnmatch(tool_name, pattern) for pattern in glob_patterns)
+        ]
+
+        for tool_name in to_remove:
+            del self._agno_mcp_tools.functions[tool_name]
+
+        if to_remove:
+            logger.info(
+                f"🔌 MCP: Excluded {len(to_remove)} tools via glob patterns: {to_remove}"
+            )
+
+    def _wrap_build_tools_for_patterns(self) -> None:
+        """Wrap Agno's build_tools to apply exclusion and approval patterns after tool registration.
+
+        This ensures patterns are applied regardless of whether MCPTool.connect()
+        or Agno's internal lifecycle triggers the connection.
+        """
+        original_build_tools = self._agno_mcp_tools.build_tools
+
+        async def patched_build_tools() -> None:
+            await original_build_tools()
+            self._apply_exclusion_patterns()
+            self._apply_approval_patterns()
+
+        self._agno_mcp_tools.build_tools = patched_build_tools
 
     async def is_alive(self) -> bool:
         """
