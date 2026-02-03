@@ -384,6 +384,7 @@ class CachingAwsBedrock(AwsBedrock):
             )
 
             chunk_count = 0
+            current_tool: dict[str, Any] = {}
             async for chunk in response.get("stream"):
                 chunk_count += 1
                 # Log each chunk at INFO level
@@ -391,8 +392,8 @@ class CachingAwsBedrock(AwsBedrock):
                     f"🔍 Stream chunk #{chunk_count}: {json.dumps(chunk, indent=2, default=str)}"
                 )
 
-                model_response = self._parse_provider_response_chunk(  # type: ignore[attr-defined]
-                    chunk, assistant_message, response_format=response_format
+                model_response, current_tool = self._parse_provider_response_delta(
+                    chunk, current_tool
                 )
 
                 if model_response:
