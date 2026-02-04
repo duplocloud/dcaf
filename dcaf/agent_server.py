@@ -1,12 +1,13 @@
 import asyncio
 import inspect
+import json
 import logging
 import os
 import traceback
 from collections.abc import AsyncIterator, Iterator
 from typing import Any, Protocol, runtime_checkable
 
-from fastapi import Body, FastAPI, HTTPException
+from fastapi import Body, FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import StreamingResponse
 from pydantic import ValidationError
 
@@ -84,6 +85,12 @@ def create_chat_app(agent: AgentProtocol, router: ChannelResponseRouter | None =
         # 2. delegate to agent (run in thread pool to not block event loop)
         try:
             msgs_dict = msgs_obj.model_dump()
+
+            # Forward top-level request fields (thread_id, tenant_id, source, etc.)
+            # so adapters can merge them into the agent context
+            request_fields = {k: v for k, v in raw_body.items() if k != "messages"}
+            msgs_dict["_request_fields"] = request_fields
+
             logger.info("Invoking agent with messages: %s", msgs_dict)
 
             # If the agent's invoke is async, await it directly;
@@ -97,6 +104,10 @@ def create_chat_app(agent: AgentProtocol, router: ChannelResponseRouter | None =
 
             # Still validate the response format
             assistant_msg = AgentMessage.model_validate(assistant_msg)  # schema guardrail
+
+            # Echo top-level request fields back for client correlation
+            if request_fields:
+                assistant_msg.meta_data["request_context"] = request_fields
 
             return assistant_msg
 
@@ -155,17 +166,22 @@ def create_chat_app(agent: AgentProtocol, router: ChannelResponseRouter | None =
         except ValidationError as ve:
             raise HTTPException(status_code=422, detail=ve.errors()) from ve
 
+        # Forward top-level request fields (thread_id, tenant_id, source, etc.)
+        msgs_dict = msgs_obj.model_dump()
+        request_fields = {k: v for k, v in raw_body.items() if k != "messages"}
+        msgs_dict["_request_fields"] = request_fields
+
         # Async generator function that yields events
         async def event_generator():
             try:
                 if inspect.iscoroutinefunction(agent.invoke_stream) or inspect.isasyncgenfunction(agent.invoke_stream):
                     # Async streaming: await each event directly
-                    async for event in agent.invoke_stream(msgs_obj.model_dump()):
+                    async for event in agent.invoke_stream(msgs_dict):
                         yield event.model_dump_json() + "\n"
                 else:
                     # Sync streaming: run in thread pool
                     def run_stream():
-                        return list(agent.invoke_stream(msgs_obj.model_dump()))
+                        return list(agent.invoke_stream(msgs_dict))
 
                     events = await asyncio.to_thread(run_stream)
                     for event in events:
@@ -187,5 +203,71 @@ def create_chat_app(agent: AgentProtocol, router: ChannelResponseRouter | None =
         LLM calls run in a thread pool so they don't block health checks.
         """
         return await _handle_stream(raw_body)
+
+    # ----- WebSocket: /api/chat-ws endpoint ------------------------------------
+    @app.websocket("/api/chat-ws")
+    async def chat_ws(websocket: WebSocket):
+        """
+        Bidirectional streaming chat over WebSocket.
+
+        Each client text frame is a JSON object with the same shape as the HTTP
+        endpoints (``{"messages": [...]}``) representing one conversation turn.
+        The server streams back ``StreamEvent`` JSON frames, ending each turn
+        with a ``DoneEvent``.  The connection stays open for multiple turns.
+        """
+        await websocket.accept()
+
+        try:
+            while True:
+                raw_text = await websocket.receive_text()
+
+                # Parse JSON
+                try:
+                    raw_body = json.loads(raw_text)
+                except json.JSONDecodeError as e:
+                    await websocket.send_text(ErrorEvent(error=f"Invalid JSON: {e}").model_dump_json())
+                    continue
+
+                # Validate messages field
+                if "messages" not in raw_body:
+                    await websocket.send_text(ErrorEvent(error="'messages' field missing").model_dump_json())
+                    continue
+
+                try:
+                    msgs_obj = Messages.model_validate({"messages": raw_body["messages"]})
+                except ValidationError as ve:
+                    await websocket.send_text(ErrorEvent(error=str(ve.errors())).model_dump_json())
+                    continue
+
+                # Forward top-level request fields (thread_id, tenant_id, source, etc.)
+                msgs_dict = msgs_obj.model_dump()
+                request_fields = {k: v for k, v in raw_body.items() if k != "messages"}
+                msgs_dict["_request_fields"] = request_fields
+
+                # Stream response events
+                try:
+                    if inspect.iscoroutinefunction(agent.invoke_stream) or inspect.isasyncgenfunction(agent.invoke_stream):
+                        async for event in agent.invoke_stream(msgs_dict):
+                            await websocket.send_text(event.model_dump_json())
+                    else:
+                        def run_stream():
+                            return list(agent.invoke_stream(msgs_dict))
+
+                        events = await asyncio.to_thread(run_stream)
+                        for event in events:
+                            await websocket.send_text(event.model_dump_json())
+                except Exception as e:
+                    logger.error("WebSocket stream error: %s", str(e), exc_info=True)
+                    await websocket.send_text(ErrorEvent(error=str(e)).model_dump_json())
+
+        except WebSocketDisconnect:
+            logger.info("WebSocket client disconnected")
+        except Exception as e:
+            logger.error("WebSocket connection error: %s", str(e), exc_info=True)
+            try:
+                await websocket.send_text(ErrorEvent(error=str(e)).model_dump_json())
+                await websocket.close(code=1011, reason=str(e))
+            except Exception:
+                pass
 
     return app

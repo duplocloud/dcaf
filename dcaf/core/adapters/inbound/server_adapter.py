@@ -19,6 +19,7 @@ from collections.abc import AsyncIterator
 from typing import Any, cast
 
 from ....schemas.events import (
+    DoneEvent,
     ErrorEvent,
     StreamEvent,
 )
@@ -88,8 +89,12 @@ class ServerAdapter:
         messages_list = messages.get("messages", [])
         platform_context = self._extract_platform_context(messages_list)
 
+        # Merge top-level request fields into context (platform_context takes precedence)
+        request_fields = messages.get("_request_fields", {})
+        context = {**request_fields, **platform_context} if request_fields else platform_context
+
         # Check for approved tool calls that need to be processed
-        executed_tool_calls = self._process_approved_tool_calls(messages_list, platform_context)
+        executed_tool_calls = self._process_approved_tool_calls(messages_list, context)
 
         # Convert to Core format (simple list of dicts with role/content)
         core_messages = self._convert_messages(messages_list)
@@ -101,7 +106,7 @@ class ServerAdapter:
         try:
             response = await self.agent.run(
                 messages=cast(list[Any], core_messages),
-                context=platform_context,
+                context=context,
             )
 
             # Convert to AgentMessage using native to_message()
@@ -142,6 +147,10 @@ class ServerAdapter:
         messages_list = messages.get("messages", [])
         platform_context = self._extract_platform_context(messages_list)
 
+        # Merge top-level request fields into context (platform_context takes precedence)
+        request_fields = messages.get("_request_fields", {})
+        context = {**request_fields, **platform_context} if request_fields else platform_context
+
         # Convert to Core format
         core_messages = self._convert_messages(messages_list)
 
@@ -153,8 +162,11 @@ class ServerAdapter:
             # Use true streaming from the Agent
             async for event in self.agent.run_stream(
                 messages=cast(list[Any], core_messages),
-                context=platform_context,
+                context=context,
             ):
+                # Echo top-level request fields in DoneEvent for client correlation
+                if isinstance(event, DoneEvent) and request_fields:
+                    event.meta_data["request_context"] = request_fields
                 yield event
 
         except Exception as e:

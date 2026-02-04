@@ -1,8 +1,8 @@
 # Stream event types for NDJSON streaming
 
-from typing import Literal
+from typing import Any, Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from .messages import Command, ExecutedCommand, ExecutedToolCall, ToolCall
 
@@ -53,6 +53,7 @@ class DoneEvent(StreamEvent):
 
     type: Literal["done"] = "done"
     stop_reason: str | None = None
+    meta_data: dict[str, Any] = Field(default_factory=dict)
 
 
 class ErrorEvent(StreamEvent):
