@@ -54,6 +54,7 @@ from .agent import Agent
 if TYPE_CHECKING:
     from fastapi import APIRouter, FastAPI
 
+    from ..channel_routing import ChannelResponseRouter
     from ..schemas.messages import AgentMessage
     from .primitives import AgentResult
     from .session import Session
@@ -63,21 +64,31 @@ logger = logging.getLogger(__name__)
 # Type for agent handlers (can be 2-arg or 3-arg with session)
 AgentHandler = Callable[..., "AgentResult"]
 
+# Server defaults
+DEFAULT_PORT = 8000
+DEFAULT_HOST = "0.0.0.0"
+DEFAULT_WORKERS = 1
+DEFAULT_TIMEOUT_KEEP_ALIVE = 5
+DEFAULT_MCP_PORT = 8001
+DEFAULT_MCP_TRANSPORT = "sse"
+DEFAULT_A2A_ADAPTER = "agno"
+
 
 def serve(
     agent: Union["Agent", AgentHandler],
-    port: int = 8000,
-    host: str = "0.0.0.0",
+    port: int = DEFAULT_PORT,
+    host: str = DEFAULT_HOST,
     reload: bool = False,
     log_level: str = "info",
-    workers: int = 1,
-    timeout_keep_alive: int = 5,
+    workers: int = DEFAULT_WORKERS,
+    timeout_keep_alive: int = DEFAULT_TIMEOUT_KEEP_ALIVE,
     additional_routers: Sequence["APIRouter"] | None = None,
+    channel_router: "ChannelResponseRouter | None" = None,
     a2a: bool = False,
-    a2a_adapter: str = "agno",
+    a2a_adapter: str = DEFAULT_A2A_ADAPTER,
     mcp: bool = False,
-    mcp_port: int = 8001,
-    mcp_transport: str = "sse",
+    mcp_port: int = DEFAULT_MCP_PORT,
+    mcp_transport: str = DEFAULT_MCP_TRANSPORT,
 ) -> None:
     """
     Start a REST server for the agent.
@@ -100,6 +111,10 @@ def serve(
                            idle timeout (e.g., AWS ALB defaults to 60s).
         additional_routers: Optional list of FastAPI APIRouter instances to include.
                            Use this to add custom endpoints beyond /api/chat.
+        channel_router: Optional channel response router for multi-agent environments.
+                       When provided and the request includes ``source: "slack"``,
+                       the router decides whether the agent should respond.
+                       Use ``SlackResponseRouter`` for Slack integration.
         a2a: Enable A2A (Agent-to-Agent) protocol support (default: False).
             When enabled, adds A2A endpoints for agent discovery and task handling.
         a2a_adapter: A2A adapter to use (default: "agno").
@@ -212,13 +227,14 @@ def serve(
         )
 
     # Create the FastAPI app
-    app = create_app(agent, additional_routers=additional_routers, a2a=a2a, a2a_adapter=a2a_adapter)
+    app = create_app(agent, additional_routers=additional_routers, channel_router=channel_router, a2a=a2a, a2a_adapter=a2a_adapter)
 
     logger.info(f"Starting DCAF server at http://{host}:{port}")
     logger.info("Endpoints:")
     logger.info(f"  GET  http://{host}:{port}/health")
     logger.info(f"  POST http://{host}:{port}/api/chat")
     logger.info(f"  POST http://{host}:{port}/api/chat-stream")
+    logger.info(f"  WS   ws://{host}:{port}/api/chat-ws")
     if a2a:
         logger.info("A2A Endpoints:")
         logger.info(f"  GET  http://{host}:{port}/.well-known/agent.json")
@@ -256,6 +272,7 @@ def serve(
 def create_app(
     agent: Union["Agent", AgentHandler],
     additional_routers: Sequence["APIRouter"] | None = None,
+    channel_router: "ChannelResponseRouter | None" = None,
     a2a: bool = False,
     a2a_adapter: str = "agno",  # noqa: ARG001 - Reserved for future A2A adapter selection
 ) -> "FastAPI":
@@ -270,6 +287,10 @@ def create_app(
                If callable, signature must be: (messages: list, context: dict) -> AgentResult
         additional_routers: Optional list of FastAPI APIRouter instances to include.
                            Use this to add custom endpoints beyond /api/chat.
+        channel_router: Optional channel response router for multi-agent environments.
+                       When provided and the request includes ``source: "slack"``,
+                       the router decides whether the agent should respond.
+                       Use ``SlackResponseRouter`` for Slack integration.
         a2a: Enable A2A (Agent-to-Agent) protocol support (default: False).
         a2a_adapter: A2A adapter to use (default: "agno").
 
@@ -327,7 +348,7 @@ def create_app(
     adapter = _create_adapter(agent)
 
     # Create the base app
-    app = create_chat_app(adapter)
+    app = create_chat_app(adapter, router=channel_router)
 
     # Add A2A routes if enabled
     if a2a:
@@ -405,7 +426,7 @@ def _start_mcp_server(agent: Any, host: str, port: int, transport: str) -> Any:
                 mcp.run()
         except ImportError as e:
             logger.error(f"MCP server failed to start: {e}. Install with: pip install dcaf[mcp]")
-        except Exception as e:
+        except Exception as e:  # Intentional catch-all: MCP subprocess boundary
             logger.exception(f"MCP server error: {e}")
 
     logger.info(f"MCP Server: http://{host}:{port} ({transport} transport)")
@@ -498,7 +519,7 @@ class CallableAdapter:
             else:
                 return AgentMessage(content=str(result))
 
-        except Exception as e:
+        except Exception as e:  # Intentional catch-all: user handler code can raise anything
             logger.exception(f"Agent handler error: {e}")
             return AgentMessage(content=f"Error: {str(e)}")
 
@@ -520,7 +541,7 @@ class CallableAdapter:
 
             yield DoneEvent()
 
-        except Exception as e:
+        except Exception as e:  # Intentional catch-all: user handler code can raise anything
             yield ErrorEvent(error=str(e))
 
     def _simplify_messages(self, messages_list: list) -> list[dict]:

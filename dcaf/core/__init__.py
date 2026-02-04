@@ -98,6 +98,7 @@ from .primitives import (
     ToolResult,
     from_agent_response,
 )
+from ..channel_routing import ChannelResponseRouter, SlackResponseRouter
 from .server import create_app, serve
 from .session import Session
 
@@ -148,6 +149,9 @@ __all__ = [
     "Conversation",
     "Message",
     "ToolCall",
+    # Channel Routing
+    "ChannelResponseRouter",
+    "SlackResponseRouter",
     # Events
     "DomainEvent",
     "ConversationStarted",

@@ -394,6 +394,12 @@ def serve(
     workers: int = 1,
     timeout_keep_alive: int = 5,
     additional_routers: Sequence[APIRouter] | None = None,
+    channel_router: ChannelResponseRouter | None = None,
+    a2a: bool = False,
+    a2a_adapter: str = "agno",
+    mcp: bool = False,
+    mcp_port: int = 8001,
+    mcp_transport: str = "sse",
 ) -> None
 ```
 
@@ -409,6 +415,12 @@ Start a REST server for the agent.
 | `workers` | `int` | `1` | Number of worker processes for parallelism |
 | `timeout_keep_alive` | `int` | `5` | Keep-alive timeout in seconds |
 | `additional_routers` | `Sequence[APIRouter]` | `None` | Custom FastAPI routers to include |
+| `channel_router` | `ChannelResponseRouter` | `None` | Channel response router for multi-agent environments. See [Channel Routing](#channel-routing). |
+| `a2a` | `bool` | `False` | Enable A2A (Agent-to-Agent) protocol support |
+| `a2a_adapter` | `str` | `"agno"` | A2A adapter to use |
+| `mcp` | `bool` | `False` | Enable MCP server alongside the HTTP server |
+| `mcp_port` | `int` | `8001` | Port for the MCP server |
+| `mcp_transport` | `str` | `"sse"` | MCP transport (`"sse"` or `"stdio"`) |
 
 **Raises:**
 
@@ -420,14 +432,194 @@ Start a REST server for the agent.
 def create_app(
     agent: Agent | Callable,
     additional_routers: Sequence[APIRouter] | None = None,
+    channel_router: ChannelResponseRouter | None = None,
+    a2a: bool = False,
+    a2a_adapter: str = "agno",
 ) -> FastAPI
 ```
 
 Create a FastAPI application without starting the server. Use this for programmatic control or custom uvicorn configuration.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `agent` | `Agent` or `Callable` | Required | Agent instance or callable `(messages, context) -> AgentResult` |
+| `additional_routers` | `Sequence[APIRouter]` | `None` | Custom FastAPI routers to include |
+| `channel_router` | `ChannelResponseRouter` | `None` | Channel response router for multi-agent environments. See [Channel Routing](#channel-routing). |
+| `a2a` | `bool` | `False` | Enable A2A (Agent-to-Agent) protocol support |
+| `a2a_adapter` | `str` | `"agno"` | A2A adapter to use |
+
+---
+
+## Channel Routing
+
+Channel routing enables intelligent message filtering in multi-agent environments. When a `channel_router` is provided and the incoming request includes `"source": "slack"`, the router determines whether the agent should respond before processing the message.
+
+This is useful when multiple agents share a Slack channel — each agent uses its own router to decide if a message is relevant to its domain.
+
+### Setup
+
+```python
+from dcaf.core import Agent, serve, SlackResponseRouter
+from dcaf.llm import BedrockLLM
+
+agent = Agent(
+    tools=[...],
+    system_prompt="You are a Kubernetes assistant.",
+)
+
+llm = BedrockLLM()
+
+slack_router = SlackResponseRouter(
+    llm_client=llm,
+    agent_name="k8s-agent",
+    agent_description="""
+    Specialized Kubernetes and Helm expert. Responds to:
+    - Kubernetes resource management, kubectl commands
+    - Helm chart operations
+    - DuploCloud service management
+    Does NOT respond to: general cloud infra, CI/CD, database queries.
+    """,
+)
+
+serve(agent, channel_router=slack_router, port=8000)
+```
+
+### With create_app()
+
+```python
+from dcaf.core import Agent, create_app, SlackResponseRouter
+from dcaf.llm import BedrockLLM
+import uvicorn
+
+agent = Agent(tools=[...])
+llm = BedrockLLM()
+
+router = SlackResponseRouter(
+    llm_client=llm,
+    agent_name="aws-agent",
+    agent_description="AWS cloud infrastructure specialist",
+)
+
+app = create_app(agent, channel_router=router)
+uvicorn.run(app, host="0.0.0.0", port=8000)
+```
+
+### How It Works
+
+When a request arrives with `"source": "slack"` in the body:
+
+1. The `SlackResponseRouter.should_agent_respond()` method is called with the message thread.
+2. The router uses a fast LLM call (Claude 3.5 Haiku) to analyze the conversation and decide if the agent should respond.
+3. If the router decides **not** to respond, the endpoint returns an empty response immediately (or a `done` event for streaming).
+4. If the router decides **to respond**, the request proceeds to the agent normally.
+
+Requests without `"source": "slack"` bypass routing entirely.
+
+### Slack Request Format
+
+```json
+{
+    "messages": [
+        {
+            "role": "user",
+            "content": "My pods keep crashing with OOMKilled",
+            "user": {"name": "alice", "id": "U123"}
+        },
+        {
+            "role": "assistant",
+            "content": "Try increasing memory limits in your deployment.",
+            "agent": {"name": "k8s-agent", "id": "B456"}
+        },
+        {
+            "role": "user",
+            "content": "Actually, I think this is an AWS node issue",
+            "user": {"name": "alice", "id": "U123"}
+        }
+    ],
+    "source": "slack"
+}
+```
+
+### Multi-Agent Example
+
+Run multiple agents on different ports, each with its own router:
+
+```python
+# k8s_server.py
+from dcaf.core import Agent, serve, SlackResponseRouter
+from dcaf.llm import BedrockLLM
+
+llm = BedrockLLM()
+agent = Agent(tools=[...], system_prompt="You are a Kubernetes expert.")
+
+serve(
+    agent,
+    channel_router=SlackResponseRouter(
+        llm_client=llm,
+        agent_name="k8s-agent",
+        agent_description="Kubernetes and container orchestration specialist",
+    ),
+    port=8000,
+)
+```
+
+```python
+# aws_server.py
+from dcaf.core import Agent, serve, SlackResponseRouter
+from dcaf.llm import BedrockLLM
+
+llm = BedrockLLM()
+agent = Agent(tools=[...], system_prompt="You are an AWS infrastructure expert.")
+
+serve(
+    agent,
+    channel_router=SlackResponseRouter(
+        llm_client=llm,
+        agent_name="aws-agent",
+        agent_description="AWS cloud infrastructure and services specialist",
+    ),
+    port=8001,
+)
+```
+
+When a Slack message arrives, each agent's router independently decides whether to respond based on the message content and the agent's description.
+
+### Custom Routers
+
+You can implement your own router by extending `ChannelResponseRouter`:
+
+```python
+from dcaf.core import ChannelResponseRouter
+
+class KeywordRouter(ChannelResponseRouter):
+    def __init__(self, keywords: list[str]):
+        self.keywords = keywords
+
+    def should_agent_respond(self, messages: list) -> dict:
+        last_msg = next(
+            (m for m in reversed(messages) if m.get("role") == "user"),
+            None,
+        )
+        if not last_msg:
+            return {"should_respond": False, "reasoning": "No user message"}
+
+        content = last_msg.get("content", "").lower()
+        for kw in self.keywords:
+            if kw.lower() in content:
+                return {"should_respond": True, "reasoning": f"Matched: {kw}"}
+
+        return {"should_respond": False, "reasoning": "No matching keywords"}
+
+serve(agent, channel_router=KeywordRouter(keywords=["kubernetes", "k8s", "pod"]))
+```
+
+!!! info "See Also"
+    For full API details on `SlackResponseRouter` (constructor parameters, decision criteria, testing patterns), see the [Channel Routing API Reference](../api-reference/channel-routing.md).
 
 ---
 
 ## See Also
 
 - [Core Overview](index.md) - Introduction to DCAF Core
+- [Channel Routing API Reference](../api-reference/channel-routing.md) - Full `SlackResponseRouter` and `ChannelResponseRouter` API details
 - [ADR-007: Lowercase Chat Endpoints](../adrs/007-lowercase-chat-endpoints.md) - Why `/api/chat` instead of `/api/sendMessage`

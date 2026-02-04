@@ -118,6 +118,7 @@ nav:
   - Core:
     - Overview: core/index.md
     - Server: core/server.md
+    - Channel Routing: api-reference/channel-routing.md
     - A2A (Agent-to-Agent): core/a2a.md
     - HelpDesk Protocol: core/helpdesk-protocol.md
     - Domain Layer: core/domain.md

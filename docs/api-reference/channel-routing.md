@@ -27,7 +27,10 @@ Channel routing helps agents make intelligent decisions about when to respond in
 ```python
 from dcaf.channel_routing import SlackResponseRouter, ChannelResponseRouter
 
-# Or from main module
+# Or from the core module
+from dcaf.core import SlackResponseRouter, ChannelResponseRouter
+
+# Or from the top-level module
 from dcaf import SlackResponseRouter
 ```
 
@@ -192,7 +195,50 @@ router = SlackResponseRouter(
 )
 ```
 
-### Using with Agent Server
+### Using with Core API (`serve()` / `create_app()`)
+
+The recommended way to use channel routing with DCAF Core agents:
+
+```python
+from dcaf.core import Agent, serve, SlackResponseRouter
+from dcaf.llm import BedrockLLM
+
+agent = Agent(
+    tools=[...],
+    system_prompt="You are a Kubernetes assistant.",
+)
+
+llm = BedrockLLM()
+router = SlackResponseRouter(
+    llm_client=llm,
+    agent_name="k8s-agent",
+    agent_description="Kubernetes and container orchestration specialist",
+)
+
+# Pass channel_router to serve()
+serve(agent, channel_router=router, port=8000)
+```
+
+Or with `create_app()` for programmatic control:
+
+```python
+from dcaf.core import Agent, create_app, SlackResponseRouter
+from dcaf.llm import BedrockLLM
+import uvicorn
+
+agent = Agent(tools=[...])
+llm = BedrockLLM()
+router = SlackResponseRouter(
+    llm_client=llm,
+    agent_name="k8s-agent",
+    agent_description="Kubernetes specialist",
+)
+
+app = create_app(agent, channel_router=router)
+uvicorn.run(app, host="0.0.0.0", port=8000)
+```
+
+### Using with Agent Server (Legacy)
 
 ```python
 from dcaf.agent_server import create_chat_app
@@ -308,7 +354,44 @@ print(f"K8sBot should respond: {k8s_result['should_respond']}")
 print(f"AWSBot should respond: {aws_result['should_respond']}")
 ```
 
-### Example 3: Full Server Integration
+### Example 3: Full Server Integration (Core API)
+
+```python
+from dcaf.core import Agent, serve, SlackResponseRouter
+from dcaf.tools import tool
+from dcaf.llm import BedrockLLM
+
+# Create tools
+@tool(description="Check the status of Kubernetes pods")
+def check_pod_status(namespace: str = "default") -> str:
+    return f"All pods in {namespace} are running"
+
+# Create agent
+agent = Agent(
+    tools=[check_pod_status],
+    system_prompt="You are K8sBot, a Kubernetes expert.",
+)
+
+# Create router
+llm = BedrockLLM()
+router = SlackResponseRouter(
+    llm_client=llm,
+    agent_name="K8sBot",
+    agent_description="""
+    K8sBot specializes in:
+    - Kubernetes troubleshooting
+    - Pod and deployment management
+    - Container orchestration
+    - kubectl commands
+    """,
+)
+
+# Serve with channel routing
+if __name__ == "__main__":
+    serve(agent, channel_router=router, port=8000)
+```
+
+### Example 3b: Full Server Integration (Legacy API)
 
 ```python
 from dcaf.llm import BedrockLLM
@@ -491,6 +574,7 @@ print(result)
 
 ## See Also
 
+- [Core Server — Channel Routing](../core/server.md#channel-routing) - Using channel routing with `serve()` and `create_app()`
 - [Agent Server API Reference](./agent-server.md)
 - [Agents API Reference](./agents.md)
 - [BedrockLLM API Reference](./llm.md)
