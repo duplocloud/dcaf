@@ -72,6 +72,8 @@ DEFAULT_TIMEOUT_KEEP_ALIVE = 5
 DEFAULT_MCP_PORT = 8001
 DEFAULT_MCP_TRANSPORT = "sse"
 DEFAULT_A2A_ADAPTER = "agno"
+DEFAULT_WS_PING_INTERVAL: float = 20.0
+DEFAULT_WS_PING_TIMEOUT: float = 20.0
 
 
 def serve(
@@ -90,6 +92,8 @@ def serve(
     mcp: bool = False,
     mcp_port: int = DEFAULT_MCP_PORT,
     mcp_transport: str = DEFAULT_MCP_TRANSPORT,
+    ws_ping_interval: float | None = DEFAULT_WS_PING_INTERVAL,
+    ws_ping_timeout: float | None = DEFAULT_WS_PING_TIMEOUT,
 ) -> None:
     """
     Start a REST server for the agent.
@@ -130,6 +134,12 @@ def serve(
         mcp_port: Port for the MCP server when mcp=True (default: 8001).
         mcp_transport: Transport for MCP server - "sse" (default) or "stdio".
                       SSE runs an HTTP server, stdio uses standard I/O.
+        ws_ping_interval: Interval in seconds between WebSocket ping frames
+                         (default: 20.0). Set to ``None`` to disable pings.
+                         Uvicorn sends these automatically to detect dead connections.
+        ws_ping_timeout: Seconds to wait for a pong reply before closing
+                        the connection (default: 20.0). Set to ``None`` to wait
+                        indefinitely.
 
     Endpoints:
         GET  /health           - Health check
@@ -264,6 +274,8 @@ def serve(
             log_level=log_level,
             workers=workers,
             timeout_keep_alive=timeout_keep_alive,
+            ws_ping_interval=ws_ping_interval,
+            ws_ping_timeout=ws_ping_timeout,
         )
     finally:
         # Clean up MCP server if it was started

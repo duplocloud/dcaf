@@ -403,6 +403,107 @@ Errors during a turn are sent as `error` events without closing the connection. 
 
 Invalid JSON or missing `messages` fields also return error events while keeping the connection alive.
 
+### Connection Stability
+
+DCAF uses uvicorn's built-in WebSocket ping/pong mechanism to detect dead connections. By default, the server sends a ping frame every **20 seconds** and expects a pong reply within **20 seconds**. If no pong is received, the server closes the connection.
+
+You can tune these values via `serve()`:
+
+```python
+serve(
+    agent,
+    ws_ping_interval=30.0,   # Ping every 30s
+    ws_ping_timeout=30.0,    # Wait 30s for pong
+)
+```
+
+Set to `None` to disable automatic pings:
+
+```python
+serve(agent, ws_ping_interval=None, ws_ping_timeout=None)
+```
+
+!!! tip "Load Balancer Considerations"
+    Many load balancers (e.g., AWS ALB, nginx) enforce their own idle timeouts, typically 60–120 seconds. Ensure `ws_ping_interval` is shorter than your load balancer's idle timeout so that ping frames keep the connection active.
+
+#### Client-Side Reconnection
+
+WebSocket connections can drop due to network issues, server restarts, or load balancer timeouts. Clients should implement reconnection logic:
+
+=== "Python"
+
+    ```python
+    import asyncio
+    import json
+    import websockets
+    from websockets.exceptions import ConnectionClosed
+
+    async def resilient_chat(url: str, message: str):
+        backoff = 1
+        while True:
+            try:
+                async with websockets.connect(url) as ws:
+                    backoff = 1  # Reset on successful connect
+                    await ws.send(json.dumps({
+                        "messages": [{"role": "user", "content": message}]
+                    }))
+
+                    async for frame in ws:
+                        event = json.loads(frame)
+                        if event["type"] == "text_delta":
+                            print(event["text"], end="", flush=True)
+                        elif event["type"] == "done":
+                            print()
+                            return  # Success
+                        elif event["type"] == "error":
+                            print(f"\nError: {event['error']}")
+                            return
+
+            except (ConnectionClosed, OSError) as e:
+                print(f"\nConnection lost: {e}. Reconnecting in {backoff}s...")
+                await asyncio.sleep(backoff)
+                backoff = min(backoff * 2, 30)  # Exponential backoff, max 30s
+    ```
+
+=== "JavaScript"
+
+    ```javascript
+    function createResilientWebSocket(url, onEvent) {
+      let backoff = 1000;
+
+      function connect() {
+        const ws = new WebSocket(url);
+
+        ws.onopen = () => { backoff = 1000; };
+
+        ws.onmessage = (msg) => {
+          const event = JSON.parse(msg.data);
+          onEvent(event);
+        };
+
+        ws.onclose = (e) => {
+          if (e.code !== 1000) {  // Abnormal close
+            console.log(`Reconnecting in ${backoff}ms...`);
+            setTimeout(connect, backoff);
+            backoff = Math.min(backoff * 2, 30000);
+          }
+        };
+
+        ws.onerror = () => ws.close();
+
+        return ws;
+      }
+
+      return connect();
+    }
+
+    // Usage
+    createResilientWebSocket("ws://localhost:8000/api/chat-ws", (event) => {
+      if (event.type === "text_delta") process.stdout.write(event.text);
+      else if (event.type === "done") console.log("\n--- Done ---");
+    });
+    ```
+
 ### When to Use WebSocket vs HTTP
 
 | Use Case | Recommended Endpoint |
@@ -509,6 +610,8 @@ def serve(
     mcp: bool = False,
     mcp_port: int = 8001,
     mcp_transport: str = "sse",
+    ws_ping_interval: float | None = 20.0,
+    ws_ping_timeout: float | None = 20.0,
 ) -> None
 ```
 
@@ -531,6 +634,8 @@ Start a REST server for the agent.
 | `mcp` | `bool` | `False` | Enable MCP server alongside the HTTP server |
 | `mcp_port` | `int` | `8001` | Port for the MCP server |
 | `mcp_transport` | `str` | `"sse"` | MCP transport (`"sse"` or `"stdio"`) |
+| `ws_ping_interval` | `float` or `None` | `20.0` | Seconds between WebSocket ping frames. Set to `None` to disable. |
+| `ws_ping_timeout` | `float` or `None` | `20.0` | Seconds to wait for a pong reply before closing the connection. |
 
 **Raises:**
 
