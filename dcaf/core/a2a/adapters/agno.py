@@ -200,12 +200,15 @@ class AgnoA2AServer(A2AServerAdapter):
             },
         )
 
-    def create_routes(self, agent: "Agent") -> list["APIRouter"]:
+    def create_routes(self, agent: "Agent", agent_card: "AgentCard | dict[str, Any] | None" = None) -> list["APIRouter"]:
         """
         Create FastAPI routes for A2A endpoints.
 
         Args:
             agent: DCAF Agent instance to expose
+            agent_card: Optional custom agent card. Can be an AgentCard instance
+                       or a dict with arbitrary A2A spec fields. If not provided,
+                       the card is auto-generated from the agent.
 
         Returns:
             List of FastAPI APIRouter instances
@@ -223,11 +226,23 @@ class AgnoA2AServer(A2AServerAdapter):
         @router.get("/.well-known/agent.json")
         async def get_agent_card(request: Request) -> dict[str, Any]:
             """Get the agent card for A2A discovery."""
-            # Generate card with current URL
             base_url = str(request.base_url).rstrip("/")
-            card = self.create_agent_card(agent)
-            card.url = base_url
-            return card.to_dict()
+
+            if agent_card is not None:
+                # Use custom card
+                if isinstance(agent_card, dict):
+                    card_dict = dict(agent_card)
+                    card_dict["url"] = base_url
+                    return card_dict
+                else:
+                    # AgentCard instance
+                    agent_card.url = base_url
+                    return agent_card.to_dict()
+            else:
+                # Auto-generate from agent
+                card = self.create_agent_card(agent)
+                card.url = base_url
+                return card.to_dict()
 
         @router.post("/a2a/tasks/send")
         async def send_task(

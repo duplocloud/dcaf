@@ -76,9 +76,11 @@ print(f"Skills: {k8s.skills}")        # ["list_pods", ...]
 
 ## Agent Card (Discovery)
 
-When you expose an agent via A2A, it automatically generates an **Agent Card** that describes its capabilities.
+When you expose an agent via A2A, it automatically generates an **Agent Card** that describes its capabilities. You can also provide a custom card for full control over the A2A discovery metadata.
 
-### Example Agent Card
+### Auto-Generated Card
+
+By default, the card is generated from your `Agent` instance:
 
 ```json
 {
@@ -94,6 +96,52 @@ When you expose an agent via A2A, it automatically generates an **Agent Card** t
   }
 }
 ```
+
+### Custom Agent Card
+
+For full control over the agent card — including fields from the [A2A spec](https://a2a.cx) that DCAF doesn't auto-generate — pass `a2a_agent_card` to `serve()` or `create_app()`.
+
+#### Using an AgentCard instance
+
+```python
+from dcaf.core import Agent, serve
+from dcaf.core.a2a.models import AgentCard
+
+agent = Agent(name="my-agent", tools=[...])
+
+custom_card = AgentCard(
+    name="ci-cd-agent",
+    description="Jenkins CI/CD assistant",
+    url="",  # Set automatically from request URL
+    skills=["fetch_logs", "trigger_build"],
+    version="2.0",
+    metadata={"org": "duplocloud", "team": "platform"},
+)
+
+serve(agent, a2a=True, a2a_agent_card=custom_card)
+```
+
+#### Using a dict (full A2A spec compliance)
+
+Pass a dict to include arbitrary fields from the A2A spec without being limited to the `AgentCard` model:
+
+```python
+from dcaf.core import Agent, create_app
+
+agent = Agent(name="my-agent", tools=[...])
+
+app = create_app(agent, a2a=True, a2a_agent_card={
+    "name": "ci-cd-agent",
+    "description": "Jenkins CI/CD assistant",
+    "skills": ["fetch_logs", "trigger_build"],
+    "authentication": {"schemes": ["bearer"]},
+    "capabilities": {"streaming": True, "pushNotifications": False},
+    "provider": {"organization": "DuploCloud"},
+})
+```
+
+!!! note
+    The `url` field is always set dynamically from the incoming request's base URL, regardless of whether you provide a custom card or use auto-generation.
 
 ### Accessing Agent Cards
 

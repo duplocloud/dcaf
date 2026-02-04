@@ -2,7 +2,7 @@
 
 from abc import ABC
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 
 from ..value_objects.conversation_id import ConversationId
 
@@ -18,7 +18,7 @@ class DomainEvent(ABC):  # noqa: B024
     side effects.
     """
 
-    timestamp: datetime = field(default_factory=datetime.utcnow)
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     @property
     def event_type(self) -> str:

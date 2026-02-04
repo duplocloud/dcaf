@@ -192,6 +192,117 @@ class TestA2ARouting:
         assert "/a2a/tasks/send" not in routes
 
 
+class TestCustomAgentCard:
+    """Tests for custom a2a_agent_card support."""
+
+    def test_custom_agent_card_via_agentcard_instance(self):
+        """Test that a custom AgentCard is served instead of auto-generated."""
+        from dcaf.core.a2a.models import AgentCard
+
+        agent = Agent(
+            name="test-agent",
+            description="A test agent",
+            tools=[echo_tool],
+        )
+
+        custom_card = AgentCard(
+            name="custom-agent",
+            description="A custom description",
+            url="",
+            skills=["custom_skill_1", "custom_skill_2"],
+            version="2.0",
+            metadata={"org": "duplocloud"},
+        )
+
+        app = create_app(agent, a2a=True, a2a_agent_card=custom_card)
+        client = TestClient(app)
+
+        response = client.get("/.well-known/agent.json")
+        assert response.status_code == 200
+
+        card_data = response.json()
+        assert card_data["name"] == "custom-agent"
+        assert card_data["description"] == "A custom description"
+        assert card_data["skills"] == ["custom_skill_1", "custom_skill_2"]
+        assert card_data["version"] == "2.0"
+        assert card_data["metadata"]["org"] == "duplocloud"
+
+    def test_custom_agent_card_via_dict(self):
+        """Test that a custom dict card is served with arbitrary A2A spec fields."""
+        agent = Agent(
+            name="test-agent",
+            description="A test agent",
+            tools=[echo_tool],
+        )
+
+        custom_card = {
+            "name": "dict-agent",
+            "description": "From a dict",
+            "skills": ["skill_a"],
+            "authentication": {"schemes": ["bearer"]},
+            "capabilities": {"streaming": True, "pushNotifications": False},
+        }
+
+        app = create_app(agent, a2a=True, a2a_agent_card=custom_card)
+        client = TestClient(app)
+
+        response = client.get("/.well-known/agent.json")
+        assert response.status_code == 200
+
+        card_data = response.json()
+        assert card_data["name"] == "dict-agent"
+        assert card_data["description"] == "From a dict"
+        assert card_data["authentication"] == {"schemes": ["bearer"]}
+        assert card_data["capabilities"]["streaming"] is True
+
+    def test_auto_generated_card_when_no_custom_card(self):
+        """Test that auto-generated card is used when a2a_agent_card is not provided."""
+        agent = Agent(
+            name="auto-agent",
+            description="Auto generated",
+            tools=[echo_tool, add_tool],
+        )
+
+        app = create_app(agent, a2a=True)
+        client = TestClient(app)
+
+        response = client.get("/.well-known/agent.json")
+        assert response.status_code == 200
+
+        card_data = response.json()
+        assert card_data["name"] == "auto-agent"
+        assert card_data["description"] == "Auto generated"
+        assert "echo_tool" in card_data["skills"]
+        assert "add_tool" in card_data["skills"]
+
+    def test_custom_card_url_set_dynamically(self):
+        """Test that url is set from request.base_url even with custom AgentCard."""
+        from dcaf.core.a2a.models import AgentCard
+
+        agent = Agent(
+            name="test-agent",
+            description="A test agent",
+            tools=[echo_tool],
+        )
+
+        custom_card = AgentCard(
+            name="custom-agent",
+            description="Custom",
+            url="http://should-be-overridden",
+            skills=[],
+        )
+
+        app = create_app(agent, a2a=True, a2a_agent_card=custom_card)
+        client = TestClient(app, base_url="http://testserver")
+
+        response = client.get("/.well-known/agent.json")
+        assert response.status_code == 200
+
+        card_data = response.json()
+        # URL should be set from the request, not the static value
+        assert "testserver" in card_data["url"]
+
+
 # Integration test that requires a running server (marked for manual testing)
 @pytest.mark.skip(
     reason="Requires running server - use examples/a2a_example.py for integration testing"

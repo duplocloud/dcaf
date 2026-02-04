@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 def create_a2a_routes(
     agent: "Agent",
     adapter: A2AServerAdapter | None = None,
+    agent_card: "AgentCard | dict | None" = None,
 ) -> list["APIRouter"]:
     """
     Create FastAPI routes for A2A endpoints.
@@ -36,6 +37,9 @@ def create_a2a_routes(
         agent: DCAF Agent instance to expose
         adapter: Optional custom A2A server adapter. If not provided,
                 uses the default adapter (Agno).
+        agent_card: Optional custom agent card. Can be an AgentCard instance
+                   or a dict with arbitrary A2A spec fields. If not provided,
+                   the card is auto-generated from the agent.
 
     Returns:
         List of FastAPI APIRouter instances
@@ -58,7 +62,7 @@ def create_a2a_routes(
     if adapter is None:
         adapter = _load_default_adapter()
 
-    return adapter.create_routes(agent)
+    return adapter.create_routes(agent, agent_card=agent_card)
 
 
 def generate_agent_card(

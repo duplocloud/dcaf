@@ -86,6 +86,7 @@ def serve(
     channel_router: "ChannelResponseRouter | None" = None,
     a2a: bool = False,
     a2a_adapter: str = DEFAULT_A2A_ADAPTER,
+    a2a_agent_card: "AgentCard | dict | None" = None,
     mcp: bool = False,
     mcp_port: int = DEFAULT_MCP_PORT,
     mcp_transport: str = DEFAULT_MCP_TRANSPORT,
@@ -119,6 +120,9 @@ def serve(
             When enabled, adds A2A endpoints for agent discovery and task handling.
         a2a_adapter: A2A adapter to use (default: "agno").
                     Currently only "agno" is supported.
+        a2a_agent_card: Optional custom agent card for A2A discovery. Can be an
+                       AgentCard instance or a dict with arbitrary A2A spec fields.
+                       If not provided, the card is auto-generated from the agent.
         mcp: Enable MCP (Model Context Protocol) server (default: False).
             When enabled, starts an MCP server alongside the HTTP server.
             This allows AI assistants like Claude to discover and use the
@@ -227,7 +231,7 @@ def serve(
         )
 
     # Create the FastAPI app
-    app = create_app(agent, additional_routers=additional_routers, channel_router=channel_router, a2a=a2a, a2a_adapter=a2a_adapter)
+    app = create_app(agent, additional_routers=additional_routers, channel_router=channel_router, a2a=a2a, a2a_adapter=a2a_adapter, a2a_agent_card=a2a_agent_card)
 
     logger.info(f"Starting DCAF server at http://{host}:{port}")
     logger.info("Endpoints:")
@@ -275,6 +279,7 @@ def create_app(
     channel_router: "ChannelResponseRouter | None" = None,
     a2a: bool = False,
     a2a_adapter: str = "agno",  # noqa: ARG001 - Reserved for future A2A adapter selection
+    a2a_agent_card: "AgentCard | dict | None" = None,
 ) -> "FastAPI":
     """
     Create a FastAPI application for the agent without starting the server.
@@ -293,6 +298,9 @@ def create_app(
                        Use ``SlackResponseRouter`` for Slack integration.
         a2a: Enable A2A (Agent-to-Agent) protocol support (default: False).
         a2a_adapter: A2A adapter to use (default: "agno").
+        a2a_agent_card: Optional custom agent card for A2A discovery. Can be an
+                       AgentCard instance or a dict with arbitrary A2A spec fields.
+                       If not provided, the card is auto-generated from the agent.
 
     Returns:
         FastAPI application instance
@@ -361,7 +369,7 @@ def create_app(
                     "A2A protocol requires an Agent instance, not a callable. A2A disabled."
                 )
             else:
-                a2a_routers = create_a2a_routes(agent)
+                a2a_routers = create_a2a_routes(agent, agent_card=a2a_agent_card)
                 for router in a2a_routers:
                     app.include_router(router)
                 logger.info("A2A protocol enabled")

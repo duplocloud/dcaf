@@ -397,6 +397,7 @@ def serve(
     channel_router: ChannelResponseRouter | None = None,
     a2a: bool = False,
     a2a_adapter: str = "agno",
+    a2a_agent_card: AgentCard | dict | None = None,
     mcp: bool = False,
     mcp_port: int = 8001,
     mcp_transport: str = "sse",
@@ -418,6 +419,7 @@ Start a REST server for the agent.
 | `channel_router` | `ChannelResponseRouter` | `None` | Channel response router for multi-agent environments. See [Channel Routing](#channel-routing). |
 | `a2a` | `bool` | `False` | Enable A2A (Agent-to-Agent) protocol support |
 | `a2a_adapter` | `str` | `"agno"` | A2A adapter to use |
+| `a2a_agent_card` | `AgentCard` or `dict` | `None` | Custom agent card for A2A discovery. See [A2A Agent Card](./a2a.md#custom-agent-card). |
 | `mcp` | `bool` | `False` | Enable MCP server alongside the HTTP server |
 | `mcp_port` | `int` | `8001` | Port for the MCP server |
 | `mcp_transport` | `str` | `"sse"` | MCP transport (`"sse"` or `"stdio"`) |
@@ -435,6 +437,7 @@ def create_app(
     channel_router: ChannelResponseRouter | None = None,
     a2a: bool = False,
     a2a_adapter: str = "agno",
+    a2a_agent_card: AgentCard | dict | None = None,
 ) -> FastAPI
 ```
 
@@ -447,6 +450,7 @@ Create a FastAPI application without starting the server. Use this for programma
 | `channel_router` | `ChannelResponseRouter` | `None` | Channel response router for multi-agent environments. See [Channel Routing](#channel-routing). |
 | `a2a` | `bool` | `False` | Enable A2A (Agent-to-Agent) protocol support |
 | `a2a_adapter` | `str` | `"agno"` | A2A adapter to use |
+| `a2a_agent_card` | `AgentCard` or `dict` | `None` | Custom agent card for A2A discovery. See [A2A Agent Card](./a2a.md#custom-agent-card). |
 
 ---
 
