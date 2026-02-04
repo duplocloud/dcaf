@@ -3399,10 +3399,11 @@
 </span><span id="__span-18-10"><a id="__codelineno-18-10" name="__codelineno-18-10" href="#__codelineno-18-10"></a>    <span class="n">channel_router</span><span class="p">:</span> <span class="n">ChannelResponseRouter</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 </span><span id="__span-18-11"><a id="__codelineno-18-11" name="__codelineno-18-11" href="#__codelineno-18-11"></a>    <span class="n">a2a</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
 </span><span id="__span-18-12"><a id="__codelineno-18-12" name="__codelineno-18-12" href="#__codelineno-18-12"></a>    <span class="n">a2a_adapter</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;agno&quot;</span><span class="p">,</span>
-</span><span id="__span-18-13"><a id="__codelineno-18-13" name="__codelineno-18-13" href="#__codelineno-18-13"></a>    <span class="n">mcp</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
-</span><span id="__span-18-14"><a id="__codelineno-18-14" name="__codelineno-18-14" href="#__codelineno-18-14"></a>    <span class="n">mcp_port</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">8001</span><span class="p">,</span>
-</span><span id="__span-18-15"><a id="__codelineno-18-15" name="__codelineno-18-15" href="#__codelineno-18-15"></a>    <span class="n">mcp_transport</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;sse&quot;</span><span class="p">,</span>
-</span><span id="__span-18-16"><a id="__codelineno-18-16" name="__codelineno-18-16" href="#__codelineno-18-16"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
+</span><span id="__span-18-13"><a id="__codelineno-18-13" name="__codelineno-18-13" href="#__codelineno-18-13"></a>    <span class="n">a2a_agent_card</span><span class="p">:</span> <span class="n">AgentCard</span> <span class="o">|</span> <span class="nb">dict</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-18-14"><a id="__codelineno-18-14" name="__codelineno-18-14" href="#__codelineno-18-14"></a>    <span class="n">mcp</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+</span><span id="__span-18-15"><a id="__codelineno-18-15" name="__codelineno-18-15" href="#__codelineno-18-15"></a>    <span class="n">mcp_port</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">8001</span><span class="p">,</span>
+</span><span id="__span-18-16"><a id="__codelineno-18-16" name="__codelineno-18-16" href="#__codelineno-18-16"></a>    <span class="n">mcp_transport</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;sse&quot;</span><span class="p">,</span>
+</span><span id="__span-18-17"><a id="__codelineno-18-17" name="__codelineno-18-17" href="#__codelineno-18-17"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
 </span></code></pre></div>
 <p>Start a REST server for the agent.</p>
 <table>
@@ -3482,6 +3483,12 @@
 <td>A2A adapter to use</td>
 </tr>
 <tr>
+<td><code>a2a_agent_card</code></td>
+<td><code>AgentCard</code> or <code>dict</code></td>
+<td><code>None</code></td>
+<td>Custom agent card for A2A discovery. See <a href="../a2a/#custom-agent-card">A2A Agent Card</a>.</td>
+</tr>
+<tr>
 <td><code>mcp</code></td>
 <td><code>bool</code></td>
 <td><code>False</code></td>
@@ -3512,7 +3519,8 @@
 </span><span id="__span-19-4"><a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a>    <span class="n">channel_router</span><span class="p">:</span> <span class="n">ChannelResponseRouter</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 </span><span id="__span-19-5"><a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a>    <span class="n">a2a</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
 </span><span id="__span-19-6"><a id="__codelineno-19-6" name="__codelineno-19-6" href="#__codelineno-19-6"></a>    <span class="n">a2a_adapter</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;agno&quot;</span><span class="p">,</span>
-</span><span id="__span-19-7"><a id="__codelineno-19-7" name="__codelineno-19-7" href="#__codelineno-19-7"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FastAPI</span>
+</span><span id="__span-19-7"><a id="__codelineno-19-7" name="__codelineno-19-7" href="#__codelineno-19-7"></a>    <span class="n">a2a_agent_card</span><span class="p">:</span> <span class="n">AgentCard</span> <span class="o">|</span> <span class="nb">dict</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-19-8"><a id="__codelineno-19-8" name="__codelineno-19-8" href="#__codelineno-19-8"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FastAPI</span>
 </span></code></pre></div>
 <p>Create a FastAPI application without starting the server. Use this for programmatic control or custom uvicorn configuration.</p>
 <table>
@@ -3554,6 +3562,12 @@
 <td><code>str</code></td>
 <td><code>"agno"</code></td>
 <td>A2A adapter to use</td>
+</tr>
+<tr>
+<td><code>a2a_agent_card</code></td>
+<td><code>AgentCard</code> or <code>dict</code></td>
+<td><code>None</code></td>
+<td>Custom agent card for A2A discovery. See <a href="../a2a/#custom-agent-card">A2A Agent Card</a>.</td>
 </tr>
 </tbody>
 </table>
