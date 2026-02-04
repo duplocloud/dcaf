@@ -38,6 +38,7 @@ from dcaf import create_chat_app, AgentProtocol
 ### Features
 
 - **REST API**: Standard HTTP endpoints
+- **WebSocket**: Bidirectional streaming via `/api/chat-ws`
 - **Streaming**: NDJSON streaming support
 - **Validation**: Pydantic schema validation
 - **Logging**: Built-in request/response logging
@@ -248,6 +249,59 @@ NDJSON (Newline-delimited JSON) stream:
 curl -X POST http://localhost:8000/api/sendMessageStream \
   -H "Content-Type: application/json" \
   -d '{"messages": [{"role": "user", "content": "Tell me a story"}]}'
+```
+
+---
+
+### WS /api/chat-ws
+
+Bidirectional streaming chat over WebSocket. The connection stays open for multiple conversation turns.
+
+```
+WS /api/chat-ws
+```
+
+#### Client Frame
+
+Each text frame from the client is a JSON object with the same shape as the HTTP endpoints:
+
+```json
+{"messages": [{"role": "user", "content": "Hello"}]}
+```
+
+#### Server Frames
+
+The server streams back the same event types as `/api/sendMessageStream` (text_delta, tool_calls, done, error, etc.), one JSON object per text frame. Each turn ends with a `done` event, after which the client can send the next turn.
+
+#### Error Behavior
+
+Errors (invalid JSON, missing fields, agent exceptions) are sent as `error` events **without** closing the connection. The client can continue sending messages after receiving an error.
+
+#### Example
+
+```python
+import asyncio
+import json
+import websockets
+
+async def chat():
+    async with websockets.connect("ws://localhost:8000/api/chat-ws") as ws:
+        await ws.send(json.dumps({
+            "messages": [{"role": "user", "content": "Hello"}]
+        }))
+
+        async for frame in ws:
+            event = json.loads(frame)
+            if event["type"] == "text_delta":
+                print(event["text"], end="", flush=True)
+            elif event["type"] == "done":
+                print("\n--- Done ---")
+                break
+            elif event["type"] == "error":
+                print(f"\nError: {event['error']}")
+                break
+
+asyncio.run(chat())
 ```
 
 ---

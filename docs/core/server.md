@@ -89,6 +89,7 @@ uvicorn.run(app, host="0.0.0.0", port=8000, workers=4)
 | `/health` | GET | Health check (always responds immediately) |
 | `/api/chat` | POST | Synchronous chat |
 | `/api/chat-stream` | POST | Streaming chat (NDJSON) |
+| `/api/chat-ws` | WebSocket | Bidirectional streaming chat |
 
 ### Legacy Endpoints (Backwards Compatible)
 
@@ -304,6 +305,113 @@ All LLM calls run in a thread pool, so:
 - **Kubernetes liveness probes** won't timeout during LLM calls
 
 This is critical for production deployments where a 15-second LLM call could otherwise cause health check failures and container restarts.
+
+---
+
+## WebSocket (`/api/chat-ws`)
+
+The WebSocket endpoint provides bidirectional streaming chat over a persistent connection. Unlike the HTTP endpoints, a single WebSocket connection stays open for multiple conversation turns.
+
+### Connecting
+
+```
+ws://localhost:8000/api/chat-ws
+```
+
+### Message Format
+
+Each client frame is a JSON object with the same shape as the HTTP endpoints:
+
+```json
+{"messages": [{"role": "user", "content": "Hello"}]}
+```
+
+The server streams back event frames (same types as `/api/chat-stream`), ending each turn with a `done` event. The connection remains open for the next turn.
+
+### Python Client
+
+```python
+import asyncio
+import json
+import websockets
+
+async def chat():
+    async with websockets.connect("ws://localhost:8000/api/chat-ws") as ws:
+        # Turn 1
+        await ws.send(json.dumps({
+            "messages": [{"role": "user", "content": "What is Kubernetes?"}]
+        }))
+
+        async for frame in ws:
+            event = json.loads(frame)
+            if event["type"] == "text_delta":
+                print(event["text"], end="", flush=True)
+            elif event["type"] == "done":
+                print()
+                break
+
+        # Turn 2 — same connection
+        await ws.send(json.dumps({
+            "messages": [
+                {"role": "user", "content": "What is Kubernetes?"},
+                {"role": "assistant", "content": "Kubernetes is a container orchestration platform..."},
+                {"role": "user", "content": "How do I list pods?"},
+            ]
+        }))
+
+        async for frame in ws:
+            event = json.loads(frame)
+            if event["type"] == "text_delta":
+                print(event["text"], end="", flush=True)
+            elif event["type"] == "done":
+                print()
+                break
+
+asyncio.run(chat())
+```
+
+### JavaScript Client
+
+```javascript
+const ws = new WebSocket("ws://localhost:8000/api/chat-ws");
+
+ws.onopen = () => {
+  ws.send(JSON.stringify({
+    messages: [{ role: "user", content: "Hello" }]
+  }));
+};
+
+ws.onmessage = (event) => {
+  const data = JSON.parse(event.data);
+  if (data.type === "text_delta") {
+    process.stdout.write(data.text);
+  } else if (data.type === "done") {
+    console.log("\n--- Turn complete ---");
+  } else if (data.type === "error") {
+    console.error("Error:", data.error);
+  }
+};
+```
+
+### Error Handling
+
+Errors during a turn are sent as `error` events without closing the connection. The client can continue sending messages after an error:
+
+```json
+{"type": "error", "error": "agent exploded"}
+```
+
+Invalid JSON or missing `messages` fields also return error events while keeping the connection alive.
+
+### When to Use WebSocket vs HTTP
+
+| Use Case | Recommended Endpoint |
+|----------|---------------------|
+| Single request/response | `/api/chat` |
+| Streaming a single response | `/api/chat-stream` |
+| Multi-turn conversation with streaming | `/api/chat-ws` |
+| Real-time interactive UI | `/api/chat-ws` |
+| Simple integration / cURL testing | `/api/chat` or `/api/chat-stream` |
 
 ---
 
