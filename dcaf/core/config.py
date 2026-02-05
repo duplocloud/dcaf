@@ -23,6 +23,15 @@ import logging
 import os
 from typing import Any
 
+from .adapters.outbound.agno.types import (
+    DEFAULT_AWS_REGION,
+    DEFAULT_FRAMEWORK,
+    DEFAULT_MAX_TOKENS,
+    DEFAULT_MODEL_ID,
+    DEFAULT_PROVIDER,
+    DEFAULT_TEMPERATURE,
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -31,12 +40,12 @@ logger = logging.getLogger(__name__)
 # ============================================================================
 
 DEFAULTS = {
-    "provider": "bedrock",
-    "model": "anthropic.claude-3-sonnet-20240229-v1:0",
-    "framework": "agno",
-    "temperature": 0.1,
-    "max_tokens": 4096,
-    "aws_region": "us-west-2",
+    "provider": DEFAULT_PROVIDER,
+    "model": DEFAULT_MODEL_ID,
+    "framework": DEFAULT_FRAMEWORK,
+    "temperature": DEFAULT_TEMPERATURE,
+    "max_tokens": DEFAULT_MAX_TOKENS,
+    "aws_region": DEFAULT_AWS_REGION,
 }
 
 # Provider-specific model defaults

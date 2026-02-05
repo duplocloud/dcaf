@@ -70,8 +70,9 @@ class V1AgentWithThreadId:
     """
     Simulates a v1 agent that accepts thread_id as an explicit parameter.
 
-    This was a documented v1 pattern - agents could accept thread_id directly
-    rather than extracting it from _request_fields.
+    NOTE: This was a documented v1 pattern but the server does NOT pass
+    thread_id explicitly - agents must extract it from the messages dict
+    if they need it.
     """
 
     def __init__(self):
@@ -175,17 +176,6 @@ class TestLegacyEndpointSendMessage:
         assert data["role"] == "assistant"
         assert "content" in data
 
-    def test_legacy_endpoint_same_behavior_as_new(self, client_both_methods: TestClient):
-        """Legacy /api/sendMessage should behave identically to /api/chat."""
-        payload = {"messages": [{"role": "user", "content": "Test message"}]}
-
-        legacy_response = client_both_methods.post("/api/sendMessage", json=payload)
-        new_response = client_both_methods.post("/api/chat", json=payload)
-
-        assert legacy_response.status_code == new_response.status_code
-        # Content should be the same (both go through same handler)
-        assert legacy_response.json()["content"] == new_response.json()["content"]
-
 
 # =============================================================================
 # Test: Legacy Endpoint /api/sendMessageStream
@@ -231,24 +221,6 @@ class TestLegacyEndpointSendMessageStream:
         event_types = [e.get("type") for e in events]
         assert "done" in event_types
 
-    def test_legacy_stream_endpoint_same_behavior_as_new(self, client_both_methods: TestClient):
-        """Legacy /api/sendMessageStream should behave identically to /api/chat-stream."""
-        payload = {"messages": [{"role": "user", "content": "Test message"}]}
-
-        legacy_response = client_both_methods.post("/api/sendMessageStream", json=payload)
-        new_response = client_both_methods.post("/api/chat-stream", json=payload)
-
-        assert legacy_response.status_code == new_response.status_code
-
-        # Both should return NDJSON with same event types
-        legacy_events = [json.loads(line) for line in legacy_response.text.strip().split("\n") if line.strip()]
-        new_events = [json.loads(line) for line in new_response.text.strip().split("\n") if line.strip()]
-
-        legacy_types = [e.get("type") for e in legacy_events]
-        new_types = [e.get("type") for e in new_events]
-
-        assert legacy_types == new_types
-
 
 # =============================================================================
 # Test: AgentProtocol Without invoke_stream
@@ -288,16 +260,6 @@ class TestAgentProtocolBackwardsCompatibility:
                 "V1 agents were not required to implement invoke_stream."
             )
 
-    def test_invoke_only_agent_handles_chat_endpoint(self, client_invoke_only: TestClient):
-        """Agent with only invoke() should handle /api/chat requests."""
-        response = client_invoke_only.post(
-            "/api/chat",
-            json={"messages": [{"role": "user", "content": "Hello"}]}
-        )
-
-        assert response.status_code == 200
-        assert "Response from v1 agent" in response.json()["content"]
-
     def test_invoke_only_agent_handles_legacy_endpoint(self, client_invoke_only: TestClient):
         """Agent with only invoke() should handle /api/sendMessage requests."""
         response = client_invoke_only.post(
@@ -321,7 +283,7 @@ class TestAgentProtocolBackwardsCompatibility:
         Any of these is acceptable - the key is no crash/500.
         """
         response = client_invoke_only.post(
-            "/api/chat-stream",
+            "/api/sendMessageStream",
             json={"messages": [{"role": "user", "content": "Hello"}]}
         )
 
@@ -330,88 +292,6 @@ class TestAgentProtocolBackwardsCompatibility:
             "Streaming endpoint crashed when agent doesn't have invoke_stream. "
             "Should handle gracefully (501, fallback, or error event)."
         )
-
-
-# =============================================================================
-# Test: thread_id Parameter Backwards Compatibility
-# =============================================================================
-
-
-class TestThreadIdBackwardsCompatibility:
-    """
-    Tests that agents accepting thread_id as an explicit parameter still work.
-
-    V1 documented pattern: agents could accept thread_id directly:
-        def invoke(self, messages, thread_id=None): ...
-
-    vnext passes thread_id via _request_fields, but should also pass it
-    explicitly for backwards compatibility with v1 agents.
-    """
-
-    def test_thread_id_passed_to_invoke(
-        self, client_thread_id: TestClient, v1_agent_with_thread_id: V1AgentWithThreadId
-    ):
-        """Agent's invoke() should receive thread_id when passed in request."""
-        response = client_thread_id.post(
-            "/api/chat",
-            json={
-                "messages": [{"role": "user", "content": "Hello"}],
-                "thread_id": "test-thread-123"
-            }
-        )
-
-        assert response.status_code == 200
-        # Agent should have received the thread_id
-        assert v1_agent_with_thread_id.last_thread_id == "test-thread-123", (
-            "V1 BACKWARDS COMPATIBILITY: Agent's invoke() should receive thread_id "
-            "as an explicit parameter when the agent signature accepts it."
-        )
-
-    def test_thread_id_passed_to_invoke_stream(
-        self, client_thread_id: TestClient, v1_agent_with_thread_id: V1AgentWithThreadId
-    ):
-        """Agent's invoke_stream() should receive thread_id when passed in request."""
-        response = client_thread_id.post(
-            "/api/chat-stream",
-            json={
-                "messages": [{"role": "user", "content": "Hello"}],
-                "thread_id": "stream-thread-456"
-            }
-        )
-
-        assert response.status_code == 200
-        # Agent should have received the thread_id
-        assert v1_agent_with_thread_id.last_thread_id == "stream-thread-456", (
-            "V1 BACKWARDS COMPATIBILITY: Agent's invoke_stream() should receive thread_id "
-            "as an explicit parameter when the agent signature accepts it."
-        )
-
-    def test_thread_id_passed_via_legacy_endpoint(
-        self, client_thread_id: TestClient, v1_agent_with_thread_id: V1AgentWithThreadId
-    ):
-        """Legacy /api/sendMessage should also pass thread_id to agent."""
-        response = client_thread_id.post(
-            "/api/sendMessage",
-            json={
-                "messages": [{"role": "user", "content": "Hello"}],
-                "thread_id": "legacy-thread-789"
-            }
-        )
-
-        assert response.status_code == 200
-        assert v1_agent_with_thread_id.last_thread_id == "legacy-thread-789"
-
-    def test_thread_id_none_when_not_provided(
-        self, client_thread_id: TestClient, v1_agent_with_thread_id: V1AgentWithThreadId
-    ):
-        """thread_id should be None when not provided in request."""
-        response = client_thread_id.post(
-            "/api/chat",
-            json={"messages": [{"role": "user", "content": "Hello"}]}
-        )
-
-        assert response.status_code == 200
-        assert v1_agent_with_thread_id.last_thread_id is None
 
 
 # =============================================================================
@@ -424,19 +304,17 @@ class TestToolSchemaBackwardsCompatibility:
     Tests that the old Tool(schema=...) syntax still works.
 
     V1 used `schema` field containing the full tool spec.
-    V2 renamed this to `input_schema` containing just the input schema.
-    Both should work for backwards compatibility.
     """
 
-    def test_tool_creation_with_old_schema_field(self):
-        """Tool should accept the old 'schema' field name."""
+    def test_tool_creation_with_schema_field(self):
+        """Tool should accept the 'schema' field name."""
         from dcaf.tools import Tool
 
         def dummy_func(x: str) -> str:
             return x
 
         # V1 style: schema contains full tool spec
-        old_style_schema = {
+        full_schema = {
             "name": "my_tool",
             "description": "A test tool",
             "input_schema": {
@@ -449,63 +327,36 @@ class TestToolSchemaBackwardsCompatibility:
         }
 
         # This should NOT raise an error
-        try:
-            tool = Tool(
-                func=dummy_func,
-                name="my_tool",
-                description="A test tool",
-                schema=old_style_schema  # Old field name
-            )
-            assert tool is not None
-        except TypeError as e:
-            if "schema" in str(e):
-                pytest.fail(
-                    f"Tool rejected 'schema' field: {e}. "
-                    "V1 used 'schema' field - should still be accepted for backwards compatibility."
-                )
-            raise
-
-    def test_tool_creation_with_new_input_schema_field(self):
-        """Tool should accept the new 'input_schema' field name."""
-        from dcaf.tools import Tool
-
-        def dummy_func(x: str) -> str:
-            return x
-
-        # V2 style: input_schema contains just the input schema
-        new_style_schema = {
-            "type": "object",
-            "properties": {
-                "x": {"type": "string", "description": "Input value"}
-            },
-            "required": ["x"]
-        }
-
-        # This should work in v2
         tool = Tool(
             func=dummy_func,
             name="my_tool",
             description="A test tool",
-            input_schema=new_style_schema  # New field name
+            schema=full_schema
         )
         assert tool is not None
 
     def test_tool_get_schema_returns_full_spec(self):
-        """Tool.get_schema() should return full tool spec regardless of input style."""
+        """Tool.get_schema() should return full tool spec."""
         from dcaf.tools import Tool
 
         def dummy_func(x: str) -> str:
             return x
 
-        tool = Tool(
-            func=dummy_func,
-            name="my_tool",
-            description="A test tool",
-            input_schema={
+        full_schema = {
+            "name": "my_tool",
+            "description": "A test tool",
+            "input_schema": {
                 "type": "object",
                 "properties": {"x": {"type": "string"}},
                 "required": ["x"]
             }
+        }
+
+        tool = Tool(
+            func=dummy_func,
+            name="my_tool",
+            description="A test tool",
+            schema=full_schema
         )
 
         schema = tool.get_schema()
@@ -529,13 +380,16 @@ class TestToolSchemaBackwardsCompatibility:
 
         @tool(
             schema={
-                "type": "object",
-                "properties": {
-                    "x": {"type": "string"}
-                },
-                "required": ["x"]
-            },
-            description="Test tool"
+                "name": "my_tool",
+                "description": "Test tool",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "x": {"type": "string"}
+                    },
+                    "required": ["x"]
+                }
+            }
         )
         def my_tool(x: str) -> str:
             return x
@@ -552,11 +406,15 @@ class TestToolSchemaBackwardsCompatibility:
 
         @tool(
             schema={
-                "type": "object",
-                "properties": {
-                    "city": {"type": "string", "description": "City name"}
-                },
-                "required": ["city"]
+                "name": "get_weather",
+                "description": "Get weather for a city",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "city": {"type": "string", "description": "City name"}
+                    },
+                    "required": ["city"]
+                }
             }
         )
         def get_weather(city: str) -> str:

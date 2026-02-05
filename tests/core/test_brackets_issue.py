@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 def get_test_tool():
     """Create a simple tool that will trigger tool use."""
-    from dcaf.tools import tool
+    from dcaf.core import tool
 
     @tool(description="Execute a terminal command on the system")
     def execute_terminal_cmd(command: str, explanation: str = "") -> str:

@@ -169,7 +169,12 @@ class AgnoResponseConverter:
         """
         Extract text content from Agno's RunOutput.
 
+        Prefers extracting from the last assistant message in run_output.messages
+        to avoid concatenated intermediate content (e.g., thinking tags from
+        multi-turn tool-calling workflows).
+
         Handles various content formats:
+        - Last assistant message from messages list (preferred)
         - Plain strings
         - JSON-serialized content blocks
         - Structured content objects
@@ -182,8 +187,12 @@ class AgnoResponseConverter:
         """
         text = None
 
-        # Try Agno's built-in method first
-        if hasattr(run_output, "get_content_as_string"):
+        # PREFERRED: Extract from the last assistant message to avoid
+        # concatenated intermediate content (like <search_quality_reflection> tags)
+        text = self._extract_from_last_assistant_message(run_output)
+
+        # Fallback: Try Agno's built-in method
+        if text is None and hasattr(run_output, "get_content_as_string"):
             text = self._extract_via_get_content_as_string(run_output)
 
         # Fallback: direct content access
@@ -197,6 +206,73 @@ class AgnoResponseConverter:
         text = self._strip_trailing_brackets(text)
 
         return text
+
+
+    def _extract_from_last_assistant_message(self, run_output: Any) -> str | None:
+        """
+        Extract text from the last assistant message in run_output.messages.
+
+        This is the preferred extraction method because run_output.content may contain
+        concatenated content from all assistant turns in a multi-turn tool-calling
+        workflow, including intermediate "thinking" content like:
+        - <search_quality_reflection>...</search_quality_reflection>
+        - <search_quality_score>...</search_quality_score>
+        - <thinking>...</thinking>
+
+        By extracting from the last assistant message, we get only the final clean
+        response without intermediate reasoning artifacts.
+
+        Args:
+            run_output: The RunOutput from Agno
+
+        Returns:
+            Text content from the last assistant message, or None if not available
+        """
+        if not hasattr(run_output, "messages") or not run_output.messages:
+            return None
+
+        # Find the last assistant message
+        last_assistant_msg = None
+        for msg in reversed(run_output.messages):
+            role = getattr(msg, "role", None)
+            # Handle both string roles and enum roles
+            role_str = role.value if hasattr(role, "value") else str(role) if role else ""
+            if role_str.lower() == "assistant":
+                last_assistant_msg = msg
+                break
+
+        if not last_assistant_msg:
+            logger.debug("No assistant message found in run_output.messages")
+            return None
+
+        # Extract content from the message
+        content = getattr(last_assistant_msg, "content", None)
+        if content is None:
+            return None
+
+        # Handle different content types
+        if isinstance(content, str):
+            logger.debug(f"Extracted text from last assistant message: {repr(content)[:200]}")
+            return content
+        elif isinstance(content, list):
+            # Content blocks format
+            text_parts = []
+            for block in content:
+                if isinstance(block, dict):
+                    if block.get("type") == "text" or "text" in block:
+                        text_parts.append(block.get("text", ""))
+                elif isinstance(block, str):
+                    text_parts.append(block)
+                elif hasattr(block, "text"):
+                    text_parts.append(str(block.text))
+            if text_parts:
+                result = " ".join(text_parts)
+                logger.debug(f"Extracted text from last assistant message blocks: {repr(result)[:200]}")
+                return result
+        elif hasattr(content, "text"):
+            return str(content.text)
+
+        return None
 
     def _extract_via_get_content_as_string(self, run_output: Any) -> str | None:
         """Extract text using Agno's get_content_as_string method."""

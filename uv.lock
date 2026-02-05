@@ -647,7 +647,7 @@ wheels = [
 
 [[package]]
 name = "dcaf"
-version = "2.0.0"
+version = "2.0.18"
 source = { editable = "." }
 dependencies = [
     { name = "agno" },
@@ -682,12 +682,14 @@ all = [
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "ruff" },
+    { name = "types-requests" },
 ]
 dev = [
     { name = "mypy" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "ruff" },
+    { name = "types-requests" },
 ]
 docs = [
     { name = "mike" },
@@ -736,6 +738,7 @@ requires-dist = [
     { name = "requests" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.8.0" },
     { name = "tk" },
+    { name = "types-requests", marker = "extra == 'dev'", specifier = ">=2.31.0" },
     { name = "uvicorn" },
 ]
 provides-extras = ["docs", "dev", "mcp", "all"]

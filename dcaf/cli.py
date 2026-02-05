@@ -198,9 +198,7 @@ def deploy_agent(agent_name, token=None):
         return 1
 
     print(f"Deploying agent: {agent_name}")
-    # TODO: Implement actual deployment logic
-    print("Deploy agent functionality not yet implemented")
-    return 0
+    raise NotImplementedError("Deploy agent functionality is not yet implemented")
 
 
 def main():

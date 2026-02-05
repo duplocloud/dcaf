@@ -24,7 +24,7 @@ import pytest
 @pytest.fixture
 def mock_tool():
     """Create a mock dcaf Tool object."""
-    from dcaf.tools import tool
+    from dcaf.core import tool
 
     @tool(description="Test tool that echoes input")
     def echo_tool(message: str, count: int = 1) -> str:
@@ -36,7 +36,7 @@ def mock_tool():
 @pytest.fixture
 def mock_tool_with_context():
     """Create a mock dcaf Tool that requires platform_context."""
-    from dcaf.tools import tool
+    from dcaf.core import tool
 
     @tool(description="Tool that uses platform context")
     def context_tool(query: str, platform_context: dict[str, Any] = None) -> str:
@@ -388,7 +388,7 @@ class TestParametersBugRegression:
         - We were incorrectly passing 'parameters=tool_schema["input_schema"]'
         - This caused: "Invalid tool configuration arguments: {'parameters'}"
         """
-        from dcaf.tools import tool
+        from dcaf.core import tool
 
         @tool(description="Regression test tool")
         def test_func(arg1: str, arg2: int = 42) -> str:

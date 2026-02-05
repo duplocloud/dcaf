@@ -179,7 +179,7 @@ class TestAdapterMCPToolDetection:
     def test_adapter_does_not_detect_regular_tools(self):
         """Adapter should not identify regular tools as MCPTool."""
         from dcaf.core.adapters.outbound.agno.adapter import AgnoAdapter
-        from dcaf.tools import tool
+        from dcaf.core import tool
 
         @tool(description="A regular tool")
         def my_tool(x: str) -> str:

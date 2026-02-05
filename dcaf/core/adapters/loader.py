@@ -156,8 +156,8 @@ def list_frameworks() -> list[str]:
                         module = importlib.import_module(f"{ADAPTERS_PACKAGE}.{item.name}")
                         if hasattr(module, "create_adapter"):
                             frameworks.append(item.name)
-                    except Exception:
-                        # Skip modules that fail to import
+                    except (ImportError, AttributeError):
+                        # Skip modules that fail to import or lack create_adapter
                         pass
 
     return sorted(frameworks)

@@ -5,8 +5,7 @@ This module provides a simple, Pythonic API for building AI agents
 with tool calling and human-in-the-loop approval.
 
 Quick Start:
-    from dcaf.core import Agent, serve
-    from dcaf.tools import tool
+    from dcaf.core import Agent, serve, tool
 
     @tool(description="Get current weather")
     def get_weather(city: str) -> str:
@@ -42,7 +41,8 @@ from dcaf import __version__
 
 # Simple API (what most users need)
 # Stream event types (for type checking in streaming)
-from ..schemas.events import (
+# NOTE: Using v2 schemas from core/schemas/ (not v1 dcaf/schemas/)
+from .schemas.events import (
     DoneEvent,
     ErrorEvent,
     TextDeltaEvent,
@@ -102,11 +102,15 @@ from ..channel_routing import ChannelResponseRouter, SlackResponseRouter
 from .server import create_app, serve
 from .session import Session
 
+# Tool decorator (v2 copy for complete separation)
+from .tools import tool
+
 __all__ = [
     # Simple API
     "Agent",
     "AgentResponse",
     "PendingToolCall",
+    "tool",
     "ChatMessage",
     "PlatformContext",
     "Session",

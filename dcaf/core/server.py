@@ -55,7 +55,7 @@ if TYPE_CHECKING:
     from fastapi import APIRouter, FastAPI
 
     from ..channel_routing import ChannelResponseRouter
-    from ..schemas.messages import AgentMessage
+    from .schemas.messages import AgentMessage
     from .primitives import AgentResult
     from .session import Session
 
@@ -296,8 +296,17 @@ def create_app(
     """
     Create a FastAPI application for the agent without starting the server.
 
-    This is useful when you need programmatic control over the server,
-    want to add custom endpoints, or need to run in a different ASGI server.
+    This creates a unified server with both v2 (preferred) and v1 (legacy) endpoints:
+
+    V2 Endpoints (Preferred) - Uses V2 code path:
+        GET  /health           - Health check
+        POST /api/chat         - Synchronous chat
+        POST /api/chat-stream  - Streaming chat (NDJSON)
+        WS   /api/chat-ws      - WebSocket bidirectional streaming
+
+    V1 Legacy Endpoints (Deprecated) - Uses V1 code path:
+        POST /api/sendMessage       - Synchronous chat (V1 code)
+        POST /api/sendMessageStream - Streaming chat (V1 code, NDJSON)
 
     Args:
         agent: Either an Agent instance OR a callable function.
@@ -362,15 +371,153 @@ def create_app(
         def status():
             return {"agents_running": 1}
     """
-    from ..agent_server import create_chat_app
+    from fastapi import Body, FastAPI, HTTPException
+    from fastapi.responses import StreamingResponse
+
+    # Import V1 handlers for legacy endpoints
+    from ..agent_server import handle_send_message_v1, handle_send_message_stream_v1
 
     # Create the appropriate adapter based on agent type
     adapter = _create_adapter(agent)
 
-    # Create the base app
-    app = create_chat_app(adapter, router=channel_router)
+    # Create FastAPI app
+    app = FastAPI(title="DCAF Core Chat Service", version="2.0.0")
 
-    # Add A2A routes if enabled
+    # Health endpoint
+    @app.get("/health", tags=["system"])
+    def health() -> dict[str, str]:
+        return {"status": "ok"}
+
+    # -------------------------------------------------------------------------
+    # V2 Handler logic
+    # -------------------------------------------------------------------------
+
+    async def _handle_chat_v2(raw_body: dict[str, Any]) -> dict[str, Any]:
+        """V2 handler for synchronous chat endpoints."""
+        # Validate messages field
+        if "messages" not in raw_body:
+            raise HTTPException(status_code=400, detail="'messages' field missing from request body")
+
+        # Extract _request_fields (all top-level fields except 'messages')
+        request_fields = {k: v for k, v in raw_body.items() if k != "messages"}
+
+        # Check channel router for Slack
+        source = raw_body.get("source")
+        if source == "slack" and channel_router:
+            should_respond = channel_router.should_agent_respond(raw_body["messages"])
+            if not should_respond.get("should_respond", True):
+                return {"role": "assistant", "content": ""}
+
+        # Build the input dict for the agent
+        agent_input: dict[str, Any] = {"messages": raw_body["messages"]}
+        if request_fields:
+            agent_input["_request_fields"] = request_fields
+
+        # Call the agent
+        try:
+            result = await _invoke_agent(adapter, agent_input)
+
+            # Build response
+            response: dict[str, Any] = {
+                "role": result.role if hasattr(result, "role") else "assistant",
+                "content": result.content if hasattr(result, "content") else str(result),
+            }
+
+            # Echo request_fields in meta_data.request_context if present
+            if request_fields:
+                response["meta_data"] = {"request_context": request_fields}
+
+            return response
+
+        except Exception as e:
+            logger.exception(f"V2 Chat endpoint error: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+
+    async def _handle_chat_stream_v2(raw_body: dict[str, Any]) -> StreamingResponse:
+        """V2 handler for streaming chat endpoints."""
+        from .schemas.events import DoneEvent, ErrorEvent
+
+        # Validate messages field
+        if "messages" not in raw_body:
+            raise HTTPException(status_code=400, detail="'messages' field missing from request body")
+
+        # Extract _request_fields (all top-level fields except 'messages')
+        request_fields = {k: v for k, v in raw_body.items() if k != "messages"}
+
+        # Check channel router for Slack
+        source = raw_body.get("source")
+        if source == "slack" and channel_router:
+            should_respond = channel_router.should_agent_respond(raw_body["messages"])
+            if not should_respond.get("should_respond", True):
+                def done_generator() -> Iterator[str]:
+                    yield DoneEvent().model_dump_json() + "\n"
+                return StreamingResponse(done_generator(), media_type="application/x-ndjson")
+
+        # Build the input dict for the agent
+        agent_input: dict[str, Any] = {"messages": raw_body["messages"]}
+        if request_fields:
+            agent_input["_request_fields"] = request_fields
+
+        async def event_generator() -> Any:
+            try:
+                async for event in _stream_agent(adapter, agent_input):
+                    if hasattr(event, "model_dump_json"):
+                        yield event.model_dump_json() + "\n"
+                    else:
+                        import json
+                        yield json.dumps(event) + "\n"
+            except Exception as e:
+                logger.exception(f"V2 Stream error: {e}")
+                yield ErrorEvent(error=str(e)).model_dump_json() + "\n"
+
+        return StreamingResponse(event_generator(), media_type="application/x-ndjson")
+
+    # -------------------------------------------------------------------------
+    # V2 Endpoints (Preferred) - Uses V2 code path
+    # -------------------------------------------------------------------------
+
+    @app.post("/api/chat", tags=["chat"])
+    async def chat(raw_body: dict[str, Any] = Body(...)) -> dict[str, Any]:
+        """Synchronous chat endpoint (V2 code path)."""
+        return await _handle_chat_v2(raw_body)
+
+    @app.post("/api/chat-stream", tags=["chat"])
+    async def chat_stream(raw_body: dict[str, Any] = Body(...)) -> StreamingResponse:
+        """Streaming chat endpoint (V2 code path, NDJSON)."""
+        return await _handle_chat_stream_v2(raw_body)
+
+    # -------------------------------------------------------------------------
+    # V1 Legacy Endpoints (Deprecated) - Uses V1 code path
+    # -------------------------------------------------------------------------
+
+    @app.post("/api/sendMessage", tags=["legacy"], deprecated=True)
+    def send_message(raw_body: dict[str, Any] = Body(...)) -> Any:
+        """
+        Synchronous chat endpoint (V1 code path).
+
+        Deprecated: Use POST /api/chat instead.
+        """
+        return handle_send_message_v1(adapter, raw_body, channel_router)
+
+    @app.post("/api/sendMessageStream", tags=["legacy"], deprecated=True)
+    def send_message_stream(raw_body: dict[str, Any] = Body(...)) -> StreamingResponse:
+        """
+        Streaming chat endpoint (V1 code path, NDJSON).
+
+        Deprecated: Use POST /api/chat-stream instead.
+        """
+        return handle_send_message_stream_v1(adapter, raw_body, channel_router)
+
+    # -------------------------------------------------------------------------
+    # WebSocket endpoint (V2 only)
+    # -------------------------------------------------------------------------
+
+    _add_websocket_endpoint(app, adapter, channel_router)
+
+    # -------------------------------------------------------------------------
+    # A2A routes (optional)
+    # -------------------------------------------------------------------------
+
     if a2a:
         try:
             from .a2a import create_a2a_routes
@@ -409,11 +556,203 @@ def _create_adapter(agent: Union["Agent", AgentHandler]) -> Any:
 
         return ServerAdapter(agent)
 
+    # Check if it's an object with invoke method (AgentProtocol-like)
+    if hasattr(agent, "invoke") and callable(getattr(agent, "invoke")):
+        # Return as-is, it can be used directly by the server
+        return agent
+
     # Check if it's a callable (function)
     if callable(agent):
         return CallableAdapter(agent)
 
     raise TypeError(f"agent must be an Agent instance or a callable function, got {type(agent)}")
+
+
+async def _invoke_agent(adapter: Any, agent_input: dict[str, Any]) -> "AgentMessage":
+    """Invoke the agent, handling both sync and async adapters."""
+    import asyncio
+
+    from .schemas.messages import AgentMessage
+
+    if hasattr(adapter, "invoke"):
+        result = adapter.invoke(agent_input)
+        # Handle coroutine result
+        if asyncio.iscoroutine(result):
+            result = await result
+        # Ensure we return an AgentMessage
+        if isinstance(result, AgentMessage):
+            return result
+        if hasattr(result, "content"):
+            return AgentMessage(role="assistant", content=result.content)
+        return AgentMessage(role="assistant", content=str(result))
+    raise TypeError("Adapter does not have invoke method")
+
+
+async def _stream_agent(adapter: Any, agent_input: dict[str, Any]) -> Any:
+    """Stream from the agent, handling both sync and async generators."""
+    import asyncio
+
+    from .schemas.events import DoneEvent, TextDeltaEvent
+
+    if hasattr(adapter, "invoke_stream"):
+        result = adapter.invoke_stream(agent_input)
+
+        # Handle coroutine result
+        if asyncio.iscoroutine(result):
+            result = await result
+
+        # Handle async generator
+        if hasattr(result, "__anext__"):
+            async for event in result:
+                yield event
+        # Handle sync generator
+        elif hasattr(result, "__next__"):
+            for event in result:
+                yield event
+        else:
+            # Single result - wrap in text_delta + done
+            if hasattr(result, "content") and result.content:
+                yield TextDeltaEvent(text=result.content)
+            yield DoneEvent()
+    else:
+        # Fallback to invoke
+        result = await _invoke_agent(adapter, agent_input)
+        if result.content:
+            yield TextDeltaEvent(text=result.content)
+        yield DoneEvent()
+
+
+def _add_websocket_endpoint(
+    app: "FastAPI",
+    adapter: Any,
+    channel_router: "ChannelResponseRouter | None" = None,
+) -> None:
+    """
+    Add WebSocket endpoint /api/chat-ws to the FastAPI app.
+
+    The WebSocket endpoint provides bidirectional streaming chat over a
+    persistent connection. A single connection stays open for multiple
+    conversation turns.
+
+    Protocol:
+        - Client sends JSON: {"messages": [{"role": "user", "content": "..."}]}
+        - Server responds with streaming events as JSON:
+          - {"type": "text_delta", "text": "..."}
+          - {"type": "tool_calls", "tool_calls": [...]}
+          - {"type": "done"}
+          - {"type": "error", "error": "..."}
+    """
+    import asyncio
+    import json
+
+    from fastapi import WebSocket, WebSocketDisconnect
+
+    @app.websocket("/api/chat-ws")
+    async def websocket_chat(websocket: WebSocket) -> None:
+        await websocket.accept()
+
+        try:
+            while True:
+                # Receive message from client
+                raw_message = await websocket.receive_text()
+
+                # Parse JSON
+                try:
+                    data = json.loads(raw_message)
+                except json.JSONDecodeError:
+                    await websocket.send_json({"type": "error", "error": "Invalid JSON"})
+                    continue
+
+                # Validate messages field
+                if "messages" not in data:
+                    await websocket.send_json({"type": "error", "error": "Missing 'messages' field"})
+                    continue
+
+                # Check channel router for Slack
+                source = data.get("source")
+                if source == "slack" and channel_router:
+                    should_respond = channel_router.should_agent_respond(data["messages"])
+                    if not should_respond.get("should_respond", True):
+                        await websocket.send_json({"type": "done"})
+                        continue
+
+                # Extract _request_fields (all top-level fields except 'messages')
+                request_fields = {k: v for k, v in data.items() if k != "messages"}
+
+                # Build the input dict for the agent
+                agent_input: dict[str, Any] = {"messages": data["messages"]}
+                if request_fields:
+                    agent_input["_request_fields"] = request_fields
+
+                # Process the message through the agent
+                try:
+                    # Check if adapter has invoke_stream
+                    if hasattr(adapter, "invoke_stream"):
+                        invoke_stream = adapter.invoke_stream
+                        result = invoke_stream(agent_input)
+
+                        # Handle different generator types
+                        if asyncio.iscoroutine(result):
+                            # It's a coroutine, await it
+                            result = await result
+
+                        if hasattr(result, "__anext__"):
+                            # Async generator
+                            async for event in result:
+                                await _send_event(websocket, event)
+                        elif hasattr(result, "__next__"):
+                            # Sync generator - iterate directly (we're in async context)
+                            for event in result:
+                                await _send_event(websocket, event)
+                        else:
+                            # Not a generator, treat as single result
+                            await _send_event(websocket, result)
+                    else:
+                        # Fallback to invoke if no streaming
+                        result = adapter.invoke(agent_input)
+                        if hasattr(result, "content") and result.content:
+                            await websocket.send_json({"type": "text_delta", "text": result.content})
+                        await websocket.send_json({"type": "done"})
+
+                except Exception as e:  # Intentional catch-all: agent code can raise anything
+                    logger.exception(f"WebSocket agent error: {e}")
+                    await websocket.send_json({"type": "error", "error": str(e)})
+                    # Don't close connection - allow recovery
+
+        except WebSocketDisconnect:
+            logger.debug("WebSocket client disconnected")
+
+
+async def _send_event(websocket: "WebSocket", event: Any) -> None:
+    """Send a streaming event over the WebSocket connection."""
+    # Convert event to JSON-serializable dict
+    if hasattr(event, "model_dump"):
+        # Pydantic model
+        event_dict = event.model_dump()
+    elif hasattr(event, "__dict__"):
+        # Dataclass or regular object
+        event_dict = {k: v for k, v in event.__dict__.items() if not k.startswith("_")}
+    elif isinstance(event, dict):
+        event_dict = event
+    else:
+        event_dict = {"data": str(event)}
+
+    # Ensure type field is present
+    if "type" not in event_dict:
+        # Infer type from class name
+        type_name = type(event).__name__
+        # Convert CamelCase to snake_case (e.g., TextDeltaEvent -> text_delta)
+        event_type = ""
+        for i, char in enumerate(type_name):
+            if char.isupper() and i > 0:
+                event_type += "_"
+            event_type += char.lower()
+        # Remove _event suffix if present
+        if event_type.endswith("_event"):
+            event_type = event_type[:-6]
+        event_dict["type"] = event_type
+
+    await websocket.send_json(event_dict)
 
 
 def _start_mcp_server(agent: Any, host: str, port: int, transport: str) -> Any:
@@ -496,7 +835,7 @@ class CallableAdapter:
         Calls the user's handler function and converts the result
         to the HelpDesk protocol format.
         """
-        from ..schemas.messages import AgentMessage
+        from .schemas.messages import AgentMessage
         from .primitives import AgentResult
 
         # Extract messages and context
@@ -550,7 +889,7 @@ class CallableAdapter:
         For now, wraps the sync call. Users can implement
         streaming in their handler by returning a generator.
         """
-        from ..schemas.events import DoneEvent, ErrorEvent, TextDeltaEvent
+        from .schemas.events import DoneEvent, ErrorEvent, TextDeltaEvent
 
         try:
             result = self.invoke(messages)

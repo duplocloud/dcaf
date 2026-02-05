@@ -1,3 +1,5 @@
+"""Kubernetes agent — suggests and executes kubectl / Helm commands."""
+
 import base64
 import contextlib
 import logging
@@ -5,54 +7,26 @@ import os
 import shutil
 import subprocess
 import tempfile
-import traceback
 from typing import Any
 
-from dcaf.agent_server import AgentProtocol
-from dcaf.llm import BedrockLLM
+from dcaf.agents.base_command_agent import BaseCommandAgent
 from dcaf.schemas.messages import AgentMessage, Command, Data, ExecutedCommand, FileObject
 
 logger = logging.getLogger(__name__)
 
 
-class K8sAgent(AgentProtocol):
-    """
-    An agent that processes user messages, executes terminal commands with user approval,
-    and uses an LLM to generate responses and suggest commands.
-    """
+class K8sAgent(BaseCommandAgent):
+    """Agent that suggests and executes kubectl and Helm commands with DuploCloud context."""
 
-    def __init__(self, llm: BedrockLLM, system_prompt: str | None = None):
-        """
-        Initialize the CommandAgent with an LLM instance and optional custom system prompt.
-
-        Args:
-            llm: An instance of BedrockLLM for generating responses
-            system_prompt: Optional custom system prompt to override the default
-        """
-        self.llm = llm
-        self.system_prompt = system_prompt or self._default_system_prompt()
-        self.response_schema = self._create_response_schema()
+    # ------------------------------------------------------------------
+    # invoke — custom because of FileObject support on commands
+    # ------------------------------------------------------------------
 
     def invoke(self, messages: dict[str, list[dict[str, Any]]]) -> AgentMessage:
-        """
-        Process user messages, execute commands if approved, and generate a response.
-
-        Args:
-            messages: A dictionary containing message history in the format {"messages": [...]}
-
-        Returns:
-            An AgentMessage containing the response, suggested commands, and executed commands
-        """
-        # Process messages to handle command execution and prepare for LLM
         processed_messages, executed_commands = self.process_messages(messages)
-
-        # Generate response from LLM
         llm_response = self.call_llm(processed_messages)
-
-        # Extract commands from LLM response
         commands = self._extract_commands(llm_response)
 
-        # Create and return the agent message with both suggested and executed commands
         def convert_files(raw_files: Any) -> list[FileObject] | None:
             if not raw_files or not isinstance(raw_files, list):
                 return None
@@ -75,24 +49,17 @@ class K8sAgent(AgentProtocol):
             ),
         )
 
+    # ------------------------------------------------------------------
+    # process_messages — custom: kubeconfig, platform context, files
+    # ------------------------------------------------------------------
+
     def process_messages(
         self, messages: dict[str, list[dict[str, Any]]]
     ) -> tuple[list[dict[str, Any]], list[dict[str, str]]]:
-        """
-        Process the raw messages to handle command execution and prepare for LLM.
-
-        Args:
-            messages: A dictionary containing message history in the format {"messages": [...]}
-
-        Returns:
-            A tuple containing:
-            - A list of processed messages ready for the LLM
-            - A list of executed commands with their outputs
-        """
         processed_messages: list[dict[str, Any]] = []
         executed_cmds_current_turn: list[dict[str, str]] = []
 
-        # --- extract kubeconfig (latest in history) and write to temp file --- TODO Just make it last messsage?
+        # Extract kubeconfig (latest in history) and write to temp file
         kubeconfig_path: str | None = None
         for m in reversed(messages.get("messages", [])):
             if m.get("role") == "user":
@@ -104,20 +71,17 @@ class K8sAgent(AgentProtocol):
                         tmp.flush()
                         os.chmod(tmp.name, 0o600)
                         kubeconfig_path = tmp.name
-                    except Exception as e:
+                    except Exception as e:  # Intentional catch-all: base64/file errors
                         logger.warning("Failed to set up kubeconfig: %s", e)
                     break
 
-        # Extract the messages list
         messages_list = messages.get("messages", [])
 
-        # Iterate through the conversation history
         for idx, msg in enumerate(messages_list):
             role = msg.get("role")
-            if role not in {"user", "assistant"}:
+            if role not in ("user", "assistant"):
                 continue
 
-            # Base message content #TODO update it to handle the case where assistant message as the last message
             content = msg.get("content", "")
 
             content = (
@@ -128,7 +92,7 @@ class K8sAgent(AgentProtocol):
             data = msg.get("data", {}) if role == "user" else {}
 
             if role == "user":
-                # Append platform context if provided in the user message
+                # Append platform context if provided
                 platform_context = msg.get("platform_context")
                 if platform_context:
                     pc_lines = []
@@ -138,10 +102,6 @@ class K8sAgent(AgentProtocol):
                     tenant = platform_context.get("tenant_name")
                     if tenant:
                         pc_lines.append(f"DuploCloud tenant: {tenant}")
-                    # Only indicate kubeconfig/credentials presence to avoid leaking large sensitive blobs
-                    if platform_context.get("kubeconfig"):
-                        pass
-                        # pc_lines.append("kubeconfig provided")
                     if pc_lines:
                         content = (
                             "\n\\Current Message Context:\n- "
@@ -150,22 +110,21 @@ class K8sAgent(AgentProtocol):
                             + content
                         )
 
-                # 1. Append context for user-executed commands
+                # Append context for user-executed commands
                 for uc in data.get("executed_cmds", []):
                     cmd = uc.get("command", "")
                     out = uc.get("output", "")
                     content += f"\n\nI ran this command in my terminal: {cmd}\nOutput:\n{out}"
 
-                # 2. Append any rejections
+                # Append any rejections
                 for c in data.get("cmds", []):
                     reason = c.get("rejection_reason")
                     if reason:
                         content += f"\n\nI rejected the suggested command: {c.get('command', '')}\nReason: {reason}"
 
-                # 3. Execute approved commands only in the latest user message
+                # Execute approved commands only in the latest user message
                 is_latest_user_msg = idx == len(messages_list) - 1
                 if is_latest_user_msg:
-                    # execute approved commands
                     for c in data.get("cmds", []):
                         if c.get("execute", False):
                             cmd_str = c.get("command", "")
@@ -194,7 +153,6 @@ class K8sAgent(AgentProtocol):
                                 {"command": cmd_str, "output": output}
                             )
 
-                            # Add executed command and files to content
                             if files:
                                 files_str = "\n".join(
                                     [
@@ -208,76 +166,28 @@ class K8sAgent(AgentProtocol):
 
             processed_messages.append({"role": role, "content": content})
 
-        # clean up temp kubeconfig
+        # Clean up temp kubeconfig
         if kubeconfig_path and os.path.exists(kubeconfig_path):
             with contextlib.suppress(OSError):
                 os.remove(kubeconfig_path)
 
         return processed_messages, executed_cmds_current_turn
 
-    def call_llm(self, messages: list[dict[str, Any]]) -> dict[str, Any]:
-        """
-        Make an API call to the LLM with the processed messages.
+    # ------------------------------------------------------------------
+    # execute_cmd — custom: kubeconfig, files, DuploCloud env vars
+    # ------------------------------------------------------------------
 
-        Args:
-            messages: A list of processed message dictionaries
-
-        Returns:
-            The LLM response as a dictionary
-        """
-        try:
-            # Use the schema as a tool to structure the response
-            tool_choice = {"type": "tool", "name": "return_response"}
-
-            # Invoke the LLM with the messages, system prompt, and response schema
-            model_id = os.getenv("BEDROCK_MODEL_ID", "anthropic.claude-3-5-sonnet-20240620-v1:0")
-            # model_id = os.getenv("BEDROCK_MODEL_ID", "us.anthropic.claude-3-7-sonnet-20250219-v1:0")
-            # model_id = os.getenv("BEDROCK_MODEL_ID", "us.anthropic.claude-sonnet-4-20250514-v1:0")
-            response = self.llm.invoke(
-                model_id=model_id,
-                messages=self.llm.normalize_message_roles(messages),
-                max_tokens=4000,
-                system_prompt=self.system_prompt,
-                tools=[self.response_schema],
-                tool_choice=tool_choice,
-            )
-
-            logger.info(f"LLM Response: {response}")
-            return response
-        except Exception as e:
-            traceback_error = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-            logger.error("Error while making LLM API call:\n%s", traceback_error)
-
-            if (
-                "An error occurred (ExpiredTokenException) when calling the InvokeModel operation: The security token included in the request is expired"
-                in str(e)
-            ):
-                solution = "If running the agent locally with Bedrock, refresh the aws creds in the .env file (use the env_update_aws_creds.sh script if using DuploCloud; refer README)."
-                raise Exception(f"Error while making LLM API call: {str(e)}. {solution}") from e
-            else:
-                raise Exception(f"Error while making LLM API call: {str(e)}") from e
-
-    def execute_cmd(
+    def execute_cmd(  # type: ignore[override]
         self,
         command: str,
         kubeconfig_path: str | None = None,
         files: list[dict[str, str]] | None = None,
         ctl_tokens: dict[str, str] | None = None,
     ) -> str:
-        """
-        Execute a terminal command and return its output.
-
-        Args:
-            command: The command string to execute
-
-        Returns:
-            The command output as a string
-        """
         tmp_dir = None
-        output = ""
         try:
             logger.info("Executing command: %s", command)
-            # --- create temp dir & files if provided ---
+            # Create temp dir & files if provided
             if files:
                 tmp_dir = tempfile.mkdtemp(prefix="cmd_files_")
                 for f in files:
@@ -286,7 +196,7 @@ class K8sAgent(AgentProtocol):
                         os.makedirs(os.path.dirname(path), exist_ok=True)
                         with open(path, "w") as fh:
                             fh.write(f.get("file_content", ""))
-                    except Exception as e:
+                    except Exception as e:  # Intentional catch-all: file write errors
                         logger.warning("Failed writing temp file %s: %s", f, e)
 
             env = os.environ.copy()
@@ -295,7 +205,6 @@ class K8sAgent(AgentProtocol):
                 env["DUPLO_HOST"] = ctl_tokens.get("DUPLO_HOST") or ""
                 env["DUPLO_TOKEN"] = ctl_tokens.get("DUPLO_TOKEN") or ""
                 env["DUPLO_TENANT"] = ctl_tokens.get("DUPLO_TENANT") or ""
-                # Log the DuploCloud environment variables at INFO level (token redacted for security)
                 if logger.isEnabledFor(logging.INFO):
                     redacted_token = None
                     token_val = ctl_tokens.get("DUPLO_TOKEN")
@@ -325,26 +234,20 @@ class K8sAgent(AgentProtocol):
                 output += "\n\nErrors:\n" + result.stderr
             if not output:
                 output = "Command executed successfully with no output."
-            # Log the output of the executed command at INFO level so it is visible in logs
             logger.info("Command output: %s", output)
             return output
-        except Exception as e:
+        except Exception as e:  # Intentional catch-all: subprocess can raise many types
             logger.error("Error executing command: %s", e)
-            return f"Error executing command: {str(e)}"
+            return f"Error executing command: {e}"
         finally:
             if tmp_dir:
                 shutil.rmtree(tmp_dir, ignore_errors=True)
 
+    # ------------------------------------------------------------------
+    # _extract_commands — custom: handles both string and dict items
+    # ------------------------------------------------------------------
+
     def _extract_commands(self, llm_response: dict[str, Any]) -> list[dict[str, str]]:
-        """
-        Extract commands from the LLM response.
-
-        Args:
-            llm_response: The response from the LLM
-
-        Returns:
-            A list of command dictionaries
-        """
         cmds: list[dict[str, Any]] = []
         raw = llm_response.get("terminal_commands", [])
         for item in raw:
@@ -354,40 +257,28 @@ class K8sAgent(AgentProtocol):
                 cmds.append(item)
         return cmds
 
+    # ------------------------------------------------------------------
+    # Domain-specific prompts and schema
+    # ------------------------------------------------------------------
+
     def _duplocloud_context(self) -> str:
-        """
-        Return the DuploCloud context for the LLM.
+        return """
+# DuploCloud Concepts Cheat-Sheet
 
-        Returns:
-            The DuploCloud context string
-        """
+## What "service" means here
+- **DuploCloud Service** = one micro-service you declared in the DuploCloud UI.
+  - DuploCloud materialises it as **one Kubernetes Deployment (or StatefulSet)** plus its Pods, HPA, ConfigMaps, etc.
+  - The Deployment/Pods carry the label **app=<service-name>**.
 
-        duplocloud_concepts_context = """
-# 📚 DuploCloud Concepts Cheat-Sheet
-
-## What “service” means here
-• **DuploCloud Service** = one micro-service you declared in the DuploCloud UI.
-  ↳ DuploCloud materialises it as **one Kubernetes Deployment (or StatefulSet)** plus its Pods, HPA, ConfigMaps, etc.
-  ↳ The Deployment/Pods carry the label **app=<service-name>**.
-
-• **It is *not* a Kubernetes `Service` object.**
-  – A K8s `Service` is just the ClusterIP/LoadBalancer front-end DuploCloud creates for traffic.
-  – When a user says “cart service”, they almost always mean the *workload* (Deployment & Pods) called **cart**, not that K8s `Service` resource.
+- **It is *not* a Kubernetes `Service` object.**
+  - A K8s `Service` is just the ClusterIP/LoadBalancer front-end DuploCloud creates for traffic.
+  - When a user says "cart service", they almost always mean the *workload* (Deployment & Pods) called **cart**, not that K8s `Service` resource.
 
 ### Key takeaway
-Whenever a user mentions “<name> service” inside DuploCloud, interpret it as **the Deployment/StatefulSet and its Pods labeled `app=<name>`**, *not* the Kubernetes `Service` resource.
+Whenever a user mentions "<name> service" inside DuploCloud, interpret it as **the Deployment/StatefulSet and its Pods labeled `app=<name>`**, *not* the Kubernetes `Service` resource.
 """
 
-        return duplocloud_concepts_context
-
     def _default_system_prompt(self) -> str:
-        """
-        Return the default system prompt for the LLM.
-
-        Returns:
-            The system prompt string
-        """
-        # Primary prompt plus DuploCloud context in a dedicated helper for easy maintenance
         return f"""You are a seasoned Kubernetes and Helm expert agent for DuploCloud.
 Your role is to help users manage, troubleshoot, and deploy applications using kubectl commands and Helm in a less wordy manner.
 Be throrough and perform in-depth analysis and run all the necessary terminal commands needed to collect the necessary information when investigating an issue (by suggesting them in the 'terminal_commands' field).
@@ -448,12 +339,6 @@ When converting Docker Compose to Helm:
 """
 
     def _create_response_schema(self) -> dict[str, Any]:
-        """
-        Create the JSON schema for structured LLM responses.
-
-        Returns:
-            The response schema as a dictionary
-        """
         return {
             "name": "return_response",
             "description": "Generate a structured response with explanatory text and terminal commands",

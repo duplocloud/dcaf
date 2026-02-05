@@ -56,7 +56,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from dcaf.schemas.messages import AgentMessage
+    from dcaf.core.schemas.messages import AgentMessage
 
 logger = logging.getLogger(__name__)
 
@@ -210,7 +210,7 @@ class AgentResult:
             message = result.to_message()
             return message.model_dump()  # → JSON for HelpDesk
         """
-        from dcaf.schemas.messages import AgentMessage, Data, ExecutedToolCall, ToolCall
+        from dcaf.core.schemas.messages import AgentMessage, Data, ExecutedToolCall, ToolCall
 
         # Build tool_calls for pending approvals
         tool_calls = []

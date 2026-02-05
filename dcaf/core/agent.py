@@ -44,9 +44,9 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
-    from dcaf.schemas.messages import AgentMessage
+    from dcaf.core.schemas.messages import AgentMessage
 
-from ..schemas.events import (
+from .schemas.events import (
     DoneEvent,
     ErrorEvent,
     TextDeltaEvent,
@@ -54,10 +54,10 @@ from ..schemas.events import (
 )
 
 # Import stream event types from schemas (server-side types)
-from ..schemas.events import (
+from .schemas.events import (
     StreamEvent as ServerStreamEvent,
 )
-from ..schemas.messages import ToolCall as SchemaToolCall
+from .schemas.messages import ToolCall as SchemaToolCall
 from .adapters.loader import load_adapter
 from .adapters.outbound.persistence import InMemoryConversationRepository
 from .application.dto import AgentRequest
@@ -77,6 +77,7 @@ from .interceptors import (
     create_response_from_text,
     normalize_interceptors,
 )
+from .adapters.outbound.agno.types import DEFAULT_FRAMEWORK, DEFAULT_MODEL_ID, DEFAULT_PROVIDER
 from .models import ChatMessage, normalize_messages
 from .session import Session
 
@@ -198,7 +199,7 @@ class AgentResponse:
             message = response.to_message()
             return message.model_dump()  # → JSON for HelpDesk
         """
-        from dcaf.schemas.messages import AgentMessage, Data, ToolCall
+        from dcaf.core.schemas.messages import AgentMessage, Data, ToolCall
 
         # Build tool_calls for the Data container
         tool_calls = []
@@ -441,9 +442,9 @@ class Agent:
     def __init__(
         self,
         tools: list | None = None,
-        model: str = "anthropic.claude-3-sonnet-20240229-v1:0",
-        provider: str = "bedrock",
-        framework: str = "agno",  # LLM framework: "agno", "strands", "langchain"
+        model: str = DEFAULT_MODEL_ID,
+        provider: str = DEFAULT_PROVIDER,
+        framework: str = DEFAULT_FRAMEWORK,
         system_prompt: str | None = None,
         system_context: str | Callable[[dict], str] | None = None,
         model_config: dict | None = None,
@@ -963,14 +964,6 @@ class Agent:
             # Convert to dict format for the internal request
             messages_as_dicts = [m.to_dict() for m in normalized]
 
-            AgentRequest(
-                content=current_message,
-                messages=messages_as_dicts,
-                tools=self.tools,
-                system_prompt=self.system_prompt,
-                context=context,
-            )
-
             # Use the streaming version of the agent service
             # For now, we'll use the runtime's stream capability directly
             # and handle the event conversion here
@@ -1122,7 +1115,7 @@ class Agent:
                 for handler in self.handlers:
                     try:
                         handler(event)
-                    except Exception as e:
+                    except Exception as e:  # Intentional catch-all: user event handlers can raise anything
                         logger.warning(f"Event handler error: {e}")
 
             def publish_all(self, events: list[DomainEvent]) -> None:
@@ -1130,11 +1123,3 @@ class Agent:
                     self.publish(event)
 
         return CallbackEventPublisher(self._event_handlers)
-
-    def _check_requires_approval(self, tool_name: str, tool_requires: bool) -> bool:  # noqa: ARG002
-        """
-        Check if a tool requires approval.
-
-        Returns True if the tool has requires_approval=True.
-        """
-        return tool_requires

@@ -225,7 +225,7 @@ class RemoteAgent:
                 system="Route requests to the appropriate specialist"
             )
         """
-        from ...tools import tool
+        from ..tools import tool
 
         # Create a tool wrapper function
         def remote_agent_call(message: str, **context: Any) -> str:

@@ -21,9 +21,9 @@ from enum import Enum
 from typing import Any
 
 # =============================================================================
-# Import reusable schema classes (Category 1 - Highly Reusable)
+# Import reusable schema classes from v2 core schemas
 # =============================================================================
-from dcaf.schemas.messages import (
+from dcaf.core.schemas.messages import (
     Command,
     ExecutedCommand,
     ExecutedToolCall,
@@ -438,14 +438,14 @@ class AgentResponse:
             include_timestamp: Whether to include timestamp (default: True)
 
         Returns:
-            AgentMessage from dcaf.schemas.messages
+            AgentMessage from dcaf.core.schemas.messages
 
         Example:
             response = agent_service.execute(request)
             message = response.to_agent_message(agent_name="k8s-agent")
             json_data = message.model_dump()  # Serialize to JSON
         """
-        from dcaf.schemas.messages import AgentMessage
+        from dcaf.core.schemas.messages import AgentMessage
 
         return AgentMessage.from_agent_response(
             self,

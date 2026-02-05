@@ -1,16 +1,11 @@
+import logging
 import os
-import sys
 from collections.abc import Callable
 from typing import Any
 
-# Add parent directory to path to import from root directory
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-import logging
-import os
-
-from agent_server import AgentProtocol
-from llm import BedrockLLM
-from schemas.messages import AgentMessage, Command, ExecutedToolCall, ToolCall
+from dcaf.agent_server import AgentProtocol
+from dcaf.llm import BedrockLLM
+from dcaf.schemas.messages import AgentMessage, Command, ExecutedToolCall, ToolCall
 
 logger = logging.getLogger(__name__)
 
@@ -482,7 +477,7 @@ Be surgical, simple and less wordy."""
 # Usage example:
 if __name__ == "__main__":
     import dotenv
-    from llm import BedrockLLM
+    from dcaf.llm import BedrockLLM
 
     dotenv.load_dotenv(override=True)
 

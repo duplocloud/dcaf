@@ -34,7 +34,14 @@ from .message_converter import AgnoMessageConverter
 from .model_factory import AgnoModelFactory, ModelConfig
 from .response_converter import AgnoResponseConverter
 from .tool_converter import AgnoToolConverter
-from .types import DEFAULT_MAX_TOKENS, DEFAULT_MODEL_ID, DEFAULT_PROVIDER
+from .types import (
+    DEFAULT_AWS_REGION,
+    DEFAULT_MAX_TOKENS,
+    DEFAULT_MODEL_ID,
+    DEFAULT_PROVIDER,
+    DEFAULT_TEMPERATURE,
+    DEFAULT_TOOL_CALL_LIMIT,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -104,15 +111,12 @@ class AgnoAdapter:
         )
     """
 
-    # Environment variable defaults
-    DEFAULT_TOOL_CALL_LIMIT = 1  # Prevent parallel tool execution bug
-
     def __init__(
         self,
         model_id: str = DEFAULT_MODEL_ID,
         provider: str = DEFAULT_PROVIDER,
         max_tokens: int = DEFAULT_MAX_TOKENS,
-        temperature: float = 0.1,  # Lower for more deterministic responses
+        temperature: float = DEFAULT_TEMPERATURE,
         # AWS-specific configuration
         aws_profile: str | None = None,
         aws_region: str | None = None,
@@ -177,7 +181,7 @@ class AgnoAdapter:
 
         # AWS configuration
         self._aws_profile = aws_profile
-        self._aws_region = aws_region or os.getenv("AWS_REGION", "us-west-2")
+        self._aws_region = aws_region or os.getenv("AWS_REGION", DEFAULT_AWS_REGION)
         self._aws_access_key = aws_access_key
         self._aws_secret_key = aws_secret_key
 
@@ -191,7 +195,7 @@ class AgnoAdapter:
 
         # Behavior flags (can also be set via env vars)
         self._tool_call_limit = tool_call_limit or int(
-            os.getenv("AGNO_TOOL_CALL_LIMIT", str(self.DEFAULT_TOOL_CALL_LIMIT))
+            os.getenv("AGNO_TOOL_CALL_LIMIT", str(DEFAULT_TOOL_CALL_LIMIT))
         )
         self._disable_history = disable_history or (
             os.getenv("AGNO_DISABLE_HISTORY", "false").lower() == "true"

@@ -48,7 +48,7 @@ def requires_aws_credentials():
 
 def create_test_tools():
     """Create test tools for LLM testing."""
-    from dcaf.tools import tool
+    from dcaf.core import tool
 
     @tool(description="Execute a terminal command to interact with the system")
     def execute_terminal_cmd(command: str, explanation: str = "") -> str:

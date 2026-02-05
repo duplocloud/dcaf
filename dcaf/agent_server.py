@@ -1,20 +1,16 @@
-import asyncio
-import inspect
-import json
+from typing import Protocol, runtime_checkable, Dict, Any, List, Optional, Iterator
+from fastapi import FastAPI, HTTPException, Body
+from pydantic import ValidationError
+from .schemas.messages import AgentMessage, Messages
+from .schemas.events import DoneEvent, ErrorEvent, StreamEvent
 import logging
 import os
 import traceback
-from collections.abc import AsyncIterator, Iterator
-from pathlib import Path
-from typing import Any, Protocol, runtime_checkable
-
-from fastapi import Body, FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from .channel_routing import ChannelResponseRouter, SlackResponseRouter
 from fastapi.responses import StreamingResponse
-from pydantic import ValidationError
-
-from .channel_routing import ChannelResponseRouter
-from .schemas.events import DoneEvent, ErrorEvent
-from .schemas.messages import AgentMessage, Messages
+import inspect
+import json
+from pathlib import Path
 
 logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO"),
@@ -23,29 +19,207 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
-
 @runtime_checkable
 class AgentProtocol(Protocol):
+    """Any agent that can respond to a chat."""
+    def invoke(self, messages: Dict[str, List[Dict[str, Any]]], thread_id: Optional[str] = None) -> AgentMessage: ...
+
+
+# ---------------------------------------------------------------------------
+# V1 Handler Functions (can be imported by V2 unified app)
+# ---------------------------------------------------------------------------
+
+
+def handle_send_message_v1(
+    agent: AgentProtocol,
+    raw_body: Dict[str, Any],
+    router: Optional[ChannelResponseRouter] = None,
+) -> AgentMessage:
     """
-    Any agent that can respond to a chat.
+    V1 handler for /api/sendMessage endpoint.
 
-    Required:
-        invoke(): Synchronous or async method to process messages and return a response.
-
-    Optional:
-        invoke_stream(): If implemented, enables streaming endpoints. If not implemented,
-                        streaming endpoints will fall back to invoke() and wrap the
-                        response in stream events.
+    This is the actual V1 code path - can be called directly or used by V2's
+    unified app for legacy endpoint compatibility.
     """
+    # log request body
+    logger.info("V1 Request Body:")
+    logger.info(str(raw_body))
 
-    def invoke(self, messages: dict[str, list[dict[str, Any]]]) -> AgentMessage: ...
+    source = raw_body.get("source")
+    logger.info("V1 Request Source: %s", source if source else "No Source Provided. Defaulting to 'help-desk'")
+
+    if source == "slack":
+        if router:
+            should_respond = router.should_agent_respond(raw_body["messages"])
+            if not should_respond["should_respond"]:
+                return AgentMessage(role="assistant", content="")
+
+    # 1. validate presence of 'messages'
+    if "messages" not in raw_body:
+        raise HTTPException(status_code=400, detail="'messages' field missing from request body")
+
+    try:
+        msgs_obj = Messages.model_validate({"messages": raw_body["messages"]})
+    except ValidationError as ve:
+        raise HTTPException(status_code=422, detail=ve.errors())
+
+    # 2. delegate to agent
+    try:
+        # Pass the raw messages dictionary directly to the agent
+        msgs_dict = msgs_obj.model_dump()
+
+        # Extract thread_id from raw_body if present
+        thread_id = raw_body.get("thread_id")
+
+        # Check if the agent's invoke method accepts thread_id parameter
+        sig = inspect.signature(agent.invoke)
+        if "thread_id" in sig.parameters:
+            logger.info("V1 Invoking agent with messages and thread_id: %s", thread_id)
+            assistant_msg = agent.invoke(msgs_dict, thread_id=thread_id)
+        else:
+            logger.info("V1 Invoking agent with messages (no thread_id support)")
+            assistant_msg = agent.invoke(msgs_dict)
+
+        logger.info("V1 Assistant message: %s", assistant_msg)
+
+        # Validate the response format (handle both dict and AgentMessage returns)
+        # Also handle V2's AgentMessage (different class from V1's)
+        if isinstance(assistant_msg, AgentMessage):
+            return assistant_msg
+        elif hasattr(assistant_msg, "role") and hasattr(assistant_msg, "content"):
+            # It's an AgentMessage-like object (could be V2's AgentMessage)
+            return AgentMessage(
+                role=assistant_msg.role,
+                content=assistant_msg.content,
+            )
+        else:
+            return AgentMessage.model_validate(assistant_msg)
+
+    except ValidationError as ve:
+        logger.error("V1 Validation error in agent: %s", ve)
+        raise HTTPException(status_code=500, detail=f"Agent returned invalid Message: {ve}")
+
+    except Exception as e:
+        traceback_error = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
+        logger.error("V1 Unhandled exception in agent:\n%s", traceback_error)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+def handle_send_message_stream_v1(
+    agent: AgentProtocol,
+    raw_body: Dict[str, Any],
+    router: Optional[ChannelResponseRouter] = None,
+) -> StreamingResponse:
+    """
+    V1 handler for /api/sendMessageStream endpoint.
+
+    This is the actual V1 code path - can be called directly or used by V2's
+    unified app for legacy endpoint compatibility.
+    """
+    logger.info("V1 Stream Request Body: %s", raw_body)
+
+    source = raw_body.get("source")
+    logger.info("V1 Request Source: %s", source if source else "No Source Provided. Defaulting to 'help-desk'")
+
+    if source == "slack":
+        if router:
+            should_respond = router.should_agent_respond(raw_body["messages"])
+            if not should_respond["should_respond"]:
+                def done_generator():
+                    yield DoneEvent().model_dump_json() + '\n'
+                return StreamingResponse(done_generator(), media_type='application/x-ndjson')
+
+    # Validate
+    if "messages" not in raw_body:
+        raise HTTPException(status_code=400, detail="'messages' field missing")
+
+    try:
+        msgs_obj = Messages.model_validate({"messages": raw_body["messages"]})
+    except ValidationError as ve:
+        raise HTTPException(status_code=422, detail=ve.errors())
+
+    # Extract thread_id from raw_body if present
+    thread_id = raw_body.get("thread_id")
+
+    # Generator function
+    def event_generator() -> Iterator[str]:
+        # Accumulate events for logging
+        text_parts: List[str] = []
+        event_counts: Dict[str, int] = {}
+        executed_commands: List[Any] = []
+        executed_tool_calls: List[Any] = []
+        tool_calls: List[Any] = []
+        commands: List[Any] = []
+        stop_reason = None
+
+        try:
+            # Check if the agent's invoke_stream method accepts thread_id parameter
+            sig = inspect.signature(agent.invoke_stream)
+            if "thread_id" in sig.parameters:
+                logger.info("V1 Invoking stream agent with messages and thread_id: %s", thread_id)
+                event_stream = agent.invoke_stream(msgs_obj.model_dump(), thread_id=thread_id)
+            else:
+                logger.info("V1 Invoking stream agent with messages (no thread_id support)")
+                event_stream = agent.invoke_stream(msgs_obj.model_dump())
+
+            for event in event_stream:
+                event_type = event.type
+                event_counts[event_type] = event_counts.get(event_type, 0) + 1
+
+                # Accumulate data based on event type
+                if event_type == "text_delta":
+                    text_parts.append(event.text)
+                elif event_type == "executed_commands":
+                    executed_commands.extend(event.executed_cmds)
+                elif event_type == "executed_tool_calls":
+                    executed_tool_calls.extend(event.executed_tool_calls)
+                elif event_type == "tool_calls":
+                    tool_calls.extend(event.tool_calls)
+                elif event_type == "commands":
+                    commands.extend(event.commands)
+                elif event_type == "done":
+                    stop_reason = event.stop_reason
+
+                yield event.model_dump_json() + '\n'
+
+            # Log final aggregated response
+            logger.info("V1 Stream completed - Event counts: %s", event_counts)
+            if text_parts:
+                full_text = ''.join(text_parts)
+                logger.info("V1 Streamed assistant message: %s", f'{full_text}')
+            if executed_tool_calls:
+                logger.info("V1 Executed tool calls: %s", executed_tool_calls)
+            if tool_calls:
+                logger.info("V1 Tool calls requested: %s", tool_calls)
+            if commands:
+                logger.info("V1 Commands requested: %s", commands)
+            if stop_reason:
+                logger.info("V1 Stop reason: %s", stop_reason)
+
+        except Exception as e:
+            logger.error("V1 Stream error: %s", str(e), exc_info=True)
+            error_event = ErrorEvent(error=str(e))
+            yield error_event.model_dump_json() + '\n'
+
+    return StreamingResponse(event_generator(), media_type='application/x-ndjson')
 
 
 def create_chat_app(
     agent: AgentProtocol,
-    router: ChannelResponseRouter | None = None,
-    a2a_agent_card_path: str | None = None,
+    router: ChannelResponseRouter = None,
+    a2a_agent_card_path: Optional[str] = None,
 ) -> FastAPI:
+    """
+    Create a V1 FastAPI application for the agent.
+
+    This is the V1-only server. For a unified server with both V1 and V2
+    endpoints, use `dcaf.core.create_app()` instead.
+
+    Endpoints:
+        GET  /health             - Health check
+        POST /api/sendMessage    - Synchronous chat (V1)
+        POST /api/sendMessageStream - Streaming chat (V1, NDJSON)
+    """
     # ONE-LINER guardrail — fails fast if agent doesn't meet the protocol
     if not isinstance(agent, AgentProtocol):
         raise TypeError(
@@ -56,9 +230,8 @@ def create_chat_app(
     app = FastAPI(title="DuploCloud Chat Service", version="0.1.0")
 
     # ----- health check ------------------------------------------------------
-    # Health check is sync and fast - never blocked by LLM calls
     @app.get("/health", tags=["system"])
-    def health() -> dict[str, str]:
+    def health() -> Dict[str, str]:
         return {"status": "ok"}
 
     # ----- agent card (A2A) --------------------------------------------------
@@ -66,7 +239,7 @@ def create_chat_app(
         card_path = Path(a2a_agent_card_path)
 
         @app.get("/.well-known/agent.json", tags=["system"])
-        def get_agent_card() -> dict[str, Any]:
+        def get_agent_card() -> Dict[str, Any]:
             """
             Serves the Agent2Agent agent card JSON.
             https://agent2agent.info/docs/concepts/agentcard/
@@ -93,358 +266,15 @@ def create_chat_app(
                     detail=f"Failed reading agent card file: {card_path}",
                 )
 
-    # ----- shared logic for chat endpoints -----------------------------------
-    async def _handle_chat(raw_body: dict[str, Any]) -> AgentMessage:
-        """
-        Shared async handler for chat endpoints.
+    # ----- V1 chat endpoints (using extracted handler functions) -------------
+    @app.post("/api/sendMessage", response_model=AgentMessage, tags=["chat"])
+    def send_message(raw_body: Dict[str, Any] = Body(...)) -> AgentMessage:
+        """V1 synchronous chat endpoint."""
+        return handle_send_message_v1(agent, raw_body, router)
 
-        Runs the agent in a thread pool so LLM calls don't block
-        the event loop (which would block health checks).
-        """
-        # log request body
-        logger.info("Request Body:")
-        logger.info(str(raw_body))
-
-        source = raw_body.get("source")
-        logger.info(
-            "Request Source: %s",
-            source if source else "No Source Provided. Defaulting to 'help-desk'",
-        )
-
-        if source == "slack" and router:
-            should_respond = router.should_agent_respond(raw_body["messages"])
-            if not should_respond["should_respond"]:
-                return AgentMessage(role="assistant", content="")
-
-        # 1. validate presence of 'messages'
-        if "messages" not in raw_body:
-            raise HTTPException(
-                status_code=400, detail="'messages' field missing from request body"
-            )
-
-        try:
-            msgs_obj = Messages.model_validate({"messages": raw_body["messages"]})
-        except ValidationError as ve:
-            raise HTTPException(status_code=422, detail=ve.errors()) from ve
-
-        # 2. delegate to agent (run in thread pool to not block event loop)
-        try:
-            msgs_dict = msgs_obj.model_dump()
-
-            # Forward top-level request fields (thread_id, tenant_id, source, etc.)
-            # so adapters can merge them into the agent context
-            request_fields = {k: v for k, v in raw_body.items() if k != "messages"}
-            msgs_dict["_request_fields"] = request_fields
-
-            logger.info("Invoking agent with messages: %s", msgs_dict)
-
-            # Extract thread_id for v1 backwards compatibility
-            thread_id = request_fields.get("thread_id")
-
-            # Check if agent's invoke method accepts thread_id parameter (v1 pattern)
-            sig = inspect.signature(agent.invoke)
-            accepts_thread_id = "thread_id" in sig.parameters
-
-            # If the agent's invoke is async, await it directly;
-            # otherwise run it in a thread pool so it doesn't block the event loop.
-            if inspect.iscoroutinefunction(agent.invoke):
-                if accepts_thread_id:
-                    assistant_msg = await agent.invoke(msgs_dict, thread_id=thread_id)
-                else:
-                    assistant_msg = await agent.invoke(msgs_dict)
-            else:
-                if accepts_thread_id:
-                    assistant_msg = await asyncio.to_thread(agent.invoke, msgs_dict, thread_id=thread_id)
-                else:
-                    assistant_msg = await asyncio.to_thread(agent.invoke, msgs_dict)
-
-            logger.info("Assistant message: %s", assistant_msg)
-
-            # Still validate the response format
-            assistant_msg = AgentMessage.model_validate(assistant_msg)  # schema guardrail
-
-            # Echo top-level request fields back for client correlation
-            if request_fields:
-                assistant_msg.meta_data["request_context"] = request_fields
-
-            return assistant_msg
-
-        except ValidationError as ve:
-            logger.error("Validation error in agent: %s", ve)
-            raise HTTPException(
-                status_code=500, detail=f"Agent returned invalid Message: {ve}"
-            ) from ve
-
-        except Exception as e:
-            traceback_error = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-            logger.error("Unhandled exception in agent:\n%s", traceback_error)
-            raise HTTPException(status_code=500, detail=str(e)) from e
-
-    # ----- NEW: /api/chat endpoint (preferred) -------------------------------
-    @app.post("/api/chat", response_model=AgentMessage, tags=["chat"])
-    async def chat(raw_body: dict[str, Any] = Body(...)) -> AgentMessage:
-        """
-        Chat endpoint (async).
-
-        Send a message to the agent and get a response.
-        LLM calls run in a thread pool so they don't block health checks.
-        """
-        return await _handle_chat(raw_body)
-
-    # ----- shared logic for stream endpoints ---------------------------------
-    def _has_invoke_stream() -> bool:
-        """Check if the agent has an invoke_stream method."""
-        return hasattr(agent, "invoke_stream") and callable(getattr(agent, "invoke_stream", None))
-
-    async def _handle_stream(raw_body: dict[str, Any]):
-        """
-        Shared async handler for streaming endpoints.
-
-        Returns a StreamingResponse with NDJSON events.
-
-        If the agent doesn't implement invoke_stream(), falls back to invoke()
-        and wraps the response in stream events for backwards compatibility.
-        """
-        from .schemas.events import TextDeltaEvent
-
-        logger.info("Stream Request Body: %s", raw_body)
-
-        source = raw_body.get("source")
-        logger.info(
-            "Request Source: %s",
-            source if source else "No Source Provided. Defaulting to 'help-desk'",
-        )
-
-        if source == "slack" and router:
-            should_respond = router.should_agent_respond(raw_body["messages"])
-            if not should_respond["should_respond"]:
-
-                async def done_generator():
-                    yield DoneEvent().model_dump_json() + "\n"
-
-                return StreamingResponse(done_generator(), media_type="application/x-ndjson")
-
-        # Validate
-        if "messages" not in raw_body:
-            raise HTTPException(status_code=400, detail="'messages' field missing")
-
-        try:
-            msgs_obj = Messages.model_validate({"messages": raw_body["messages"]})
-        except ValidationError as ve:
-            raise HTTPException(status_code=422, detail=ve.errors()) from ve
-
-        # Forward top-level request fields (thread_id, tenant_id, source, etc.)
-        msgs_dict = msgs_obj.model_dump()
-        request_fields = {k: v for k, v in raw_body.items() if k != "messages"}
-        msgs_dict["_request_fields"] = request_fields
-
-        # Extract thread_id for v1 backwards compatibility
-        thread_id = request_fields.get("thread_id")
-
-        # Async generator function that yields events
-        async def event_generator():
-            try:
-                # Check if agent has invoke_stream method
-                if _has_invoke_stream():
-                    # Check if invoke_stream accepts thread_id (v1 pattern)
-                    sig = inspect.signature(agent.invoke_stream)
-                    accepts_thread_id = "thread_id" in sig.parameters
-
-                    if inspect.iscoroutinefunction(agent.invoke_stream) or inspect.isasyncgenfunction(agent.invoke_stream):
-                        # Async streaming: await each event directly
-                        if accepts_thread_id:
-                            async for event in agent.invoke_stream(msgs_dict, thread_id=thread_id):
-                                yield event.model_dump_json() + "\n"
-                        else:
-                            async for event in agent.invoke_stream(msgs_dict):
-                                yield event.model_dump_json() + "\n"
-                    else:
-                        # Sync streaming: run in thread pool
-                        if accepts_thread_id:
-                            def run_stream():
-                                return list(agent.invoke_stream(msgs_dict, thread_id=thread_id))
-                        else:
-                            def run_stream():
-                                return list(agent.invoke_stream(msgs_dict))
-
-                        events = await asyncio.to_thread(run_stream)
-                        for event in events:
-                            yield event.model_dump_json() + "\n"
-                else:
-                    # Fallback: agent doesn't have invoke_stream, use invoke() instead
-                    # and wrap the response in stream events
-                    logger.debug("Agent doesn't have invoke_stream, falling back to invoke()")
-
-                    # Check if invoke accepts thread_id (v1 pattern)
-                    sig = inspect.signature(agent.invoke)
-                    accepts_thread_id = "thread_id" in sig.parameters
-
-                    if inspect.iscoroutinefunction(agent.invoke):
-                        if accepts_thread_id:
-                            response = await agent.invoke(msgs_dict, thread_id=thread_id)
-                        else:
-                            response = await agent.invoke(msgs_dict)
-                    else:
-                        if accepts_thread_id:
-                            response = await asyncio.to_thread(agent.invoke, msgs_dict, thread_id=thread_id)
-                        else:
-                            response = await asyncio.to_thread(agent.invoke, msgs_dict)
-
-                    # Wrap response in stream events
-                    response = AgentMessage.model_validate(response)
-                    if response.content:
-                        yield TextDeltaEvent(text=response.content).model_dump_json() + "\n"
-                    yield DoneEvent().model_dump_json() + "\n"
-
-            except Exception as e:
-                logger.error("Stream error: %s", str(e), exc_info=True)
-                error_event = ErrorEvent(error=str(e))
-                yield error_event.model_dump_json() + "\n"
-
-        return StreamingResponse(event_generator(), media_type="application/x-ndjson")
-
-    # ----- NEW: /api/chat-stream endpoint (preferred) ------------------------
-    @app.post("/api/chat-stream", tags=["chat"])
-    async def chat_stream(raw_body: dict[str, Any] = Body(...)):
-        """
-        Streaming chat endpoint (async).
-
-        Stream agent response as NDJSON events.
-        LLM calls run in a thread pool so they don't block health checks.
-        """
-        return await _handle_stream(raw_body)
-
-    # ----- LEGACY: /api/sendMessage endpoint (deprecated) --------------------
-    # Per ADR-007, these endpoints are preserved for backwards compatibility
-    # with existing clients. New integrations should use /api/chat instead.
-    @app.post("/api/sendMessage", response_model=AgentMessage, tags=["chat"], deprecated=True)
-    async def send_message_legacy(raw_body: dict[str, Any] = Body(...)) -> AgentMessage:
-        """
-        Legacy chat endpoint (deprecated).
-
-        .. deprecated::
-            Use ``/api/chat`` instead. This endpoint is maintained for
-            backwards compatibility with existing clients.
-        """
-        return await _handle_chat(raw_body)
-
-    # ----- LEGACY: /api/sendMessageStream endpoint (deprecated) --------------
-    @app.post("/api/sendMessageStream", tags=["chat"], deprecated=True)
-    async def send_message_stream_legacy(raw_body: dict[str, Any] = Body(...)):
-        """
-        Legacy streaming chat endpoint (deprecated).
-
-        .. deprecated::
-            Use ``/api/chat-stream`` instead. This endpoint is maintained for
-            backwards compatibility with existing clients.
-        """
-        return await _handle_stream(raw_body)
-
-    # ----- WebSocket: /api/chat-ws endpoint ------------------------------------
-    @app.websocket("/api/chat-ws")
-    async def chat_ws(websocket: WebSocket):
-        """
-        Bidirectional streaming chat over WebSocket.
-
-        Each client text frame is a JSON object with the same shape as the HTTP
-        endpoints (``{"messages": [...]}``) representing one conversation turn.
-        The server streams back ``StreamEvent`` JSON frames, ending each turn
-        with a ``DoneEvent``.  The connection stays open for multiple turns.
-        """
-        await websocket.accept()
-
-        try:
-            while True:
-                raw_text = await websocket.receive_text()
-
-                # Parse JSON
-                try:
-                    raw_body = json.loads(raw_text)
-                except json.JSONDecodeError as e:
-                    await websocket.send_text(ErrorEvent(error=f"Invalid JSON: {e}").model_dump_json())
-                    continue
-
-                # Validate messages field
-                if "messages" not in raw_body:
-                    await websocket.send_text(ErrorEvent(error="'messages' field missing").model_dump_json())
-                    continue
-
-                try:
-                    msgs_obj = Messages.model_validate({"messages": raw_body["messages"]})
-                except ValidationError as ve:
-                    await websocket.send_text(ErrorEvent(error=str(ve.errors())).model_dump_json())
-                    continue
-
-                # Forward top-level request fields (thread_id, tenant_id, source, etc.)
-                msgs_dict = msgs_obj.model_dump()
-                request_fields = {k: v for k, v in raw_body.items() if k != "messages"}
-                msgs_dict["_request_fields"] = request_fields
-
-                # Extract thread_id for v1 backwards compatibility
-                thread_id = request_fields.get("thread_id")
-
-                # Stream response events
-                try:
-                    from .schemas.events import TextDeltaEvent
-
-                    if _has_invoke_stream():
-                        # Check if invoke_stream accepts thread_id (v1 pattern)
-                        sig = inspect.signature(agent.invoke_stream)
-                        accepts_thread_id = "thread_id" in sig.parameters
-
-                        if inspect.iscoroutinefunction(agent.invoke_stream) or inspect.isasyncgenfunction(agent.invoke_stream):
-                            if accepts_thread_id:
-                                async for event in agent.invoke_stream(msgs_dict, thread_id=thread_id):
-                                    await websocket.send_text(event.model_dump_json())
-                            else:
-                                async for event in agent.invoke_stream(msgs_dict):
-                                    await websocket.send_text(event.model_dump_json())
-                        else:
-                            if accepts_thread_id:
-                                def run_stream():
-                                    return list(agent.invoke_stream(msgs_dict, thread_id=thread_id))
-                            else:
-                                def run_stream():
-                                    return list(agent.invoke_stream(msgs_dict))
-
-                            events = await asyncio.to_thread(run_stream)
-                            for event in events:
-                                await websocket.send_text(event.model_dump_json())
-                    else:
-                        # Fallback: agent doesn't have invoke_stream, use invoke()
-                        logger.debug("Agent doesn't have invoke_stream, falling back to invoke()")
-
-                        # Check if invoke accepts thread_id (v1 pattern)
-                        sig = inspect.signature(agent.invoke)
-                        accepts_thread_id = "thread_id" in sig.parameters
-
-                        if inspect.iscoroutinefunction(agent.invoke):
-                            if accepts_thread_id:
-                                response = await agent.invoke(msgs_dict, thread_id=thread_id)
-                            else:
-                                response = await agent.invoke(msgs_dict)
-                        else:
-                            if accepts_thread_id:
-                                response = await asyncio.to_thread(agent.invoke, msgs_dict, thread_id=thread_id)
-                            else:
-                                response = await asyncio.to_thread(agent.invoke, msgs_dict)
-
-                        response = AgentMessage.model_validate(response)
-                        if response.content:
-                            await websocket.send_text(TextDeltaEvent(text=response.content).model_dump_json())
-                        await websocket.send_text(DoneEvent().model_dump_json())
-                except Exception as e:
-                    logger.error("WebSocket stream error: %s", str(e), exc_info=True)
-                    await websocket.send_text(ErrorEvent(error=str(e)).model_dump_json())
-
-        except WebSocketDisconnect:
-            logger.info("WebSocket client disconnected")
-        except Exception as e:
-            logger.error("WebSocket connection error: %s", str(e), exc_info=True)
-            try:
-                await websocket.send_text(ErrorEvent(error=str(e)).model_dump_json())
-                await websocket.close(code=1011, reason=str(e))
-            except Exception:
-                pass
+    @app.post("/api/sendMessageStream", tags=["chat"])
+    def send_message_stream(raw_body: Dict[str, Any] = Body(...)) -> StreamingResponse:
+        """V1 streaming chat endpoint (NDJSON)."""
+        return handle_send_message_stream_v1(agent, raw_body, router)
 
     return app

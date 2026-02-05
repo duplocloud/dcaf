@@ -75,8 +75,11 @@ class AgnoStreamEvent(TypedDict, total=False):
 # Default configuration values
 DEFAULT_MODEL_ID = "anthropic.claude-3-sonnet-20240229-v1:0"
 DEFAULT_PROVIDER = "bedrock"
+DEFAULT_FRAMEWORK = "agno"
 DEFAULT_MAX_TOKENS = 4096
-DEFAULT_TEMPERATURE = 0.7
+DEFAULT_TEMPERATURE = 0.1
+DEFAULT_TOOL_CALL_LIMIT = 1
+DEFAULT_AWS_REGION = "us-west-2"
 
 # Supported providers
-SUPPORTED_PROVIDERS = ["bedrock", "anthropic", "openai"]
+SUPPORTED_PROVIDERS = ["bedrock", "anthropic", "openai", "google", "azure", "ollama"]

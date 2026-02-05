@@ -8,9 +8,8 @@ agent discovery and communication.
 import pytest
 from fastapi.testclient import TestClient
 
-from dcaf.core import Agent, create_app
+from dcaf.core import Agent, create_app, tool
 from dcaf.core.a2a import generate_agent_card
-from dcaf.tools import tool
 
 
 @tool(description="Echo back the message")

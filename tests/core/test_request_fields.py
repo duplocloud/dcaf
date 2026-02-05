@@ -1,4 +1,13 @@
-"""Tests for forwarding top-level request fields through the agent pipeline."""
+"""Tests for forwarding top-level request fields through the agent pipeline.
+
+V2 Core endpoints:
+- POST /api/chat - Synchronous chat
+- POST /api/chat-stream - Streaming chat (NDJSON)
+- WS /api/chat-ws - WebSocket bidirectional streaming
+
+These endpoints forward top-level request fields (thread_id, tenant_id, source, etc.)
+to the agent via _request_fields, and echo them back in meta_data.request_context.
+"""
 
 from __future__ import annotations
 
@@ -6,12 +15,12 @@ import json
 from collections.abc import AsyncIterator, Iterator
 from typing import Any
 
-import pytest
 from fastapi.testclient import TestClient
+import pytest
 
-from dcaf.agent_server import create_chat_app
-from dcaf.schemas.events import DoneEvent, TextDeltaEvent
-from dcaf.schemas.messages import AgentMessage
+from dcaf.core import create_app
+from dcaf.core.schemas.events import DoneEvent, TextDeltaEvent
+from dcaf.core.schemas.messages import AgentMessage
 
 
 # ---------------------------------------------------------------------------
@@ -65,7 +74,7 @@ def sync_agent() -> CapturingSyncAgent:
 
 @pytest.fixture
 def sync_client(sync_agent: CapturingSyncAgent) -> TestClient:
-    app = create_chat_app(sync_agent)
+    app = create_app(sync_agent)
     return TestClient(app)
 
 
@@ -76,7 +85,7 @@ def async_agent() -> CapturingAsyncAgent:
 
 @pytest.fixture
 def async_client(async_agent: CapturingAsyncAgent) -> TestClient:
-    app = create_chat_app(async_agent)
+    app = create_app(async_agent)
     return TestClient(app)
 
 
@@ -252,3 +261,56 @@ class TestBackwardCompatibility:
 
         rf = sync_agent.last_invoke_input.get("_request_fields", {})
         assert "messages" not in rf
+
+
+# ---------------------------------------------------------------------------
+# Tests: V1 Legacy endpoint compatibility
+# ---------------------------------------------------------------------------
+
+
+class TestLegacyEndpoints:
+    """Verify that legacy v1 endpoints work in the unified app.
+
+    V1 endpoints exercise V1 code paths, which means:
+    - No _request_fields forwarding (V2-only feature)
+    - V1-style response format
+    """
+
+    def test_send_message_endpoint_exists(self, sync_client: TestClient):
+        """POST /api/sendMessage endpoint exists (v1 legacy)."""
+        response = sync_client.post("/api/sendMessage", json=REQUEST_WITHOUT_FIELDS)
+        assert response.status_code == 200
+
+    def test_send_message_stream_endpoint_exists(self, sync_client: TestClient):
+        """POST /api/sendMessageStream endpoint exists (v1 legacy)."""
+        response = sync_client.post("/api/sendMessageStream", json=REQUEST_WITHOUT_FIELDS)
+        assert response.status_code == 200
+
+    def test_send_message_returns_valid_response(self, sync_client: TestClient):
+        """Legacy /api/sendMessage returns a valid response."""
+        response = sync_client.post("/api/sendMessage", json=REQUEST_WITH_FIELDS)
+        assert response.status_code == 200
+        data = response.json()
+        assert data["role"] == "assistant"
+        assert data["content"] == "ok"
+
+    def test_send_message_stream_returns_events(self, sync_client: TestClient):
+        """Legacy /api/sendMessageStream returns NDJSON events."""
+        response = sync_client.post("/api/sendMessageStream", json=REQUEST_WITH_FIELDS)
+        assert response.status_code == 200
+
+        events = [json.loads(line) for line in response.text.strip().split("\n") if line.strip()]
+        types = [e["type"] for e in events]
+        assert "text_delta" in types
+        assert "done" in types
+
+    def test_v1_endpoints_do_not_forward_request_fields(
+        self, sync_client: TestClient, sync_agent: CapturingSyncAgent
+    ):
+        """V1 endpoints use V1 code path which does NOT forward _request_fields."""
+        response = sync_client.post("/api/sendMessage", json=REQUEST_WITH_FIELDS)
+        assert response.status_code == 200
+
+        # V1 code path does NOT include _request_fields (that's a V2-only feature)
+        rf = sync_agent.last_invoke_input.get("_request_fields")
+        assert rf is None, "V1 endpoints should NOT forward _request_fields"
