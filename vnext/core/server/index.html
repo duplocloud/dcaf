@@ -3306,27 +3306,49 @@
 </tbody>
 </table>
 <h3 id="legacy-endpoints-backwards-compatible">Legacy Endpoints (Backwards Compatible)<a class="headerlink" href="#legacy-endpoints-backwards-compatible" title="Permanent link">&para;</a></h3>
+<p>For backwards compatibility with existing v1 clients, the following endpoints are preserved as aliases:</p>
 <table>
 <thead>
 <tr>
-<th>Endpoint</th>
-<th>Method</th>
+<th>Legacy Endpoint</th>
+<th>Preferred Endpoint</th>
 <th>Status</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>/api/sendMessage</code></td>
-<td>POST</td>
-<td>Deprecated, use <code>/api/chat</code></td>
+<td><code>POST /api/sendMessage</code></td>
+<td><code>POST /api/chat</code></td>
+<td>Deprecated</td>
 </tr>
 <tr>
-<td><code>/api/sendMessageStream</code></td>
-<td>POST</td>
-<td>Deprecated, use <code>/api/chat-stream</code></td>
+<td><code>POST /api/sendMessageStream</code></td>
+<td><code>POST /api/chat-stream</code></td>
+<td>Deprecated</td>
 </tr>
 </tbody>
 </table>
+<div class="admonition info">
+<p class="admonition-title">Full Backwards Compatibility</p>
+<p>Legacy endpoints are <strong>fully functional aliases</strong> that route to the same handlers as the new endpoints. They behave identically—same request format, same response format, same streaming behavior.</p>
+<p><strong>Existing integrations continue to work without any code changes.</strong></p>
+</div>
+<div class="admonition note">
+<p class="admonition-title">When to Use Legacy Endpoints</p>
+<ul>
+<li><strong>New projects</strong>: Use <code>/api/chat</code> and <code>/api/chat-stream</code></li>
+<li><strong>Existing integrations</strong>: Legacy endpoints work indefinitely, but consider migrating when convenient</li>
+<li><strong>Mixed environments</strong>: Both endpoint styles can be used simultaneously</li>
+</ul>
+</div>
+<h4 id="why-the-rename-adr-007">Why the Rename? (ADR-007)<a class="headerlink" href="#why-the-rename-adr-007" title="Permanent link">&para;</a></h4>
+<p>The endpoint names were changed for three reasons:</p>
+<ol>
+<li><strong>Future-proofing</strong>: Lowercase URLs avoid case-sensitivity issues if security middleware is added later</li>
+<li><strong>Semantic accuracy</strong>: "chat" better describes bidirectional conversation than "sendMessage"</li>
+<li><strong>REST conventions</strong>: Lowercase, hyphenated paths follow RESTful best practices</li>
+</ol>
+<p>See <a href="../../adrs/007-lowercase-chat-endpoints/">ADR-007: Lowercase Chat Endpoints</a> for the full rationale.</p>
 <hr />
 <h2 id="request-format">Request Format<a class="headerlink" href="#request-format" title="Permanent link">&para;</a></h2>
 <p>All chat endpoints accept the same request body:</p>
