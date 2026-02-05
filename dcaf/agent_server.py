@@ -138,12 +138,25 @@ def create_chat_app(
 
             logger.info("Invoking agent with messages: %s", msgs_dict)
 
+            # Extract thread_id for v1 backwards compatibility
+            thread_id = request_fields.get("thread_id")
+
+            # Check if agent's invoke method accepts thread_id parameter (v1 pattern)
+            sig = inspect.signature(agent.invoke)
+            accepts_thread_id = "thread_id" in sig.parameters
+
             # If the agent's invoke is async, await it directly;
             # otherwise run it in a thread pool so it doesn't block the event loop.
             if inspect.iscoroutinefunction(agent.invoke):
-                assistant_msg = await agent.invoke(msgs_dict)
+                if accepts_thread_id:
+                    assistant_msg = await agent.invoke(msgs_dict, thread_id=thread_id)
+                else:
+                    assistant_msg = await agent.invoke(msgs_dict)
             else:
-                assistant_msg = await asyncio.to_thread(agent.invoke, msgs_dict)
+                if accepts_thread_id:
+                    assistant_msg = await asyncio.to_thread(agent.invoke, msgs_dict, thread_id=thread_id)
+                else:
+                    assistant_msg = await asyncio.to_thread(agent.invoke, msgs_dict)
 
             logger.info("Assistant message: %s", assistant_msg)
 
@@ -225,19 +238,34 @@ def create_chat_app(
         request_fields = {k: v for k, v in raw_body.items() if k != "messages"}
         msgs_dict["_request_fields"] = request_fields
 
+        # Extract thread_id for v1 backwards compatibility
+        thread_id = request_fields.get("thread_id")
+
         # Async generator function that yields events
         async def event_generator():
             try:
                 # Check if agent has invoke_stream method
                 if _has_invoke_stream():
+                    # Check if invoke_stream accepts thread_id (v1 pattern)
+                    sig = inspect.signature(agent.invoke_stream)
+                    accepts_thread_id = "thread_id" in sig.parameters
+
                     if inspect.iscoroutinefunction(agent.invoke_stream) or inspect.isasyncgenfunction(agent.invoke_stream):
                         # Async streaming: await each event directly
-                        async for event in agent.invoke_stream(msgs_dict):
-                            yield event.model_dump_json() + "\n"
+                        if accepts_thread_id:
+                            async for event in agent.invoke_stream(msgs_dict, thread_id=thread_id):
+                                yield event.model_dump_json() + "\n"
+                        else:
+                            async for event in agent.invoke_stream(msgs_dict):
+                                yield event.model_dump_json() + "\n"
                     else:
                         # Sync streaming: run in thread pool
-                        def run_stream():
-                            return list(agent.invoke_stream(msgs_dict))
+                        if accepts_thread_id:
+                            def run_stream():
+                                return list(agent.invoke_stream(msgs_dict, thread_id=thread_id))
+                        else:
+                            def run_stream():
+                                return list(agent.invoke_stream(msgs_dict))
 
                         events = await asyncio.to_thread(run_stream)
                         for event in events:
@@ -246,10 +274,21 @@ def create_chat_app(
                     # Fallback: agent doesn't have invoke_stream, use invoke() instead
                     # and wrap the response in stream events
                     logger.debug("Agent doesn't have invoke_stream, falling back to invoke()")
+
+                    # Check if invoke accepts thread_id (v1 pattern)
+                    sig = inspect.signature(agent.invoke)
+                    accepts_thread_id = "thread_id" in sig.parameters
+
                     if inspect.iscoroutinefunction(agent.invoke):
-                        response = await agent.invoke(msgs_dict)
+                        if accepts_thread_id:
+                            response = await agent.invoke(msgs_dict, thread_id=thread_id)
+                        else:
+                            response = await agent.invoke(msgs_dict)
                     else:
-                        response = await asyncio.to_thread(agent.invoke, msgs_dict)
+                        if accepts_thread_id:
+                            response = await asyncio.to_thread(agent.invoke, msgs_dict, thread_id=thread_id)
+                        else:
+                            response = await asyncio.to_thread(agent.invoke, msgs_dict)
 
                     # Wrap response in stream events
                     response = AgentMessage.model_validate(response)
@@ -341,17 +380,32 @@ def create_chat_app(
                 request_fields = {k: v for k, v in raw_body.items() if k != "messages"}
                 msgs_dict["_request_fields"] = request_fields
 
+                # Extract thread_id for v1 backwards compatibility
+                thread_id = request_fields.get("thread_id")
+
                 # Stream response events
                 try:
                     from .schemas.events import TextDeltaEvent
 
                     if _has_invoke_stream():
+                        # Check if invoke_stream accepts thread_id (v1 pattern)
+                        sig = inspect.signature(agent.invoke_stream)
+                        accepts_thread_id = "thread_id" in sig.parameters
+
                         if inspect.iscoroutinefunction(agent.invoke_stream) or inspect.isasyncgenfunction(agent.invoke_stream):
-                            async for event in agent.invoke_stream(msgs_dict):
-                                await websocket.send_text(event.model_dump_json())
+                            if accepts_thread_id:
+                                async for event in agent.invoke_stream(msgs_dict, thread_id=thread_id):
+                                    await websocket.send_text(event.model_dump_json())
+                            else:
+                                async for event in agent.invoke_stream(msgs_dict):
+                                    await websocket.send_text(event.model_dump_json())
                         else:
-                            def run_stream():
-                                return list(agent.invoke_stream(msgs_dict))
+                            if accepts_thread_id:
+                                def run_stream():
+                                    return list(agent.invoke_stream(msgs_dict, thread_id=thread_id))
+                            else:
+                                def run_stream():
+                                    return list(agent.invoke_stream(msgs_dict))
 
                             events = await asyncio.to_thread(run_stream)
                             for event in events:
@@ -359,10 +413,21 @@ def create_chat_app(
                     else:
                         # Fallback: agent doesn't have invoke_stream, use invoke()
                         logger.debug("Agent doesn't have invoke_stream, falling back to invoke()")
+
+                        # Check if invoke accepts thread_id (v1 pattern)
+                        sig = inspect.signature(agent.invoke)
+                        accepts_thread_id = "thread_id" in sig.parameters
+
                         if inspect.iscoroutinefunction(agent.invoke):
-                            response = await agent.invoke(msgs_dict)
+                            if accepts_thread_id:
+                                response = await agent.invoke(msgs_dict, thread_id=thread_id)
+                            else:
+                                response = await agent.invoke(msgs_dict)
                         else:
-                            response = await asyncio.to_thread(agent.invoke, msgs_dict)
+                            if accepts_thread_id:
+                                response = await asyncio.to_thread(agent.invoke, msgs_dict, thread_id=thread_id)
+                            else:
+                                response = await asyncio.to_thread(agent.invoke, msgs_dict)
 
                         response = AgentMessage.model_validate(response)
                         if response.content:

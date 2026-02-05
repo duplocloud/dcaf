@@ -66,6 +66,32 @@ class V1AgentWithBothMethods:
         yield DoneEvent()
 
 
+class V1AgentWithThreadId:
+    """
+    Simulates a v1 agent that accepts thread_id as an explicit parameter.
+
+    This was a documented v1 pattern - agents could accept thread_id directly
+    rather than extracting it from _request_fields.
+    """
+
+    def __init__(self):
+        self.last_thread_id = None
+
+    def invoke(self, messages: dict[str, list[dict[str, Any]]], thread_id: str | None = None) -> AgentMessage:
+        """Process messages with optional thread_id parameter (v1 pattern)."""
+        self.last_thread_id = thread_id
+        return AgentMessage(
+            role="assistant",
+            content=f"Response with thread_id: {thread_id}"
+        )
+
+    def invoke_stream(self, messages: dict[str, Any], thread_id: str | None = None) -> Iterator[Any]:
+        """Stream with optional thread_id parameter (v1 pattern)."""
+        self.last_thread_id = thread_id
+        yield TextDeltaEvent(text=f"thread_id={thread_id}")
+        yield DoneEvent()
+
+
 # =============================================================================
 # Fixtures
 # =============================================================================
@@ -94,6 +120,19 @@ def client_invoke_only(v1_agent_invoke_only: V1AgentWithOnlyInvoke) -> TestClien
 def client_both_methods(v1_agent_both_methods: V1AgentWithBothMethods) -> TestClient:
     """Test client with v1 agent that has both methods."""
     app = create_chat_app(v1_agent_both_methods)
+    return TestClient(app)
+
+
+@pytest.fixture
+def v1_agent_with_thread_id() -> V1AgentWithThreadId:
+    """Agent that accepts thread_id as an explicit parameter (v1 pattern)."""
+    return V1AgentWithThreadId()
+
+
+@pytest.fixture
+def client_thread_id(v1_agent_with_thread_id: V1AgentWithThreadId) -> TestClient:
+    """Test client with v1 agent that accepts thread_id parameter."""
+    app = create_chat_app(v1_agent_with_thread_id)
     return TestClient(app)
 
 
@@ -291,6 +330,88 @@ class TestAgentProtocolBackwardsCompatibility:
             "Streaming endpoint crashed when agent doesn't have invoke_stream. "
             "Should handle gracefully (501, fallback, or error event)."
         )
+
+
+# =============================================================================
+# Test: thread_id Parameter Backwards Compatibility
+# =============================================================================
+
+
+class TestThreadIdBackwardsCompatibility:
+    """
+    Tests that agents accepting thread_id as an explicit parameter still work.
+
+    V1 documented pattern: agents could accept thread_id directly:
+        def invoke(self, messages, thread_id=None): ...
+
+    vnext passes thread_id via _request_fields, but should also pass it
+    explicitly for backwards compatibility with v1 agents.
+    """
+
+    def test_thread_id_passed_to_invoke(
+        self, client_thread_id: TestClient, v1_agent_with_thread_id: V1AgentWithThreadId
+    ):
+        """Agent's invoke() should receive thread_id when passed in request."""
+        response = client_thread_id.post(
+            "/api/chat",
+            json={
+                "messages": [{"role": "user", "content": "Hello"}],
+                "thread_id": "test-thread-123"
+            }
+        )
+
+        assert response.status_code == 200
+        # Agent should have received the thread_id
+        assert v1_agent_with_thread_id.last_thread_id == "test-thread-123", (
+            "V1 BACKWARDS COMPATIBILITY: Agent's invoke() should receive thread_id "
+            "as an explicit parameter when the agent signature accepts it."
+        )
+
+    def test_thread_id_passed_to_invoke_stream(
+        self, client_thread_id: TestClient, v1_agent_with_thread_id: V1AgentWithThreadId
+    ):
+        """Agent's invoke_stream() should receive thread_id when passed in request."""
+        response = client_thread_id.post(
+            "/api/chat-stream",
+            json={
+                "messages": [{"role": "user", "content": "Hello"}],
+                "thread_id": "stream-thread-456"
+            }
+        )
+
+        assert response.status_code == 200
+        # Agent should have received the thread_id
+        assert v1_agent_with_thread_id.last_thread_id == "stream-thread-456", (
+            "V1 BACKWARDS COMPATIBILITY: Agent's invoke_stream() should receive thread_id "
+            "as an explicit parameter when the agent signature accepts it."
+        )
+
+    def test_thread_id_passed_via_legacy_endpoint(
+        self, client_thread_id: TestClient, v1_agent_with_thread_id: V1AgentWithThreadId
+    ):
+        """Legacy /api/sendMessage should also pass thread_id to agent."""
+        response = client_thread_id.post(
+            "/api/sendMessage",
+            json={
+                "messages": [{"role": "user", "content": "Hello"}],
+                "thread_id": "legacy-thread-789"
+            }
+        )
+
+        assert response.status_code == 200
+        assert v1_agent_with_thread_id.last_thread_id == "legacy-thread-789"
+
+    def test_thread_id_none_when_not_provided(
+        self, client_thread_id: TestClient, v1_agent_with_thread_id: V1AgentWithThreadId
+    ):
+        """thread_id should be None when not provided in request."""
+        response = client_thread_id.post(
+            "/api/chat",
+            json={"messages": [{"role": "user", "content": "Hello"}]}
+        )
+
+        assert response.status_code == 200
+        assert v1_agent_with_thread_id.last_thread_id is None
 
 
 # =============================================================================
