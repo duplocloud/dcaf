@@ -25,11 +25,19 @@ logger = logging.getLogger(__name__)
 
 @runtime_checkable
 class AgentProtocol(Protocol):
-    """Any agent that can respond to a chat."""
+    """
+    Any agent that can respond to a chat.
+
+    Required:
+        invoke(): Synchronous or async method to process messages and return a response.
+
+    Optional:
+        invoke_stream(): If implemented, enables streaming endpoints. If not implemented,
+                        streaming endpoints will fall back to invoke() and wrap the
+                        response in stream events.
+    """
 
     def invoke(self, messages: dict[str, list[dict[str, Any]]]) -> AgentMessage: ...
-
-    def invoke_stream(self, messages: dict[str, Any]) -> Iterator[Any]: ...
 
 
 def create_chat_app(agent: AgentProtocol, router: ChannelResponseRouter | None = None) -> FastAPI:
@@ -134,12 +142,21 @@ def create_chat_app(agent: AgentProtocol, router: ChannelResponseRouter | None =
         return await _handle_chat(raw_body)
 
     # ----- shared logic for stream endpoints ---------------------------------
+    def _has_invoke_stream() -> bool:
+        """Check if the agent has an invoke_stream method."""
+        return hasattr(agent, "invoke_stream") and callable(getattr(agent, "invoke_stream", None))
+
     async def _handle_stream(raw_body: dict[str, Any]):
         """
         Shared async handler for streaming endpoints.
 
         Returns a StreamingResponse with NDJSON events.
+
+        If the agent doesn't implement invoke_stream(), falls back to invoke()
+        and wraps the response in stream events for backwards compatibility.
         """
+        from .schemas.events import TextDeltaEvent
+
         logger.info("Stream Request Body: %s", raw_body)
 
         source = raw_body.get("source")
@@ -174,18 +191,35 @@ def create_chat_app(agent: AgentProtocol, router: ChannelResponseRouter | None =
         # Async generator function that yields events
         async def event_generator():
             try:
-                if inspect.iscoroutinefunction(agent.invoke_stream) or inspect.isasyncgenfunction(agent.invoke_stream):
-                    # Async streaming: await each event directly
-                    async for event in agent.invoke_stream(msgs_dict):
-                        yield event.model_dump_json() + "\n"
-                else:
-                    # Sync streaming: run in thread pool
-                    def run_stream():
-                        return list(agent.invoke_stream(msgs_dict))
+                # Check if agent has invoke_stream method
+                if _has_invoke_stream():
+                    if inspect.iscoroutinefunction(agent.invoke_stream) or inspect.isasyncgenfunction(agent.invoke_stream):
+                        # Async streaming: await each event directly
+                        async for event in agent.invoke_stream(msgs_dict):
+                            yield event.model_dump_json() + "\n"
+                    else:
+                        # Sync streaming: run in thread pool
+                        def run_stream():
+                            return list(agent.invoke_stream(msgs_dict))
 
-                    events = await asyncio.to_thread(run_stream)
-                    for event in events:
-                        yield event.model_dump_json() + "\n"
+                        events = await asyncio.to_thread(run_stream)
+                        for event in events:
+                            yield event.model_dump_json() + "\n"
+                else:
+                    # Fallback: agent doesn't have invoke_stream, use invoke() instead
+                    # and wrap the response in stream events
+                    logger.debug("Agent doesn't have invoke_stream, falling back to invoke()")
+                    if inspect.iscoroutinefunction(agent.invoke):
+                        response = await agent.invoke(msgs_dict)
+                    else:
+                        response = await asyncio.to_thread(agent.invoke, msgs_dict)
+
+                    # Wrap response in stream events
+                    response = AgentMessage.model_validate(response)
+                    if response.content:
+                        yield TextDeltaEvent(text=response.content).model_dump_json() + "\n"
+                    yield DoneEvent().model_dump_json() + "\n"
+
             except Exception as e:
                 logger.error("Stream error: %s", str(e), exc_info=True)
                 error_event = ErrorEvent(error=str(e))
@@ -201,6 +235,32 @@ def create_chat_app(agent: AgentProtocol, router: ChannelResponseRouter | None =
 
         Stream agent response as NDJSON events.
         LLM calls run in a thread pool so they don't block health checks.
+        """
+        return await _handle_stream(raw_body)
+
+    # ----- LEGACY: /api/sendMessage endpoint (deprecated) --------------------
+    # Per ADR-007, these endpoints are preserved for backwards compatibility
+    # with existing clients. New integrations should use /api/chat instead.
+    @app.post("/api/sendMessage", response_model=AgentMessage, tags=["chat"], deprecated=True)
+    async def send_message_legacy(raw_body: dict[str, Any] = Body(...)) -> AgentMessage:
+        """
+        Legacy chat endpoint (deprecated).
+
+        .. deprecated::
+            Use ``/api/chat`` instead. This endpoint is maintained for
+            backwards compatibility with existing clients.
+        """
+        return await _handle_chat(raw_body)
+
+    # ----- LEGACY: /api/sendMessageStream endpoint (deprecated) --------------
+    @app.post("/api/sendMessageStream", tags=["chat"], deprecated=True)
+    async def send_message_stream_legacy(raw_body: dict[str, Any] = Body(...)):
+        """
+        Legacy streaming chat endpoint (deprecated).
+
+        .. deprecated::
+            Use ``/api/chat-stream`` instead. This endpoint is maintained for
+            backwards compatibility with existing clients.
         """
         return await _handle_stream(raw_body)
 
@@ -246,16 +306,31 @@ def create_chat_app(agent: AgentProtocol, router: ChannelResponseRouter | None =
 
                 # Stream response events
                 try:
-                    if inspect.iscoroutinefunction(agent.invoke_stream) or inspect.isasyncgenfunction(agent.invoke_stream):
-                        async for event in agent.invoke_stream(msgs_dict):
-                            await websocket.send_text(event.model_dump_json())
-                    else:
-                        def run_stream():
-                            return list(agent.invoke_stream(msgs_dict))
+                    from .schemas.events import TextDeltaEvent
 
-                        events = await asyncio.to_thread(run_stream)
-                        for event in events:
-                            await websocket.send_text(event.model_dump_json())
+                    if _has_invoke_stream():
+                        if inspect.iscoroutinefunction(agent.invoke_stream) or inspect.isasyncgenfunction(agent.invoke_stream):
+                            async for event in agent.invoke_stream(msgs_dict):
+                                await websocket.send_text(event.model_dump_json())
+                        else:
+                            def run_stream():
+                                return list(agent.invoke_stream(msgs_dict))
+
+                            events = await asyncio.to_thread(run_stream)
+                            for event in events:
+                                await websocket.send_text(event.model_dump_json())
+                    else:
+                        # Fallback: agent doesn't have invoke_stream, use invoke()
+                        logger.debug("Agent doesn't have invoke_stream, falling back to invoke()")
+                        if inspect.iscoroutinefunction(agent.invoke):
+                            response = await agent.invoke(msgs_dict)
+                        else:
+                            response = await asyncio.to_thread(agent.invoke, msgs_dict)
+
+                        response = AgentMessage.model_validate(response)
+                        if response.content:
+                            await websocket.send_text(TextDeltaEvent(text=response.content).model_dump_json())
+                        await websocket.send_text(DoneEvent().model_dump_json())
                 except Exception as e:
                     logger.error("WebSocket stream error: %s", str(e), exc_info=True)
                     await websocket.send_text(ErrorEvent(error=str(e)).model_dump_json())

@@ -217,6 +217,40 @@ class Tool(BaseModel):
     requires_approval: bool = False
     requires_platform_context: bool = False
 
+    def __init__(self, **data: Any):
+        """
+        Initialize Tool with backwards compatibility for 'schema' field.
+
+        V1 used `schema` containing the full tool spec:
+            Tool(schema={"name": "...", "description": "...", "input_schema": {...}})
+
+        V2 uses `input_schema` containing just the input schema:
+            Tool(input_schema={"type": "object", "properties": {...}})
+
+        This constructor accepts both for backwards compatibility.
+        """
+        # Handle backwards compatibility: 'schema' field -> 'input_schema'
+        if "schema" in data and "input_schema" not in data:
+            schema_value = data.pop("schema")
+
+            if isinstance(schema_value, dict):
+                # V1 style: schema contains full tool spec with input_schema inside
+                if "input_schema" in schema_value:
+                    data["input_schema"] = schema_value["input_schema"]
+                    # Also extract name/description if not provided
+                    if "name" not in data and "name" in schema_value:
+                        data["name"] = schema_value["name"]
+                    if "description" not in data and "description" in schema_value:
+                        data["description"] = schema_value["description"]
+                else:
+                    # Schema is already the input schema (just properties, type, etc.)
+                    data["input_schema"] = schema_value
+            else:
+                # Could be a Pydantic model or other type
+                data["input_schema"] = _normalize_schema(schema_value)
+
+        super().__init__(**data)
+
     def get_input_schema(self) -> dict[str, Any]:
         """Get the tool's schema (alias for input_schema)."""
         return self.input_schema
@@ -271,7 +305,7 @@ def tool(
     *,
     description: str | None = None,
     name: str | None = None,
-    requires_approval: bool = False,
+    requires_approval: bool = True,  # V1 default: True (safe by default)
     schema: dict[str, Any] | type[BaseModel] | Any | None = None,
 ):
     """

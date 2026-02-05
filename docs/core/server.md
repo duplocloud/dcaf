@@ -93,10 +93,32 @@ uvicorn.run(app, host="0.0.0.0", port=8000, workers=4)
 
 ### Legacy Endpoints (Backwards Compatible)
 
-| Endpoint | Method | Status |
-|----------|--------|--------|
-| `/api/sendMessage` | POST | Deprecated, use `/api/chat` |
-| `/api/sendMessageStream` | POST | Deprecated, use `/api/chat-stream` |
+For backwards compatibility with existing v1 clients, the following endpoints are preserved as aliases:
+
+| Legacy Endpoint | Preferred Endpoint | Status |
+|-----------------|-------------------|--------|
+| `POST /api/sendMessage` | `POST /api/chat` | Deprecated |
+| `POST /api/sendMessageStream` | `POST /api/chat-stream` | Deprecated |
+
+!!! info "Full Backwards Compatibility"
+    Legacy endpoints are **fully functional aliases** that route to the same handlers as the new endpoints. They behave identically—same request format, same response format, same streaming behavior.
+
+    **Existing integrations continue to work without any code changes.**
+
+!!! note "When to Use Legacy Endpoints"
+    - **New projects**: Use `/api/chat` and `/api/chat-stream`
+    - **Existing integrations**: Legacy endpoints work indefinitely, but consider migrating when convenient
+    - **Mixed environments**: Both endpoint styles can be used simultaneously
+
+#### Why the Rename? (ADR-007)
+
+The endpoint names were changed for three reasons:
+
+1. **Future-proofing**: Lowercase URLs avoid case-sensitivity issues if security middleware is added later
+2. **Semantic accuracy**: "chat" better describes bidirectional conversation than "sendMessage"
+3. **REST conventions**: Lowercase, hyphenated paths follow RESTful best practices
+
+See [ADR-007: Lowercase Chat Endpoints](../adrs/007-lowercase-chat-endpoints.md) for the full rationale.
 
 ---
 

@@ -45,6 +45,29 @@ from dcaf import create_chat_app, AgentProtocol
 - **Health Check**: Endpoint for monitoring
 - **Channel Routing**: Optional Slack integration
 
+### AgentProtocol Interface
+
+Any agent passed to `create_chat_app()` must satisfy the `AgentProtocol`:
+
+```python
+from typing import Protocol, runtime_checkable
+
+@runtime_checkable
+class AgentProtocol(Protocol):
+    def invoke(self, messages: dict[str, list[dict[str, Any]]]) -> AgentMessage: ...
+```
+
+**Required:**
+
+- `invoke(messages) -> AgentMessage`: Process messages and return a response. Can be sync or async.
+
+**Optional:**
+
+- `invoke_stream(messages) -> Iterator[StreamEvent]`: Stream responses. If not implemented, streaming endpoints fall back to `invoke()` and wrap the response in stream events.
+
+!!! note "Backwards Compatibility"
+    The protocol only requires `invoke()`. V1 agents that don't implement `invoke_stream()` will still work with all endpoints—streaming endpoints automatically fall back to wrapping the `invoke()` response in stream events.
+
 ---
 
 ## create_chat_app()
@@ -117,6 +140,15 @@ app = create_chat_app(agent, router=router)
 
 ## API Endpoints
 
+!!! note "Endpoint Naming"
+    The legacy endpoints (`/api/sendMessage`, `/api/sendMessageStream`) are still fully functional but deprecated. New integrations should use the preferred endpoints (`/api/chat`, `/api/chat-stream`).
+
+    | Legacy (Deprecated) | Preferred | Description |
+    |---------------------|-----------|-------------|
+    | `POST /api/sendMessage` | `POST /api/chat` | Synchronous chat |
+    | `POST /api/sendMessageStream` | `POST /api/chat-stream` | Streaming chat |
+    | — | `WS /api/chat-ws` | WebSocket chat (new) |
+
 ### GET /health
 
 Health check endpoint for monitoring.
@@ -143,6 +175,11 @@ curl http://localhost:8000/health
 ---
 
 ### POST /api/sendMessage
+
+!!! warning "Deprecated"
+    This endpoint is deprecated. Use `POST /api/chat` instead for new integrations.
+
+    The endpoint remains fully functional for backwards compatibility.
 
 Send a message to the agent and receive a response.
 
@@ -220,6 +257,11 @@ curl -X POST http://localhost:8000/api/sendMessage \
 ---
 
 ### POST /api/sendMessageStream
+
+!!! warning "Deprecated"
+    This endpoint is deprecated. Use `POST /api/chat-stream` instead for new integrations.
+
+    The endpoint remains fully functional for backwards compatibility.
 
 Stream a response from the agent.
 
