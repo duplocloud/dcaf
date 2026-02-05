@@ -700,10 +700,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#legacy-endpoints-backwards-compatible" class="md-nav__link">
+  <a href="#legacy-endpoints-v1-code-path" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Legacy Endpoints (Backwards Compatible)
+        Legacy Endpoints (V1 Code Path)
       
     </span>
   </a>
@@ -2711,10 +2711,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#legacy-endpoints-backwards-compatible" class="md-nav__link">
+  <a href="#legacy-endpoints-v1-code-path" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Legacy Endpoints (Backwards Compatible)
+        Legacy Endpoints (V1 Code Path)
       
     </span>
   </a>
@@ -3305,40 +3305,72 @@
 </tr>
 </tbody>
 </table>
-<h3 id="legacy-endpoints-backwards-compatible">Legacy Endpoints (Backwards Compatible)<a class="headerlink" href="#legacy-endpoints-backwards-compatible" title="Permanent link">&para;</a></h3>
-<p>For backwards compatibility with existing v1 clients, the following endpoints are preserved as aliases:</p>
+<h3 id="legacy-endpoints-v1-code-path">Legacy Endpoints (V1 Code Path)<a class="headerlink" href="#legacy-endpoints-v1-code-path" title="Permanent link">&para;</a></h3>
+<p>For backwards compatibility with existing v1 clients, the following endpoints are preserved:</p>
 <table>
 <thead>
 <tr>
 <th>Legacy Endpoint</th>
 <th>Preferred Endpoint</th>
-<th>Status</th>
+<th>Code Path</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td><code>POST /api/sendMessage</code></td>
 <td><code>POST /api/chat</code></td>
-<td>Deprecated</td>
+<td>V1 (<code>dcaf.agent_server</code>)</td>
 </tr>
 <tr>
 <td><code>POST /api/sendMessageStream</code></td>
 <td><code>POST /api/chat-stream</code></td>
-<td>Deprecated</td>
+<td>V1 (<code>dcaf.agent_server</code>)</td>
 </tr>
 </tbody>
 </table>
 <div class="admonition info">
-<p class="admonition-title">Full Backwards Compatibility</p>
-<p>Legacy endpoints are <strong>fully functional aliases</strong> that route to the same handlers as the new endpoints. They behave identically—same request format, same response format, same streaming behavior.</p>
+<p class="admonition-title">Strangler Fig Migration (ADR-006)</p>
+<p>Legacy endpoints use the <strong>V1 code path</strong> from <code>dcaf.agent_server</code>, while new endpoints use the <strong>V2 code path</strong> from <code>dcaf.core</code>. This follows the <a href="../../adrs/006-strangler-fig-migration/">Strangler Fig migration pattern</a>.</p>
+<p><strong>Key differences:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>V2 (<code>/api/chat</code>)</th>
+<th>V1 (<code>/api/sendMessage</code>)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>_request_fields</code> forwarding</td>
+<td>✅ Yes</td>
+<td>❌ No</td>
+</tr>
+<tr>
+<td><code>meta_data.request_context</code> echo</td>
+<td>✅ Yes</td>
+<td>❌ No</td>
+</tr>
+<tr>
+<td>WebSocket support</td>
+<td>✅ Yes</td>
+<td>❌ No</td>
+</tr>
+<tr>
+<td>Response format</td>
+<td>V2 <code>AgentMessage</code></td>
+<td>V1 <code>AgentMessage</code></td>
+</tr>
+</tbody>
+</table>
 <p><strong>Existing integrations continue to work without any code changes.</strong></p>
 </div>
 <div class="admonition note">
-<p class="admonition-title">When to Use Legacy Endpoints</p>
+<p class="admonition-title">When to Use Each Endpoint</p>
 <ul>
-<li><strong>New projects</strong>: Use <code>/api/chat</code> and <code>/api/chat-stream</code></li>
-<li><strong>Existing integrations</strong>: Legacy endpoints work indefinitely, but consider migrating when convenient</li>
-<li><strong>Mixed environments</strong>: Both endpoint styles can be used simultaneously</li>
+<li><strong>New projects</strong>: Use <code>/api/chat</code>, <code>/api/chat-stream</code>, and <code>/api/chat-ws</code> (V2)</li>
+<li><strong>Existing v1 integrations</strong>: Continue using <code>/api/sendMessage</code> and <code>/api/sendMessageStream</code></li>
+<li><strong>Unified server</strong>: <code>dcaf.core.create_app()</code> exposes both V1 and V2 endpoints simultaneously</li>
 </ul>
 </div>
 <h4 id="why-the-rename-adr-007">Why the Rename? (ADR-007)<a class="headerlink" href="#why-the-rename-adr-007" title="Permanent link">&para;</a></h4>

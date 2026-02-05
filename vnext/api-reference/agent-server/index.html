@@ -3239,34 +3239,64 @@
 <hr />
 <h2 id="api-endpoints">API Endpoints<a class="headerlink" href="#api-endpoints" title="Permanent link">&para;</a></h2>
 <div class="admonition note">
-<p class="admonition-title">Endpoint Naming</p>
-<p>The legacy endpoints (<code>/api/sendMessage</code>, <code>/api/sendMessageStream</code>) are still fully functional but deprecated. New integrations should use the preferred endpoints (<code>/api/chat</code>, <code>/api/chat-stream</code>).</p>
+<p class="admonition-title">V1 vs V2 Code Paths</p>
+<p>This module (<code>dcaf.agent_server</code>) provides the <strong>V1 code path</strong>. The V1 endpoints are:</p>
 <table>
 <thead>
 <tr>
-<th>Legacy (Deprecated)</th>
-<th>Preferred</th>
+<th>V1 Endpoint</th>
 <th>Description</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td><code>POST /api/sendMessage</code></td>
-<td><code>POST /api/chat</code></td>
-<td>Synchronous chat</td>
+<td>Synchronous chat (V1)</td>
 </tr>
 <tr>
 <td><code>POST /api/sendMessageStream</code></td>
-<td><code>POST /api/chat-stream</code></td>
-<td>Streaming chat</td>
-</tr>
-<tr>
-<td>—</td>
-<td><code>WS /api/chat-ws</code></td>
-<td>WebSocket chat (new)</td>
+<td>Streaming chat (V1)</td>
 </tr>
 </tbody>
 </table>
+<p>For a unified server with <strong>both V1 and V2 endpoints</strong>, use <code>dcaf.core.create_app()</code> instead:</p>
+<table>
+<thead>
+<tr>
+<th>Endpoint</th>
+<th>Code Path</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>POST /api/chat</code></td>
+<td>V2</td>
+<td>Synchronous chat with <code>_request_fields</code> forwarding</td>
+</tr>
+<tr>
+<td><code>POST /api/chat-stream</code></td>
+<td>V2</td>
+<td>Streaming chat with <code>_request_fields</code> forwarding</td>
+</tr>
+<tr>
+<td><code>WS /api/chat-ws</code></td>
+<td>V2</td>
+<td>WebSocket bidirectional streaming</td>
+</tr>
+<tr>
+<td><code>POST /api/sendMessage</code></td>
+<td>V1</td>
+<td>Legacy synchronous chat</td>
+</tr>
+<tr>
+<td><code>POST /api/sendMessageStream</code></td>
+<td>V1</td>
+<td>Legacy streaming chat</td>
+</tr>
+</tbody>
+</table>
+<p>See <a href="../../adrs/006-strangler-fig-migration/">ADR-006: Strangler Fig Migration</a> for the rationale.</p>
 </div>
 <h3 id="get-health">GET /health<a class="headerlink" href="#get-health" title="Permanent link">&para;</a></h3>
 <p>Health check endpoint for monitoring.</p>

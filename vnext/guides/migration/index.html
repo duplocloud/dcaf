@@ -2989,23 +2989,37 @@
 <tr>
 <th>Old Endpoint</th>
 <th>New Endpoint</th>
-<th>Status</th>
+<th>Code Path</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td><code>/api/sendMessage</code></td>
 <td><code>/api/chat</code></td>
-<td>Both work (legacy supported)</td>
+<td>V1 → V2</td>
 </tr>
 <tr>
 <td><code>/api/sendMessageStream</code></td>
 <td><code>/api/chat-stream</code></td>
-<td>Both work (legacy supported)</td>
+<td>V1 → V2</td>
+</tr>
+<tr>
+<td>—</td>
+<td><code>/api/chat-ws</code></td>
+<td>V2 only</td>
 </tr>
 </tbody>
 </table>
-<p>The legacy endpoints still work, but we recommend updating clients to use the new endpoints.</p>
+<div class="admonition info">
+<p class="admonition-title">V1 vs V2 Code Paths</p>
+<p>When using <code>dcaf.core.create_app()</code>, both endpoint styles are available but use <strong>different code paths</strong>:</p>
+<ul>
+<li><strong>V2 endpoints</strong> (<code>/api/chat</code>, <code>/api/chat-stream</code>, <code>/api/chat-ws</code>): Use the V2 code path with features like <code>_request_fields</code> forwarding and <code>meta_data.request_context</code> echo.</li>
+<li><strong>V1 endpoints</strong> (<code>/api/sendMessage</code>, <code>/api/sendMessageStream</code>): Use the V1 code path from <code>dcaf.agent_server</code> for backwards compatibility.</li>
+</ul>
+<p>This follows the <a href="../../adrs/006-strangler-fig-migration/">Strangler Fig migration pattern (ADR-006)</a>.</p>
+</div>
+<p>The legacy endpoints still work indefinitely, but we recommend updating clients to use the new V2 endpoints for access to new features.</p>
 <hr />
 <h2 id="common-patterns">Common Patterns<a class="headerlink" href="#common-patterns" title="Permanent link">&para;</a></h2>
 <h3 id="custom-agent-logic-v1-core">Custom Agent Logic (v1 → Core)<a class="headerlink" href="#custom-agent-logic-v1-core" title="Permanent link">&para;</a></h3>

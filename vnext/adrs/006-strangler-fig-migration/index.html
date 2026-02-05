@@ -2159,6 +2159,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#implementation-status" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Implementation Status
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#related-adrs" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2386,6 +2397,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#implementation-status" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Implementation Status
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#related-adrs" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2574,10 +2596,49 @@
 <li>Need to maintain compatibility layer</li>
 <li>Longer overall timeline than big-bang</li>
 </ul>
+<h2 id="implementation-status">Implementation Status<a class="headerlink" href="#implementation-status" title="Permanent link">&para;</a></h2>
+<p><strong>Current Phase: 3 - Unified Surface (Complete)</strong></p>
+<p>As of 2025-02, the unified surface is implemented:</p>
+<ul>
+<li>✅ <code>dcaf.core.create_app()</code> exposes both V1 and V2 endpoints</li>
+<li>✅ V2 endpoints (<code>/api/chat</code>, <code>/api/chat-stream</code>, <code>/api/chat-ws</code>) use V2 code path</li>
+<li>✅ V1 endpoints (<code>/api/sendMessage</code>, <code>/api/sendMessageStream</code>) use V1 code path</li>
+<li>✅ V1 handler functions extracted for reuse by unified app</li>
+<li>✅ Tests verify code path separation (<code>tests/core/test_request_fields.py</code>)</li>
+</ul>
+<p><strong>Key V2 Features (not available in V1):</strong></p>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>_request_fields</code></td>
+<td>Top-level request fields forwarded to agent</td>
+</tr>
+<tr>
+<td><code>meta_data.request_context</code></td>
+<td>Request fields echoed back in response</td>
+</tr>
+<tr>
+<td>WebSocket support</td>
+<td><code>/api/chat-ws</code> bidirectional streaming</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Next Steps (Phase 4-5):</strong></p>
+<ul>
+<li>Migrate existing agents to Core one at a time</li>
+<li>Eventually deprecate <code>dcaf.agent_server.create_chat_app()</code> for new projects</li>
+</ul>
 <h2 id="related-adrs">Related ADRs<a class="headerlink" href="#related-adrs" title="Permanent link">&para;</a></h2>
 <ul>
 <li>ADR-001: Clean Architecture</li>
 <li>ADR-003: Adapter Pattern for Frameworks</li>
+<li>ADR-007: Lowercase Chat Endpoints</li>
 </ul>
 
 
