@@ -5,6 +5,7 @@ import logging
 import os
 import traceback
 from collections.abc import AsyncIterator, Iterator
+from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
 
 from fastapi import Body, FastAPI, HTTPException, WebSocket, WebSocketDisconnect
@@ -40,7 +41,11 @@ class AgentProtocol(Protocol):
     def invoke(self, messages: dict[str, list[dict[str, Any]]]) -> AgentMessage: ...
 
 
-def create_chat_app(agent: AgentProtocol, router: ChannelResponseRouter | None = None) -> FastAPI:
+def create_chat_app(
+    agent: AgentProtocol,
+    router: ChannelResponseRouter | None = None,
+    a2a_agent_card_path: str | None = None,
+) -> FastAPI:
     # ONE-LINER guardrail — fails fast if agent doesn't meet the protocol
     if not isinstance(agent, AgentProtocol):
         raise TypeError(
@@ -55,6 +60,38 @@ def create_chat_app(agent: AgentProtocol, router: ChannelResponseRouter | None =
     @app.get("/health", tags=["system"])
     def health() -> dict[str, str]:
         return {"status": "ok"}
+
+    # ----- agent card (A2A) --------------------------------------------------
+    if a2a_agent_card_path:
+        card_path = Path(a2a_agent_card_path)
+
+        @app.get("/.well-known/agent.json", tags=["system"])
+        def get_agent_card() -> dict[str, Any]:
+            """
+            Serves the Agent2Agent agent card JSON.
+            https://agent2agent.info/docs/concepts/agentcard/
+            """
+            if not card_path.exists() or not card_path.is_file():
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Agent card not found at path: {card_path}",
+                )
+
+            try:
+                raw = card_path.read_text(encoding="utf-8")
+                return json.loads(raw)
+            except json.JSONDecodeError as e:
+                logger.error("Invalid JSON in agent card file %s: %s", card_path, str(e))
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Invalid JSON in agent card file: {card_path}",
+                )
+            except Exception as e:
+                logger.error("Failed reading agent card file %s: %s", card_path, str(e))
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Failed reading agent card file: {card_path}",
+                )
 
     # ----- shared logic for chat endpoints -----------------------------------
     async def _handle_chat(raw_body: dict[str, Any]) -> AgentMessage:

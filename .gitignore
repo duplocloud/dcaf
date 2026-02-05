@@ -14,6 +14,8 @@ backup_tool_calling_cmd_agent.py
 # AWS credentials
 update_env_aws_creds.sh
 
+CLAUDE.md
+
 # Distribution / packaging
 .Python
 build/

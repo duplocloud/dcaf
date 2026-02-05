@@ -25,6 +25,21 @@ class BedrockLLM(LLM):
     Provides consistent interface across all Bedrock models.
     """
 
+    # Minimum tokens required for caching by model family (from main)
+    CACHE_MIN_TOKENS: dict[str, int] = {
+        "claude-haiku-4-5": 4096,
+        "claude-sonnet-4-5": 1024,
+        "claude-sonnet-4": 1024,
+        "claude-opus-4": 1024,
+        "claude-3-7-sonnet": 1024,
+        "claude-3-5-sonnet": 1024,
+        "claude-3-5-haiku": 2048,
+        "nova-micro": 1000,
+        "nova-lite": 1000,
+        "nova-pro": 1000,
+        "nova-premier": 1000,
+    }
+
     def __init__(self, region_name: str = "us-east-1", boto3_config: Config | None = None):
         """
         Initialize the BedrockLLM client.
@@ -58,6 +73,55 @@ class BedrockLLM(LLM):
             "bedrock-runtime", region_name=region_name, config=boto3_config
         )
 
+    def _get_cache_min_tokens(self, model_id: str) -> int:
+        """
+        Get the minimum token count required for caching based on model ID.
+
+        Args:
+            model_id: The Bedrock model ID
+
+        Returns:
+            Minimum token count for caching, or 0 if model not recognized
+        """
+        model_id_lower = model_id.lower()
+        for model_key, min_tokens in self.CACHE_MIN_TOKENS.items():
+            if model_key in model_id_lower:
+                return min_tokens
+        return 0
+
+    def _log_cache_metrics(self, response: dict[str, Any], model_id: str) -> None:
+        """
+        Log prompt cache metrics from the API response.
+
+        Args:
+            response: The Converse API response
+            model_id: The model ID used for the request
+        """
+        usage = response.get("usage", {})
+        cache_write = usage.get("cacheWriteInputTokens", 0)
+        cache_read = usage.get("cacheReadInputTokens", 0)
+        input_tokens = usage.get("inputTokens", 0)
+        output_tokens = usage.get("outputTokens", 0)
+
+        if cache_write > 0 or cache_read > 0:
+            if cache_read > 0:
+                logger.info(
+                    f"[CACHE HIT] Model {model_id} - "
+                    f"Read {cache_read} tokens from cache, "
+                    f"Input: {input_tokens}, Output: {output_tokens}"
+                )
+            elif cache_write > 0:
+                logger.info(
+                    f"[CACHE WRITE] Model {model_id} - "
+                    f"Wrote {cache_write} tokens to cache, "
+                    f"Input: {input_tokens}, Output: {output_tokens}"
+                )
+        else:
+            logger.debug(
+                f"[CACHE MISS] Model {model_id} - "
+                f"No cache activity. Input: {input_tokens}, Output: {output_tokens}"
+            )
+
     # stream
     def invoke_stream(
         self,
@@ -68,6 +132,7 @@ class BedrockLLM(LLM):
         max_tokens: int = 1000,
         temperature: float = 0.0,
         additional_params: dict[str, Any] | None = None,
+        cache_system_prompt: bool = False,
     ):
         """
         Stream response from Bedrock Converse API.
@@ -81,6 +146,9 @@ class BedrockLLM(LLM):
             max_tokens: Max tokens to generate
             temperature: Sampling temperature
             additional_params: Additional inference config
+            cache_system_prompt: If True, enable caching for the system prompt.
+                                 Requires minimum token count based on model.
+                                 Cache TTL is 5 minutes (resets on each cache hit).
 
         Yields:
             Dict events from the stream
@@ -97,7 +165,20 @@ class BedrockLLM(LLM):
         }
 
         if system_prompt:
-            request["system"] = [{"text": system_prompt}]
+            system_content = [{"text": system_prompt}]
+            if cache_system_prompt:
+                # Note: TTL parameter requires newer boto3 version (1.35+)
+                # Default TTL is 5 minutes, which resets on each cache hit
+                cache_point = {"cachePoint": {"type": "default"}}
+                system_content.append(cache_point)
+
+                # Log cache configuration
+                min_tokens = self._get_cache_min_tokens(model_id)
+                logger.info(
+                    f"[CACHE CONFIG] System prompt caching enabled for {model_id}. "
+                    f"Min tokens required: {min_tokens}, TTL: 5m (default)"
+                )
+            request["system"] = system_content
 
         if tools:
             request["toolConfig"] = {"tools": tools}
@@ -111,12 +192,46 @@ class BedrockLLM(LLM):
         logger.info("Streaming from model %s", model_id)
         start_time = time.perf_counter()
 
+        # Track event statistics
+        event_counts: dict[str, int] = {}
+        cache_metrics = {"cacheWriteInputTokens": 0, "cacheReadInputTokens": 0}
+
         response = self.bedrock_runtime.converse_stream(**request)
 
-        yield from response["stream"]
+        for event in response["stream"]:
+            # Count event types for statistics
+            event_type = list(event.keys())[0] if event else "unknown"
+            event_counts[event_type] = event_counts.get(event_type, 0) + 1
+
+            # Log entire event at DEBUG level
+            logger.debug("Stream event: %s", event)
+
+            # Capture cache metrics from metadata event
+            if "metadata" in event:
+                usage = event["metadata"].get("usage", {})
+                cache_metrics["cacheWriteInputTokens"] = usage.get("cacheWriteInputTokens", 0)
+                cache_metrics["cacheReadInputTokens"] = usage.get("cacheReadInputTokens", 0)
+
+            yield event
 
         elapsed = time.perf_counter() - start_time
-        logger.info("Stream completed in %.2f seconds", elapsed)
+
+        # Log cache metrics for streaming
+        if cache_system_prompt and (
+            cache_metrics["cacheWriteInputTokens"] > 0 or cache_metrics["cacheReadInputTokens"] > 0
+        ):
+            if cache_metrics["cacheReadInputTokens"] > 0:
+                logger.info(
+                    f"[CACHE HIT] Stream completed in {elapsed:.2f}s - "
+                    f"Read {cache_metrics['cacheReadInputTokens']} tokens from cache"
+                )
+            else:
+                logger.info(
+                    f"[CACHE WRITE] Stream completed in {elapsed:.2f}s - "
+                    f"Wrote {cache_metrics['cacheWriteInputTokens']} tokens to cache"
+                )
+        else:
+            logger.info("Stream completed in %.2f seconds - Event breakdown: %s", elapsed, event_counts)
 
     def invoke(
         self,
@@ -124,12 +239,13 @@ class BedrockLLM(LLM):
         model_id: str,
         max_tokens: int = 1000,
         temperature: float = 0.0,
-        top_p: float = 0.9,
+        top_p: float | None = None,
         system_prompt: str | None = None,
         tools: list[dict[str, Any]] | None = None,
         tool_choice: str | dict[str, Any] | None = None,
         additional_model_request_fields: dict[str, Any] | None = None,
         performance_config: dict[str, str] | None = None,
+        cache_system_prompt: bool = False,
         **_kwargs: Any,
     ) -> dict[str, Any]:
         """
@@ -137,16 +253,23 @@ class BedrockLLM(LLM):
 
         Args:
             messages: List of message dictionaries with 'role' and 'content' keys
-            model_id: The Bedrock model ID (e.g., 'anthropic.claude-3-5-sonnet-20240620-v1:0')
+            model_id: The Bedrock model ID (e.g., 'anthropic.claude-sonnet-4-5-20250929-v1:0')
             max_tokens: Maximum number of tokens to generate
             temperature: Controls randomness (0-1)
-            top_p: Controls diversity via nucleus sampling (0-1)
+            top_p: Controls diversity via nucleus sampling (0-1), optional
             system_prompt: Optional system prompt to guide model behavior
             tools: Optional list of tool specifications (JSON schemas)
             tool_choice: Optional tool choice strategy ('auto', 'any', or specific tool dict)
             additional_model_request_fields: Model-specific parameters
             performance_config: Performance configuration (e.g., {'latency': 'optimized'})
-            **kwargs: Additional parameters for compatibility
+            cache_system_prompt: If True, enable caching for the system prompt.
+                                 Cache TTL is 5 minutes (resets on each cache hit).
+                                 Requires minimum token count based on model:
+                                 - Claude Sonnet 4.5/4, Claude 3.7 Sonnet: 1,024 tokens
+                                 - Claude 3.5 Haiku: 2,048 tokens
+                                 - Claude Haiku 4.5: 4,096 tokens
+                                 - Amazon Nova models: 1,000 tokens
+            **_kwargs: Additional parameters for compatibility
 
         Returns:
             The response from the Converse API
@@ -162,16 +285,30 @@ class BedrockLLM(LLM):
         # Build the request
         request = {"modelId": model_id, "messages": self._format_messages(messages)}
 
-        # Add system prompt if provided
+        # Add system prompt with optional caching
         if system_prompt:
-            request["system"] = [{"text": system_prompt}]
+            system_content = [{"text": system_prompt}]
+            if cache_system_prompt:
+                # Note: TTL parameter requires newer boto3 version (1.35+)
+                # Default TTL is 5 minutes, which resets on each cache hit
+                cache_point = {"cachePoint": {"type": "default"}}
+                system_content.append(cache_point)
+
+                # Log cache configuration with model requirements
+                min_tokens = self._get_cache_min_tokens(model_id)
+                logger.info(
+                    f"[CACHE CONFIG] System prompt caching enabled for {model_id}. "
+                    f"Min tokens required: {min_tokens}, TTL: 5m (default)"
+                )
+            request["system"] = system_content
 
         # Add inference configuration
         inference_config: dict[str, Any] = {
             "maxTokens": max_tokens,
             "temperature": temperature,
-            "topP": top_p,
         }
+        if top_p is not None:
+            inference_config["topP"] = top_p
         request["inferenceConfig"] = inference_config  # type: ignore[assignment]
 
         # Add tool configuration if provided
@@ -198,6 +335,10 @@ class BedrockLLM(LLM):
             elapsed = time.perf_counter() - start_time
             logger.info(f"Model {model_id} call completed in {elapsed:.2f} seconds")
             logger.info(f"Response: {response}")
+
+            # Log cache metrics if caching was enabled
+            if cache_system_prompt:
+                self._log_cache_metrics(response, model_id)
 
             return dict(response)
 
