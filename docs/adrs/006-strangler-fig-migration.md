@@ -108,8 +108,34 @@ class CoreAgentBridge:
 - Need to maintain compatibility layer
 - Longer overall timeline than big-bang
 
+## Implementation Status
+
+**Current Phase: 3 - Unified Surface (Complete)**
+
+As of 2025-02, the unified surface is implemented:
+
+- ✅ `dcaf.core.create_app()` exposes both V1 and V2 endpoints
+- ✅ V2 endpoints (`/api/chat`, `/api/chat-stream`, `/api/chat-ws`) use V2 code path
+- ✅ V1 endpoints (`/api/sendMessage`, `/api/sendMessageStream`) use V1 code path
+- ✅ V1 handler functions extracted for reuse by unified app
+- ✅ Tests verify code path separation (`tests/core/test_request_fields.py`)
+
+**Key V2 Features (not available in V1):**
+
+| Feature | Description |
+|---------|-------------|
+| `_request_fields` | Top-level request fields forwarded to agent |
+| `meta_data.request_context` | Request fields echoed back in response |
+| WebSocket support | `/api/chat-ws` bidirectional streaming |
+
+**Next Steps (Phase 4-5):**
+
+- Migrate existing agents to Core one at a time
+- Eventually deprecate `dcaf.agent_server.create_chat_app()` for new projects
+
 ## Related ADRs
 
 - ADR-001: Clean Architecture
 - ADR-003: Adapter Pattern for Frameworks
+- ADR-007: Lowercase Chat Endpoints
 

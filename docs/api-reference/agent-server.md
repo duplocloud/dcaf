@@ -140,14 +140,25 @@ app = create_chat_app(agent, router=router)
 
 ## API Endpoints
 
-!!! note "Endpoint Naming"
-    The legacy endpoints (`/api/sendMessage`, `/api/sendMessageStream`) are still fully functional but deprecated. New integrations should use the preferred endpoints (`/api/chat`, `/api/chat-stream`).
+!!! note "V1 vs V2 Code Paths"
+    This module (`dcaf.agent_server`) provides the **V1 code path**. The V1 endpoints are:
 
-    | Legacy (Deprecated) | Preferred | Description |
-    |---------------------|-----------|-------------|
-    | `POST /api/sendMessage` | `POST /api/chat` | Synchronous chat |
-    | `POST /api/sendMessageStream` | `POST /api/chat-stream` | Streaming chat |
-    | — | `WS /api/chat-ws` | WebSocket chat (new) |
+    | V1 Endpoint | Description |
+    |-------------|-------------|
+    | `POST /api/sendMessage` | Synchronous chat (V1) |
+    | `POST /api/sendMessageStream` | Streaming chat (V1) |
+
+    For a unified server with **both V1 and V2 endpoints**, use `dcaf.core.create_app()` instead:
+
+    | Endpoint | Code Path | Description |
+    |----------|-----------|-------------|
+    | `POST /api/chat` | V2 | Synchronous chat with `_request_fields` forwarding |
+    | `POST /api/chat-stream` | V2 | Streaming chat with `_request_fields` forwarding |
+    | `WS /api/chat-ws` | V2 | WebSocket bidirectional streaming |
+    | `POST /api/sendMessage` | V1 | Legacy synchronous chat |
+    | `POST /api/sendMessageStream` | V1 | Legacy streaming chat |
+
+    See [ADR-006: Strangler Fig Migration](../adrs/006-strangler-fig-migration.md) for the rationale.
 
 ### GET /health
 

@@ -91,24 +91,33 @@ uvicorn.run(app, host="0.0.0.0", port=8000, workers=4)
 | `/api/chat-stream` | POST | Streaming chat (NDJSON) |
 | `/api/chat-ws` | WebSocket | Bidirectional streaming chat |
 
-### Legacy Endpoints (Backwards Compatible)
+### Legacy Endpoints (V1 Code Path)
 
-For backwards compatibility with existing v1 clients, the following endpoints are preserved as aliases:
+For backwards compatibility with existing v1 clients, the following endpoints are preserved:
 
-| Legacy Endpoint | Preferred Endpoint | Status |
-|-----------------|-------------------|--------|
-| `POST /api/sendMessage` | `POST /api/chat` | Deprecated |
-| `POST /api/sendMessageStream` | `POST /api/chat-stream` | Deprecated |
+| Legacy Endpoint | Preferred Endpoint | Code Path |
+|-----------------|-------------------|-----------|
+| `POST /api/sendMessage` | `POST /api/chat` | V1 (`dcaf.agent_server`) |
+| `POST /api/sendMessageStream` | `POST /api/chat-stream` | V1 (`dcaf.agent_server`) |
 
-!!! info "Full Backwards Compatibility"
-    Legacy endpoints are **fully functional aliases** that route to the same handlers as the new endpoints. They behave identically—same request format, same response format, same streaming behavior.
+!!! info "Strangler Fig Migration (ADR-006)"
+    Legacy endpoints use the **V1 code path** from `dcaf.agent_server`, while new endpoints use the **V2 code path** from `dcaf.core`. This follows the [Strangler Fig migration pattern](../adrs/006-strangler-fig-migration.md).
+
+    **Key differences:**
+
+    | Feature | V2 (`/api/chat`) | V1 (`/api/sendMessage`) |
+    |---------|------------------|-------------------------|
+    | `_request_fields` forwarding | ✅ Yes | ❌ No |
+    | `meta_data.request_context` echo | ✅ Yes | ❌ No |
+    | WebSocket support | ✅ Yes | ❌ No |
+    | Response format | V2 `AgentMessage` | V1 `AgentMessage` |
 
     **Existing integrations continue to work without any code changes.**
 
-!!! note "When to Use Legacy Endpoints"
-    - **New projects**: Use `/api/chat` and `/api/chat-stream`
-    - **Existing integrations**: Legacy endpoints work indefinitely, but consider migrating when convenient
-    - **Mixed environments**: Both endpoint styles can be used simultaneously
+!!! note "When to Use Each Endpoint"
+    - **New projects**: Use `/api/chat`, `/api/chat-stream`, and `/api/chat-ws` (V2)
+    - **Existing v1 integrations**: Continue using `/api/sendMessage` and `/api/sendMessageStream`
+    - **Unified server**: `dcaf.core.create_app()` exposes both V1 and V2 endpoints simultaneously
 
 #### Why the Rename? (ADR-007)
 

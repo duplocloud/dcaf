@@ -174,12 +174,21 @@ if __name__ == "__main__":
 
 If you have clients calling your agent:
 
-| Old Endpoint | New Endpoint | Status |
-|--------------|--------------|--------|
-| `/api/sendMessage` | `/api/chat` | Both work (legacy supported) |
-| `/api/sendMessageStream` | `/api/chat-stream` | Both work (legacy supported) |
+| Old Endpoint | New Endpoint | Code Path |
+|--------------|--------------|-----------|
+| `/api/sendMessage` | `/api/chat` | V1 → V2 |
+| `/api/sendMessageStream` | `/api/chat-stream` | V1 → V2 |
+| — | `/api/chat-ws` | V2 only |
 
-The legacy endpoints still work, but we recommend updating clients to use the new endpoints.
+!!! info "V1 vs V2 Code Paths"
+    When using `dcaf.core.create_app()`, both endpoint styles are available but use **different code paths**:
+
+    - **V2 endpoints** (`/api/chat`, `/api/chat-stream`, `/api/chat-ws`): Use the V2 code path with features like `_request_fields` forwarding and `meta_data.request_context` echo.
+    - **V1 endpoints** (`/api/sendMessage`, `/api/sendMessageStream`): Use the V1 code path from `dcaf.agent_server` for backwards compatibility.
+
+    This follows the [Strangler Fig migration pattern (ADR-006)](../adrs/006-strangler-fig-migration.md).
+
+The legacy endpoints still work indefinitely, but we recommend updating clients to use the new V2 endpoints for access to new features.
 
 ---
 
