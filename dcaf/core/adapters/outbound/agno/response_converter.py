@@ -13,6 +13,7 @@ Responsibilities:
 
 import json
 import logging
+import re
 from dataclasses import dataclass
 from typing import Any
 
@@ -224,6 +225,9 @@ class AgnoResponseConverter:
         # WORKAROUND: Strip trailing [] if present (temporary fix for Agno bug)
         text = self._strip_trailing_brackets(text)
 
+        # Sanitize Claude's internal thinking/reasoning tags
+        text = self._sanitize_internal_tags(text)
+
         return text
 
 
@@ -374,6 +378,70 @@ class AgnoResponseConverter:
         # Also handle cases where [] appears with whitespace before it
         if text and text.rstrip().endswith("[]"):
             text = text.rstrip()[:-2].rstrip()
+
+        return text
+
+    def _sanitize_internal_tags(self, text: str | None) -> str | None:
+        """
+        Remove Claude's internal thinking/reasoning tags from response text.
+
+        Claude may include internal metadata tags in responses that should not
+        be shown to end users. These include:
+        - <search_quality_reflection>...</search_quality_reflection>
+        - <search_quality_score>...</search_quality_score>
+        - <thinking>...</thinking>
+        - <result>...</result> (outer wrapper only, content is extracted)
+
+        Args:
+            text: The response text to sanitize
+
+        Returns:
+            The sanitized text with internal tags removed
+        """
+        if not text:
+            return text
+
+        original_text = text
+
+        # Define patterns for Claude's internal tags (order matters - process <result> last)
+        internal_tag_patterns = [
+            # Remove reflection tags entirely
+            (r"<search_quality_reflection>.*?</search_quality_reflection>", "", "search_quality_reflection"),
+            # Remove score tags entirely
+            (r"<search_quality_score>.*?</search_quality_score>", "", "search_quality_score"),
+            # Remove thinking tags entirely
+            (r"<thinking>.*?</thinking>", "", "thinking"),
+        ]
+
+        for pattern, replacement, tag_name in internal_tag_patterns:
+            if f"<{tag_name}>" in text:
+                text = re.sub(pattern, replacement, text, flags=re.DOTALL)
+
+        # Handle <result> tag specially - extract the content inside
+        if "<result>" in text and "</result>" in text:
+            match = re.search(r"<result>(.*?)</result>", text, flags=re.DOTALL)
+            if match:
+                # Replace the entire text with just the result content
+                # This handles cases where the entire response is wrapped in <result> tags
+                result_content = match.group(1).strip()
+                # Check if there's significant content outside <result> tags
+                text_without_result = re.sub(
+                    r"<result>.*?</result>", "", text, flags=re.DOTALL
+                ).strip()
+                if not text_without_result:
+                    # The result tag was the whole response, use its content
+                    text = result_content
+                else:
+                    # There's other content, just remove the result tags but keep content
+                    text = re.sub(r"<result>(.*?)</result>", r"\1", text, flags=re.DOTALL)
+
+        # Clean up extra whitespace that may result from tag removal
+        text = re.sub(r"\n{3,}", "\n\n", text)  # Collapse multiple newlines
+        text = text.strip()
+
+        if text != original_text:
+            logger.info("Sanitized internal Claude tags from response")
+            logger.debug(f"Original length: {len(original_text)}, Sanitized length: {len(text)}")
 
         return text
 

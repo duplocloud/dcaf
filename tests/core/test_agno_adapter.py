@@ -449,5 +449,112 @@ class TestParametersBugRegression:
         )
 
 
+# =============================================================================
+# Test: Response Converter Tag Sanitization
+# =============================================================================
+
+
+class TestResponseConverterSanitization:
+    """Tests for the response converter's internal tag sanitization."""
+
+    @pytest.fixture
+    def converter(self):
+        """Create a response converter instance."""
+        from dcaf.core.adapters.outbound.agno.response_converter import AgnoResponseConverter
+
+        return AgnoResponseConverter()
+
+    def test_sanitizes_search_quality_reflection_tags(self, converter):
+        """Verify that <search_quality_reflection> tags are removed."""
+        text = """<search_quality_reflection>
+The search results are good.
+</search_quality_reflection>
+
+Here is the actual response."""
+
+        result = converter._sanitize_internal_tags(text)
+
+        assert "<search_quality_reflection>" not in result
+        assert "</search_quality_reflection>" not in result
+        assert "Here is the actual response." in result
+
+    def test_sanitizes_search_quality_score_tags(self, converter):
+        """Verify that <search_quality_score> tags are removed."""
+        text = """<search_quality_score>5</search_quality_score>
+
+Here is the response."""
+
+        result = converter._sanitize_internal_tags(text)
+
+        assert "<search_quality_score>" not in result
+        assert "</search_quality_score>" not in result
+        assert "Here is the response." in result
+
+    def test_sanitizes_thinking_tags(self, converter):
+        """Verify that <thinking> tags are removed."""
+        text = """<thinking>
+Let me think about this...
+</thinking>
+
+Here is my answer."""
+
+        result = converter._sanitize_internal_tags(text)
+
+        assert "<thinking>" not in result
+        assert "</thinking>" not in result
+        assert "Here is my answer." in result
+
+    def test_extracts_result_content_when_entire_response(self, converter):
+        """Verify that <result> tags are handled - content is extracted."""
+        text = """<result>
+## Summary
+This is the actual content.
+</result>"""
+
+        result = converter._sanitize_internal_tags(text)
+
+        assert "<result>" not in result
+        assert "</result>" not in result
+        assert "## Summary" in result
+        assert "This is the actual content." in result
+
+    def test_sanitizes_combined_tags(self, converter):
+        """Verify that multiple internal tags are all removed correctly."""
+        text = """<search_quality_reflection>
+The search results provide a good overview.
+</search_quality_reflection>
+
+<search_quality_score>5</search_quality_score>
+
+<result>
+Here's the final response to the user.
+</result>"""
+
+        result = converter._sanitize_internal_tags(text)
+
+        assert "<search_quality_reflection>" not in result
+        assert "<search_quality_score>" not in result
+        assert "<result>" not in result
+        assert "Here's the final response to the user." in result
+
+    def test_preserves_normal_content(self, converter):
+        """Verify that normal content without internal tags is preserved."""
+        text = "This is a normal response without any internal tags."
+
+        result = converter._sanitize_internal_tags(text)
+
+        assert result == text
+
+    def test_handles_none_input(self, converter):
+        """Verify that None input returns None."""
+        result = converter._sanitize_internal_tags(None)
+        assert result is None
+
+    def test_handles_empty_string(self, converter):
+        """Verify that empty string input returns empty string."""
+        result = converter._sanitize_internal_tags("")
+        assert result == ""
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
