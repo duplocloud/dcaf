@@ -33,7 +33,6 @@ dependencies = [
     "python-dotenv",
     "tk",
     "requests",
-    "langchain_community",
     "duplocloud-client",
     # LLM provider dependencies (all included by default)
     "agno==2.3.21",               # Agno SDK - pinned to avoid [] bug in 2.3.26
