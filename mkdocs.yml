@@ -152,6 +152,7 @@ nav:
     - Prompt Caching: guides/prompt-caching.md
     - Message Protocol: guides/message-protocol.md
     - Streaming Responses: guides/streaming.md
+    - Event Subscriptions: guides/event-subscriptions.md
     - Documentation Versioning: guides/versioning.md
   
   - Architecture:
