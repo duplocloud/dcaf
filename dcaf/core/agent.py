@@ -521,12 +521,21 @@ class Agent:
             logger.debug(f"Response interceptors configured: {interceptor_names}")
 
         # Normalize event handlers to a list
-        if on_event is None:
-            self._event_handlers: list[EventHandler] = []
-        elif callable(on_event):
-            self._event_handlers = [on_event]
+        if on_event is not None:
+            import warnings
+            warnings.warn(
+                "on_event parameter is deprecated. Use @agent.on('event_type') decorator instead. "
+                "See docs/guides/event-subscriptions.md for the new subscription-based approach.",
+                DeprecationWarning,
+                stacklevel=2
+            )
+            # Keep existing behavior for backward compatibility
+            if callable(on_event):
+                self._event_handlers = [on_event]
+            else:
+                self._event_handlers = list(on_event)
         else:
-            self._event_handlers = list(on_event)
+            self._event_handlers = []
 
         # New subscription-based event registry
         self._event_registry = EventRegistry()
