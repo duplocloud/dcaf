@@ -163,6 +163,25 @@ class AgnoResponseConverter:
                 index=0,
             )
 
+        elif event_type in ("ReasoningStartedEvent", "ReasoningStarted"):
+            return StreamEvent(
+                event_type=StreamEventType.REASONING_STARTED,
+                data={},
+            )
+
+        elif event_type in ("ReasoningStepEvent", "ReasoningStep"):
+            content = getattr(agno_event, "content", "")
+            return StreamEvent(
+                event_type=StreamEventType.REASONING_STEP,
+                data={"content": content},
+            )
+
+        elif event_type in ("ReasoningCompletedEvent", "ReasoningCompleted"):
+            return StreamEvent(
+                event_type=StreamEventType.REASONING_COMPLETED,
+                data={},
+            )
+
         return None
 
     def _extract_text_content(self, run_output: Any) -> str | None:

@@ -420,7 +420,12 @@ class AgnoAdapter:
             yield StreamEvent.message_start()
 
             # Run with streaming and tracing parameters
-            async for event in agno_agent.arun(messages_to_send, stream=True, **tracing_kwargs):
+            async for event in agno_agent.arun(
+                messages_to_send,
+                stream=True,
+                stream_events=True,  # Enable all event types
+                **tracing_kwargs
+            ):
                 stream_event = self._response_converter.convert_stream_event(event)
                 if stream_event:
                     yield stream_event
@@ -475,6 +480,10 @@ class AgnoAdapter:
             StreamEventType.ERROR: "error",
             StreamEventType.MESSAGE_START: "message_start",
             StreamEventType.MESSAGE_END: "message_end",
+            # Reasoning events
+            StreamEventType.REASONING_STARTED: "reasoning_started",
+            StreamEventType.REASONING_STEP: "reasoning_step",
+            StreamEventType.REASONING_COMPLETED: "reasoning_completed",
         }
 
         event_type = type_mapping.get(stream_event.event_type)

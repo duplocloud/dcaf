@@ -75,6 +75,11 @@ class StreamEventType(Enum):
     MESSAGE_START = "message_start"
     MESSAGE_END = "message_end"
 
+    # Reasoning events
+    REASONING_STARTED = "reasoning_started"
+    REASONING_STEP = "reasoning_step"
+    REASONING_COMPLETED = "reasoning_completed"
+
 
 # =============================================================================
 # Tool Call DTOs
