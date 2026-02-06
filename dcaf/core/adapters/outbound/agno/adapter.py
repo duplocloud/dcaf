@@ -27,7 +27,9 @@ from agno.utils.log import set_log_level_to_debug, set_log_level_to_info
 from ....application.dto.responses import (
     AgentResponse,
     StreamEvent,
+    StreamEventType,
 )
+from ....events import Event, EventRegistry
 from ....application.ports.mcp_protocol import MCPToolLike
 from .gcp_metadata import GCPMetadataManager, get_default_gcp_metadata_manager
 from .message_converter import AgnoMessageConverter
@@ -354,6 +356,7 @@ class AgnoAdapter:
         static_system: str | None = None,
         dynamic_system: str | None = None,
         platform_context: dict[str, Any] | None = None,
+        event_registry: EventRegistry | None = None,
     ) -> AsyncIterator[StreamEvent]:
         """
         Invoke the agent with async streaming response.
@@ -422,6 +425,18 @@ class AgnoAdapter:
                 if stream_event:
                     yield stream_event
 
+                    # Dispatch to new event subscription system
+                    if event_registry and stream_event:
+                        new_event = self._convert_to_new_event(stream_event)
+                        if new_event and event_registry.has_subscribers(new_event.type):
+                            for handler in event_registry.get_handlers(new_event.type):
+                                try:
+                                    result = handler(new_event)
+                                    if hasattr(result, "__await__"):
+                                        await result
+                                except Exception as e:
+                                    logger.warning(f"Event handler error: {e}")
+
                 # Capture final output if available
                 if hasattr(event, "run_output") and event.run_output:
                     # Prefer our run_id if provided
@@ -450,6 +465,23 @@ class AgnoAdapter:
         except Exception as e:
             logger.error(f"Agno streaming failed: {e}", exc_info=True)
             yield StreamEvent.error(str(e))
+
+    def _convert_to_new_event(self, stream_event: StreamEvent) -> Event | None:
+        """Convert legacy StreamEvent to new Event format."""
+        type_mapping = {
+            StreamEventType.TOOL_USE_START: "tool_call_started",
+            StreamEventType.TOOL_USE_END: "tool_call_completed",
+            StreamEventType.TEXT_DELTA: "text_delta",
+            StreamEventType.ERROR: "error",
+            StreamEventType.MESSAGE_START: "message_start",
+            StreamEventType.MESSAGE_END: "message_end",
+        }
+
+        event_type = type_mapping.get(stream_event.event_type)
+        if not event_type:
+            return None
+
+        return Event(type=event_type, data=stream_event.data)
 
     # =========================================================================
     # Message Building (Bedrock-Compatible)
