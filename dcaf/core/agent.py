@@ -78,6 +78,7 @@ from .interceptors import (
     normalize_interceptors,
 )
 from .adapters.outbound.agno.types import DEFAULT_FRAMEWORK, DEFAULT_MODEL_ID, DEFAULT_PROVIDER
+from .events import EventRegistry
 from .models import ChatMessage, normalize_messages
 from .session import Session
 
@@ -527,6 +528,9 @@ class Agent:
         else:
             self._event_handlers = list(on_event)
 
+        # New subscription-based event registry
+        self._event_registry = EventRegistry()
+
         # Create internal services using dynamic adapter loading
         # This enables plugin-style framework support without if-statements
         self._runtime = load_adapter(
@@ -552,6 +556,45 @@ class Agent:
             conversations=self._conversations,
             events=self._create_event_publisher(),
         )
+
+    def on(self, *event_types: str):
+        """
+        Decorator to subscribe a handler to one or more event types.
+
+        The handler will be called whenever the specified event types
+        fire during agent execution. Events are only created if at least
+        one handler is subscribed (lazy creation for performance).
+
+        Args:
+            *event_types: One or more event type strings to subscribe to
+
+        Returns:
+            Decorator function that registers the handler
+
+        Example:
+            agent = Agent(tools=[weather_tool])
+
+            @agent.on("tool_call_started")
+            async def handle_tool_start(event):
+                print(f"Calling {event.tool_name}...")
+
+            @agent.on("tool_call_started", "tool_call_completed")
+            async def handle_tools(event):
+                print(f"Tool event: {event.type}")
+
+            # Using an array
+            my_events = ["text_delta", "error"]
+
+            @agent.on(*my_events)
+            async def handle_stream(event):
+                if event.type == "text_delta":
+                    print(event.text, end="")
+        """
+        def decorator(handler):
+            for event_type in event_types:
+                self._event_registry.subscribe(event_type, handler)
+            return handler
+        return decorator
 
     def _build_system_parts(
         self, platform_context: dict | None = None
