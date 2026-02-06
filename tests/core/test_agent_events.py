@@ -85,3 +85,39 @@ async def test_agent_dispatches_tool_call_started_event():
     # For now, we test the wiring is in place
 
     assert agent._event_registry.has_subscribers("tool_call_started")
+
+
+def test_convert_to_new_event_maps_stream_event_types():
+    """_convert_to_new_event correctly maps StreamEvent types to Event types."""
+    from dcaf.core.adapters.outbound.agno.adapter import AgnoAdapter
+    from dcaf.core.application.dto.responses import StreamEvent, StreamEventType
+
+    # Create adapter instance (minimal config)
+    adapter = AgnoAdapter(model_id="test-model", provider="anthropic")
+
+    # Test tool_use_start mapping
+    stream_event = StreamEvent.tool_use_start(
+        tool_call_id="test-123",
+        tool_name="weather"
+    )
+    new_event = adapter._convert_to_new_event(stream_event)
+
+    assert new_event is not None
+    assert new_event.type == "tool_call_started"
+    assert new_event.tool_call_id == "test-123"
+    assert new_event.tool_name == "weather"
+
+
+def test_convert_to_new_event_maps_text_delta():
+    """_convert_to_new_event maps text_delta events."""
+    from dcaf.core.adapters.outbound.agno.adapter import AgnoAdapter
+    from dcaf.core.application.dto.responses import StreamEvent
+
+    adapter = AgnoAdapter(model_id="test-model", provider="anthropic")
+
+    stream_event = StreamEvent.text_delta("Hello world")
+    new_event = adapter._convert_to_new_event(stream_event)
+
+    assert new_event is not None
+    assert new_event.type == "text_delta"
+    assert new_event.text == "Hello world"
