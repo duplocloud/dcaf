@@ -80,6 +80,20 @@ from .domain.events import (
     DomainEvent,
     ToolExecuted,
 )
+from .events import (
+    Event,
+    # Event type constants
+    TOOL_CALL_STARTED,
+    TOOL_CALL_COMPLETED,
+    TOOL_CALL_FAILED,
+    TEXT_DELTA,
+    REASONING_STARTED,
+    REASONING_STEP,
+    REASONING_COMPLETED,
+    MESSAGE_START,
+    MESSAGE_END,
+    ERROR,
+)
 
 # Interceptors API (for request/response processing)
 from .interceptors import (
@@ -161,4 +175,16 @@ __all__ = [
     "ConversationStarted",
     "ApprovalRequested",
     "ToolExecuted",
+    # Event subscription system
+    "Event",
+    "TOOL_CALL_STARTED",
+    "TOOL_CALL_COMPLETED",
+    "TOOL_CALL_FAILED",
+    "TEXT_DELTA",
+    "REASONING_STARTED",
+    "REASONING_STEP",
+    "REASONING_COMPLETED",
+    "MESSAGE_START",
+    "MESSAGE_END",
+    "ERROR",
 ]
