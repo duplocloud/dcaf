@@ -121,3 +121,55 @@ def test_convert_to_new_event_maps_text_delta():
     assert new_event is not None
     assert new_event.type == "text_delta"
     assert new_event.text == "Hello world"
+
+
+def test_convert_to_new_event_maps_reasoning_started():
+    """_convert_to_new_event maps reasoning_started events."""
+    from dcaf.core.adapters.outbound.agno.adapter import AgnoAdapter
+    from dcaf.core.application.dto.responses import StreamEvent, StreamEventType
+
+    adapter = AgnoAdapter(model_id="test-model", provider="anthropic")
+
+    stream_event = StreamEvent(
+        event_type=StreamEventType.REASONING_STARTED,
+        data={},
+    )
+    new_event = adapter._convert_to_new_event(stream_event)
+
+    assert new_event is not None
+    assert new_event.type == "reasoning_started"
+
+
+def test_convert_to_new_event_maps_reasoning_step():
+    """_convert_to_new_event maps reasoning_step events with content."""
+    from dcaf.core.adapters.outbound.agno.adapter import AgnoAdapter
+    from dcaf.core.application.dto.responses import StreamEvent, StreamEventType
+
+    adapter = AgnoAdapter(model_id="test-model", provider="anthropic")
+
+    stream_event = StreamEvent(
+        event_type=StreamEventType.REASONING_STEP,
+        data={"content": "Thinking about the problem..."},
+    )
+    new_event = adapter._convert_to_new_event(stream_event)
+
+    assert new_event is not None
+    assert new_event.type == "reasoning_step"
+    assert new_event.content == "Thinking about the problem..."
+
+
+def test_convert_to_new_event_maps_reasoning_completed():
+    """_convert_to_new_event maps reasoning_completed events."""
+    from dcaf.core.adapters.outbound.agno.adapter import AgnoAdapter
+    from dcaf.core.application.dto.responses import StreamEvent, StreamEventType
+
+    adapter = AgnoAdapter(model_id="test-model", provider="anthropic")
+
+    stream_event = StreamEvent(
+        event_type=StreamEventType.REASONING_COMPLETED,
+        data={},
+    )
+    new_event = adapter._convert_to_new_event(stream_event)
+
+    assert new_event is not None
+    assert new_event.type == "reasoning_completed"
