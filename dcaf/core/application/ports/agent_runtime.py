@@ -1,10 +1,13 @@
 """AgentRuntime port - interface for LLM framework adapters."""
 
 from collections.abc import AsyncGenerator
-from typing import Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 from ...domain.entities import Message
 from ..dto.responses import AgentResponse, StreamEvent
+
+if TYPE_CHECKING:
+    from ...events import EventRegistry
 
 
 class ToolLike(Protocol):
@@ -86,6 +89,7 @@ class AgentRuntime(Protocol):
         platform_context: dict | None = None,
         static_system: str | None = None,
         dynamic_system: str | None = None,
+        event_registry: "EventRegistry | None" = None,
     ) -> AsyncGenerator[StreamEvent, None]:
         """
         Invoke the agent with streaming response.
@@ -110,6 +114,7 @@ class AgentRuntime(Protocol):
                 - request_id: HTTP request correlation ID
             static_system: Optional static system prompt part (for caching)
             dynamic_system: Optional dynamic system prompt part (for caching)
+            event_registry: Optional event registry for dispatching events to subscribers
 
         Yields:
             StreamEvent objects containing chunks of the response

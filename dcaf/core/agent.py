@@ -1041,6 +1041,7 @@ class Agent:
                 messages=conversation.messages,
                 tools=self.tools,
                 system_prompt=self.system_prompt,
+                event_registry=self._event_registry,
             ):
                 # Convert internal stream events to server stream events
                 server_event = self._convert_stream_event(event, pending_tool_calls)

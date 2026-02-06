@@ -146,6 +146,7 @@ class FakeAgentRuntime:
         messages: list[Message],
         tools: list[Any],
         system_prompt: str | None = None,
+        event_registry: Any = None,
     ) -> Iterator[StreamEvent]:
         """Fake invoke_stream that returns configured events."""
         self._invoke_stream_calls.append(
@@ -153,6 +154,7 @@ class FakeAgentRuntime:
                 "messages": messages,
                 "tools": tools,
                 "system_prompt": system_prompt,
+                "event_registry": event_registry,
             }
         )
 
