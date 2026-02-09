@@ -9,9 +9,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 from dcaf.core import create_app
-from dcaf.core.schemas.events import DoneEvent, ErrorEvent, TextDeltaEvent
+from dcaf.core.schemas.events import DoneEvent, TextDeltaEvent
 from dcaf.core.schemas.messages import AgentMessage
-
 
 # ---------------------------------------------------------------------------
 # Mock agents
@@ -21,10 +20,10 @@ from dcaf.core.schemas.messages import AgentMessage
 class SyncMockAgent:
     """Synchronous agent that yields a text delta then done."""
 
-    def invoke(self, messages: dict[str, Any]) -> AgentMessage:
+    def invoke(self, _messages: dict[str, Any]) -> AgentMessage:
         return AgentMessage(role="assistant", content="hello")
 
-    def invoke_stream(self, messages: dict[str, Any]) -> Iterator[Any]:
+    def invoke_stream(self, _messages: dict[str, Any]) -> Iterator[Any]:
         yield TextDeltaEvent(text="hello")
         yield DoneEvent()
 
@@ -32,10 +31,10 @@ class SyncMockAgent:
 class AsyncMockAgent:
     """Async agent that yields a text delta then done."""
 
-    async def invoke(self, messages: dict[str, Any]) -> AgentMessage:
+    async def invoke(self, _messages: dict[str, Any]) -> AgentMessage:
         return AgentMessage(role="assistant", content="async hello")
 
-    async def invoke_stream(self, messages: dict[str, Any]) -> AsyncIterator[Any]:
+    async def invoke_stream(self, _messages: dict[str, Any]) -> AsyncIterator[Any]:
         yield TextDeltaEvent(text="async hello")
         yield DoneEvent()
 
@@ -43,10 +42,10 @@ class AsyncMockAgent:
 class ErrorMockAgent:
     """Agent whose invoke_stream raises an exception."""
 
-    def invoke(self, messages: dict[str, Any]) -> AgentMessage:
+    def invoke(self, _messages: dict[str, Any]) -> AgentMessage:
         return AgentMessage(role="assistant", content="")
 
-    def invoke_stream(self, messages: dict[str, Any]) -> Iterator[Any]:
+    def invoke_stream(self, _messages: dict[str, Any]) -> Iterator[Any]:
         raise RuntimeError("agent exploded")
 
 

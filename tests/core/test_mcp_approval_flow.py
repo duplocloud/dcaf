@@ -110,9 +110,7 @@ class TestGlobPatternEdgeCases:
         async with mcp:
             for tool_name, func in mcp._agno_mcp_tools.functions.items():
                 requires = getattr(func, "requires_confirmation", None)
-                assert requires is not True, (
-                    f"{tool_name} should be auto-approved with '*' pattern"
-                )
+                assert requires is not True, f"{tool_name} should be auto-approved with '*' pattern"
 
     async def test_empty_patterns_requires_all_approval(self):
         """Empty auto_approve_tools list should require approval for all tools."""
@@ -137,6 +135,5 @@ class TestGlobPatternEdgeCases:
             for tool_name, func in mcp._agno_mcp_tools.functions.items():
                 requires = getattr(func, "requires_confirmation", None)
                 assert requires is not True, (
-                    f"{tool_name} should not require confirmation when "
-                    f"auto_approve_tools is None"
+                    f"{tool_name} should not require confirmation when auto_approve_tools is None"
                 )

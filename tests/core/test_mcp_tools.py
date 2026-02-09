@@ -178,8 +178,8 @@ class TestAdapterMCPToolDetection:
 
     def test_adapter_does_not_detect_regular_tools(self):
         """Adapter should not identify regular tools as MCPTool."""
-        from dcaf.core.adapters.outbound.agno.adapter import AgnoAdapter
         from dcaf.core import tool
+        from dcaf.core.adapters.outbound.agno.adapter import AgnoAdapter
 
         @tool(description="A regular tool")
         def my_tool(x: str) -> str:
@@ -891,15 +891,17 @@ class TestMCPToolAutoApproveConnect:
             auto_approve_tools=["*_get*"],
         )
 
-        with patch("dcaf.mcp.tools.MCPTool._wrap_build_tools_for_patterns") as mock_wrap:
-            with patch("agno.tools.mcp.MCPTools") as MockAgnoMCPTools:
-                mock_instance = Mock()
-                mock_instance.functions = {}
-                MockAgnoMCPTools.return_value = mock_instance
+        with (
+            patch("dcaf.mcp.tools.MCPTool._wrap_build_tools_for_patterns") as mock_wrap,
+            patch("agno.tools.mcp.MCPTools") as MockAgnoMCPTools,
+        ):
+            mock_instance = Mock()
+            mock_instance.functions = {}
+            MockAgnoMCPTools.return_value = mock_instance
 
-                mcp._create_agno_mcp_tools()
+            mcp._create_agno_mcp_tools()
 
-                mock_wrap.assert_called_once()
+            mock_wrap.assert_called_once()
 
     async def test_create_agno_mcp_tools_skips_wrap_without_patterns(self):
         """_create_agno_mcp_tools should NOT wrap build_tools when auto_approve_tools is None."""
@@ -910,12 +912,14 @@ class TestMCPToolAutoApproveConnect:
             transport="streamable-http",
         )
 
-        with patch("dcaf.mcp.tools.MCPTool._wrap_build_tools_for_patterns") as mock_wrap:
-            with patch("agno.tools.mcp.MCPTools") as MockAgnoMCPTools:
-                mock_instance = Mock()
-                mock_instance.functions = {}
-                MockAgnoMCPTools.return_value = mock_instance
+        with (
+            patch("dcaf.mcp.tools.MCPTool._wrap_build_tools_for_patterns") as mock_wrap,
+            patch("agno.tools.mcp.MCPTools") as MockAgnoMCPTools,
+        ):
+            mock_instance = Mock()
+            mock_instance.functions = {}
+            MockAgnoMCPTools.return_value = mock_instance
 
-                mcp._create_agno_mcp_tools()
+            mcp._create_agno_mcp_tools()
 
-                mock_wrap.assert_not_called()
+            mock_wrap.assert_not_called()

@@ -1,7 +1,6 @@
 # tests/core/test_events.py
 """Tests for the unified Event class."""
 
-import pytest
 from datetime import datetime
 
 
@@ -9,10 +8,7 @@ def test_event_creation():
     """Event can be created with type and data."""
     from dcaf.core.events import Event
 
-    event = Event(
-        type="tool_call_started",
-        data={"tool_name": "weather", "tool_call_id": "abc123"}
-    )
+    event = Event(type="tool_call_started", data={"tool_name": "weather", "tool_call_id": "abc123"})
 
     assert event.type == "tool_call_started"
     assert event.data["tool_name"] == "weather"
@@ -24,10 +20,7 @@ def test_event_tool_name_accessor():
     """Event provides convenient accessor for tool_name."""
     from dcaf.core.events import Event
 
-    event = Event(
-        type="tool_call_started",
-        data={"tool_name": "weather"}
-    )
+    event = Event(type="tool_call_started", data={"tool_name": "weather"})
 
     assert event.tool_name == "weather"
 

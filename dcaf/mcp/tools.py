@@ -267,7 +267,9 @@ class MCPTool:
         # post-connect by DCAF's _apply_exclusion_patterns().
         agno_exclude = None
         if self._exclude_tools:
-            agno_exclude = [name for name in self._exclude_tools if not any(c in name for c in "*?[]")]
+            agno_exclude = [
+                name for name in self._exclude_tools if not any(c in name for c in "*?[]")
+            ]
 
         # Create the Agno MCPTools with our configuration
         self._agno_mcp_tools = AgnoMCPTools(
@@ -495,8 +497,7 @@ class MCPTool:
 
         for tool_name, func in self._agno_mcp_tools.functions.items():
             is_auto_approved = any(
-                fnmatch.fnmatch(tool_name, pattern)
-                for pattern in self._auto_approve_tools
+                fnmatch.fnmatch(tool_name, pattern) for pattern in self._auto_approve_tools
             )
             if is_auto_approved:
                 auto_approved += 1
@@ -533,9 +534,7 @@ class MCPTool:
             del self._agno_mcp_tools.functions[tool_name]
 
         if to_remove:
-            logger.info(
-                f"🔌 MCP: Excluded {len(to_remove)} tools via glob patterns: {to_remove}"
-            )
+            logger.info(f"🔌 MCP: Excluded {len(to_remove)} tools via glob patterns: {to_remove}")
 
     def _wrap_build_tools_for_patterns(self) -> None:
         """Wrap Agno's build_tools to apply exclusion and approval patterns after tool registration.

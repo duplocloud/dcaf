@@ -29,8 +29,8 @@ from ....application.dto.responses import (
     StreamEvent,
     StreamEventType,
 )
-from ....events import Event, EventRegistry
 from ....application.ports.mcp_protocol import MCPToolLike
+from ....events import Event, EventRegistry
 from .gcp_metadata import GCPMetadataManager, get_default_gcp_metadata_manager
 from .message_converter import AgnoMessageConverter
 from .model_factory import AgnoModelFactory, ModelConfig
@@ -424,7 +424,7 @@ class AgnoAdapter:
                 messages_to_send,
                 stream=True,
                 stream_events=True,  # Enable all event types
-                **tracing_kwargs
+                **tracing_kwargs,
             ):
                 stream_event = self._response_converter.convert_stream_event(event)
                 if stream_event:

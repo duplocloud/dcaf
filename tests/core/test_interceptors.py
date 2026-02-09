@@ -13,7 +13,6 @@ from dcaf.core.interceptors import (
 )
 from dcaf.core.session import Session
 
-
 # =============================================================================
 # LLMRequest Tests
 # =============================================================================
@@ -48,9 +47,7 @@ class TestLLMRequest:
         assert request.get_latest_user_message() == "second"
 
     def test_get_latest_user_message_no_user_messages(self):
-        request = LLMRequest(
-            messages=[{"role": "assistant", "content": "hello"}]
-        )
+        request = LLMRequest(messages=[{"role": "assistant", "content": "hello"}])
         assert request.get_latest_user_message() == ""
 
     def test_get_latest_user_message_empty_messages(self):
@@ -191,9 +188,7 @@ class TestInterceptorPipeline:
         def add_suffix(data):
             return data + "_modified"
 
-        pipeline = InterceptorPipeline(
-            interceptors=[add_suffix], pipeline_name="test"
-        )
+        pipeline = InterceptorPipeline(interceptors=[add_suffix], pipeline_name="test")
         result = await pipeline.run("input")
         assert result == "input_modified"
 
@@ -208,9 +203,7 @@ class TestInterceptorPipeline:
         def step3(data):
             return data + "_3"
 
-        pipeline = InterceptorPipeline(
-            interceptors=[step1, step2, step3], pipeline_name="test"
-        )
+        pipeline = InterceptorPipeline(interceptors=[step1, step2, step3], pipeline_name="test")
         result = await pipeline.run("start")
         assert result == "start_1_2_3"
 
@@ -219,9 +212,7 @@ class TestInterceptorPipeline:
         async def async_step(data):
             return data + "_async"
 
-        pipeline = InterceptorPipeline(
-            interceptors=[async_step], pipeline_name="test"
-        )
+        pipeline = InterceptorPipeline(interceptors=[async_step], pipeline_name="test")
         result = await pipeline.run("input")
         assert result == "input_async"
 
@@ -233,9 +224,7 @@ class TestInterceptorPipeline:
         async def async_step(data):
             return data + "_async"
 
-        pipeline = InterceptorPipeline(
-            interceptors=[sync_step, async_step], pipeline_name="test"
-        )
+        pipeline = InterceptorPipeline(interceptors=[sync_step, async_step], pipeline_name="test")
         result = await pipeline.run("start")
         assert result == "start_sync_async"
 
@@ -247,9 +236,7 @@ class TestInterceptorPipeline:
         def should_not_run(data):
             return data + "_never"
 
-        pipeline = InterceptorPipeline(
-            interceptors=[blocker, should_not_run], pipeline_name="test"
-        )
+        pipeline = InterceptorPipeline(interceptors=[blocker, should_not_run], pipeline_name="test")
         with pytest.raises(InterceptorError) as exc_info:
             await pipeline.run("input")
         assert exc_info.value.user_message == "Blocked!"
@@ -259,9 +246,7 @@ class TestInterceptorPipeline:
         def bad_interceptor(data):
             raise ValueError("something went wrong")
 
-        pipeline = InterceptorPipeline(
-            interceptors=[bad_interceptor], pipeline_name="test"
-        )
+        pipeline = InterceptorPipeline(interceptors=[bad_interceptor], pipeline_name="test")
         with pytest.raises(ValueError, match="something went wrong"):
             await pipeline.run("input")
 
@@ -271,9 +256,7 @@ class TestInterceptorPipeline:
             request.context["added"] = True
             return request
 
-        pipeline = InterceptorPipeline(
-            interceptors=[add_context], pipeline_name="request"
-        )
+        pipeline = InterceptorPipeline(interceptors=[add_context], pipeline_name="request")
         request = LLMRequest(messages=[{"role": "user", "content": "hi"}])
         result = await pipeline.run(request)
         assert result.context["added"] is True
@@ -284,9 +267,7 @@ class TestInterceptorPipeline:
             response.text = response.text.upper()
             return response
 
-        pipeline = InterceptorPipeline(
-            interceptors=[clean_text], pipeline_name="response"
-        )
+        pipeline = InterceptorPipeline(interceptors=[clean_text], pipeline_name="response")
         response = LLMResponse(text="hello world")
         result = await pipeline.run(response)
         assert result.text == "HELLO WORLD"
@@ -299,9 +280,7 @@ class TestInterceptorPipeline:
 
 class TestCreateRequestFromMessages:
     def test_basic(self):
-        request = create_request_from_messages(
-            messages=[{"role": "user", "content": "hello"}]
-        )
+        request = create_request_from_messages(messages=[{"role": "user", "content": "hello"}])
         assert len(request.messages) == 1
         assert request.tools == []
         assert request.system is None

@@ -39,15 +39,7 @@ For advanced usage, see the domain, application, and adapters submodules.
 
 from dcaf import __version__
 
-# Simple API (what most users need)
-# Stream event types (for type checking in streaming)
-# NOTE: Using v2 schemas from core/schemas/ (not v1 dcaf/schemas/)
-from .schemas.events import (
-    DoneEvent,
-    ErrorEvent,
-    TextDeltaEvent,
-    ToolCallsEvent,
-)
+from ..channel_routing import ChannelResponseRouter, SlackResponseRouter
 from .agent import Agent, AgentResponse, PendingToolCall
 
 # HelpDesk Protocol DTOs (for full compatibility)
@@ -81,18 +73,18 @@ from .domain.events import (
     ToolExecuted,
 )
 from .events import (
-    Event,
-    # Event type constants
-    TOOL_CALL_STARTED,
-    TOOL_CALL_COMPLETED,
-    TOOL_CALL_FAILED,
-    TEXT_DELTA,
+    ERROR,
+    MESSAGE_END,
+    MESSAGE_START,
+    REASONING_COMPLETED,
     REASONING_STARTED,
     REASONING_STEP,
-    REASONING_COMPLETED,
-    MESSAGE_START,
-    MESSAGE_END,
-    ERROR,
+    TEXT_DELTA,
+    TOOL_CALL_COMPLETED,
+    TOOL_CALL_FAILED,
+    # Event type constants
+    TOOL_CALL_STARTED,
+    Event,
 )
 
 # Interceptors API (for request/response processing)
@@ -112,7 +104,16 @@ from .primitives import (
     ToolResult,
     from_agent_response,
 )
-from ..channel_routing import ChannelResponseRouter, SlackResponseRouter
+
+# Simple API (what most users need)
+# Stream event types (for type checking in streaming)
+# NOTE: Using v2 schemas from core/schemas/ (not v1 dcaf/schemas/)
+from .schemas.events import (
+    DoneEvent,
+    ErrorEvent,
+    TextDeltaEvent,
+    ToolCallsEvent,
+)
 from .server import create_app, serve
 from .session import Session
 

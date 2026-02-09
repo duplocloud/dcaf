@@ -2,8 +2,6 @@
 
 import os
 
-import pytest
-
 from dcaf.core.config import (
     DEFAULTS,
     PROVIDER_MODEL_DEFAULTS,
@@ -13,7 +11,6 @@ from dcaf.core.config import (
     is_provider_configured,
     load_agent_config,
 )
-
 
 # =============================================================================
 # DEFAULTS Tests
@@ -43,7 +40,9 @@ class TestDefaults:
     def test_provider_model_defaults_has_all_providers(self):
         expected_providers = ["bedrock", "anthropic", "google", "openai", "azure", "ollama"]
         for provider in expected_providers:
-            assert provider in PROVIDER_MODEL_DEFAULTS, f"Missing provider model default: {provider}"
+            assert provider in PROVIDER_MODEL_DEFAULTS, (
+                f"Missing provider model default: {provider}"
+            )
 
 
 # =============================================================================

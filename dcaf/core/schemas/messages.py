@@ -86,7 +86,9 @@ class Data(BaseModel):
     tool_calls: list[ToolCall] = Field(default_factory=list)
     executed_tool_calls: list[ExecutedToolCall] = Field(default_factory=list)
     url_configs: list[URLConfig] = Field(default_factory=list)
-    user_file_uploads: list[FileObject] = Field(default_factory=list)  # From main: user uploaded files
+    user_file_uploads: list[FileObject] = Field(
+        default_factory=list
+    )  # From main: user uploaded files
     session: dict[str, Any] = Field(
         default_factory=dict, description="Session state that persists across conversation turns"
     )

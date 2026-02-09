@@ -13,16 +13,15 @@ Tests cover:
 """
 
 import json
-from typing import Any
 from collections.abc import Iterator
+from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
 
 from dcaf.agent_server import AgentProtocol, create_chat_app
+from dcaf.schemas.events import DoneEvent, TextDeltaEvent
 from dcaf.schemas.messages import AgentMessage
-from dcaf.schemas.events import TextDeltaEvent, DoneEvent
-
 
 # =============================================================================
 # Test Agents
@@ -37,12 +36,9 @@ class V1AgentWithOnlyInvoke:
     invoke_stream. This test ensures such agents still work.
     """
 
-    def invoke(self, messages: dict[str, list[dict[str, Any]]]) -> AgentMessage:
+    def invoke(self, _messages: dict[str, list[dict[str, Any]]]) -> AgentMessage:
         """Process messages and return a response."""
-        return AgentMessage(
-            role="assistant",
-            content="Response from v1 agent with only invoke()"
-        )
+        return AgentMessage(role="assistant", content="Response from v1 agent with only invoke()")
 
     # NOTE: No invoke_stream method - this is intentional!
 
@@ -54,13 +50,10 @@ class V1AgentWithBothMethods:
     Some v1 agents may have implemented streaming voluntarily.
     """
 
-    def invoke(self, messages: dict[str, list[dict[str, Any]]]) -> AgentMessage:
-        return AgentMessage(
-            role="assistant",
-            content="Response from v1 agent"
-        )
+    def invoke(self, _messages: dict[str, list[dict[str, Any]]]) -> AgentMessage:
+        return AgentMessage(role="assistant", content="Response from v1 agent")
 
-    def invoke_stream(self, messages: dict[str, Any]) -> Iterator[Any]:
+    def invoke_stream(self, _messages: dict[str, Any]) -> Iterator[Any]:
         yield TextDeltaEvent(text="Streaming ")
         yield TextDeltaEvent(text="response")
         yield DoneEvent()
@@ -78,15 +71,16 @@ class V1AgentWithThreadId:
     def __init__(self):
         self.last_thread_id = None
 
-    def invoke(self, messages: dict[str, list[dict[str, Any]]], thread_id: str | None = None) -> AgentMessage:
+    def invoke(
+        self, _messages: dict[str, list[dict[str, Any]]], thread_id: str | None = None
+    ) -> AgentMessage:
         """Process messages with optional thread_id parameter (v1 pattern)."""
         self.last_thread_id = thread_id
-        return AgentMessage(
-            role="assistant",
-            content=f"Response with thread_id: {thread_id}"
-        )
+        return AgentMessage(role="assistant", content=f"Response with thread_id: {thread_id}")
 
-    def invoke_stream(self, messages: dict[str, Any], thread_id: str | None = None) -> Iterator[Any]:
+    def invoke_stream(
+        self, _messages: dict[str, Any], thread_id: str | None = None
+    ) -> Iterator[Any]:
         """Stream with optional thread_id parameter (v1 pattern)."""
         self.last_thread_id = thread_id
         yield TextDeltaEvent(text=f"thread_id={thread_id}")
@@ -153,8 +147,7 @@ class TestLegacyEndpointSendMessage:
     def test_legacy_endpoint_exists(self, client_both_methods: TestClient):
         """The /api/sendMessage endpoint should exist and return 200."""
         response = client_both_methods.post(
-            "/api/sendMessage",
-            json={"messages": [{"role": "user", "content": "Hello"}]}
+            "/api/sendMessage", json={"messages": [{"role": "user", "content": "Hello"}]}
         )
         # Should NOT be 404
         assert response.status_code == 200, (
@@ -165,8 +158,7 @@ class TestLegacyEndpointSendMessage:
     def test_legacy_endpoint_returns_agent_message(self, client_both_methods: TestClient):
         """The /api/sendMessage endpoint should return a valid AgentMessage."""
         response = client_both_methods.post(
-            "/api/sendMessage",
-            json={"messages": [{"role": "user", "content": "Hello"}]}
+            "/api/sendMessage", json={"messages": [{"role": "user", "content": "Hello"}]}
         )
         assert response.status_code == 200
         data = response.json()
@@ -193,8 +185,7 @@ class TestLegacyEndpointSendMessageStream:
     def test_legacy_stream_endpoint_exists(self, client_both_methods: TestClient):
         """The /api/sendMessageStream endpoint should exist and return 200."""
         response = client_both_methods.post(
-            "/api/sendMessageStream",
-            json={"messages": [{"role": "user", "content": "Hello"}]}
+            "/api/sendMessageStream", json={"messages": [{"role": "user", "content": "Hello"}]}
         )
         # Should NOT be 404
         assert response.status_code == 200, (
@@ -205,8 +196,7 @@ class TestLegacyEndpointSendMessageStream:
     def test_legacy_stream_endpoint_returns_ndjson(self, client_both_methods: TestClient):
         """The /api/sendMessageStream endpoint should return NDJSON events."""
         response = client_both_methods.post(
-            "/api/sendMessageStream",
-            json={"messages": [{"role": "user", "content": "Hello"}]}
+            "/api/sendMessageStream", json={"messages": [{"role": "user", "content": "Hello"}]}
         )
         assert response.status_code == 200
 
@@ -263,8 +253,7 @@ class TestAgentProtocolBackwardsCompatibility:
     def test_invoke_only_agent_handles_legacy_endpoint(self, client_invoke_only: TestClient):
         """Agent with only invoke() should handle /api/sendMessage requests."""
         response = client_invoke_only.post(
-            "/api/sendMessage",
-            json={"messages": [{"role": "user", "content": "Hello"}]}
+            "/api/sendMessage", json={"messages": [{"role": "user", "content": "Hello"}]}
         )
 
         assert response.status_code == 200
@@ -283,8 +272,7 @@ class TestAgentProtocolBackwardsCompatibility:
         Any of these is acceptable - the key is no crash/500.
         """
         response = client_invoke_only.post(
-            "/api/sendMessageStream",
-            json={"messages": [{"role": "user", "content": "Hello"}]}
+            "/api/sendMessageStream", json={"messages": [{"role": "user", "content": "Hello"}]}
         )
 
         # Should not be a 500 server error
@@ -319,20 +307,13 @@ class TestToolSchemaBackwardsCompatibility:
             "description": "A test tool",
             "input_schema": {
                 "type": "object",
-                "properties": {
-                    "x": {"type": "string", "description": "Input value"}
-                },
-                "required": ["x"]
-            }
+                "properties": {"x": {"type": "string", "description": "Input value"}},
+                "required": ["x"],
+            },
         }
 
         # This should NOT raise an error
-        tool = Tool(
-            func=dummy_func,
-            name="my_tool",
-            description="A test tool",
-            schema=full_schema
-        )
+        tool = Tool(func=dummy_func, name="my_tool", description="A test tool", schema=full_schema)
         assert tool is not None
 
     def test_tool_get_schema_returns_full_spec(self):
@@ -348,16 +329,11 @@ class TestToolSchemaBackwardsCompatibility:
             "input_schema": {
                 "type": "object",
                 "properties": {"x": {"type": "string"}},
-                "required": ["x"]
-            }
+                "required": ["x"],
+            },
         }
 
-        tool = Tool(
-            func=dummy_func,
-            name="my_tool",
-            description="A test tool",
-            schema=full_schema
-        )
+        tool = Tool(func=dummy_func, name="my_tool", description="A test tool", schema=full_schema)
 
         schema = tool.get_schema()
 
@@ -384,11 +360,9 @@ class TestToolSchemaBackwardsCompatibility:
                 "description": "Test tool",
                 "input_schema": {
                     "type": "object",
-                    "properties": {
-                        "x": {"type": "string"}
-                    },
-                    "required": ["x"]
-                }
+                    "properties": {"x": {"type": "string"}},
+                    "required": ["x"],
+                },
             }
         )
         def my_tool(x: str) -> str:
@@ -410,11 +384,9 @@ class TestToolSchemaBackwardsCompatibility:
                 "description": "Get weather for a city",
                 "input_schema": {
                     "type": "object",
-                    "properties": {
-                        "city": {"type": "string", "description": "City name"}
-                    },
-                    "required": ["city"]
-                }
+                    "properties": {"city": {"type": "string", "description": "City name"}},
+                    "required": ["city"],
+                },
             }
         )
         def get_weather(city: str) -> str:
@@ -441,41 +413,48 @@ class TestV1AgentImports:
     def test_import_agent_protocol(self):
         """AgentProtocol should be importable from dcaf.agent_server."""
         from dcaf.agent_server import AgentProtocol
+
         assert AgentProtocol is not None
 
     def test_import_create_chat_app(self):
         """create_chat_app should be importable from dcaf.agent_server."""
         from dcaf.agent_server import create_chat_app
+
         assert create_chat_app is not None
 
     def test_import_bedrock_llm(self):
         """BedrockLLM should be importable from dcaf.llm."""
         from dcaf.llm import BedrockLLM
+
         assert BedrockLLM is not None
 
     def test_import_agent_message(self):
         """AgentMessage should be importable from dcaf.schemas.messages."""
         from dcaf.schemas.messages import AgentMessage
+
         assert AgentMessage is not None
 
     def test_import_tool_decorator(self):
         """tool decorator should be importable from dcaf.tools."""
         from dcaf.tools import tool
+
         assert tool is not None
 
     def test_import_tool_class(self):
         """Tool class should be importable from dcaf.tools."""
         from dcaf.tools import Tool
+
         assert Tool is not None
 
     def test_top_level_exports(self):
         """Key classes should be importable from dcaf package."""
         from dcaf import (
-            AgentProtocol,
-            create_chat_app,
-            BedrockLLM,
             AgentMessage,
+            AgentProtocol,
+            BedrockLLM,
+            create_chat_app,
         )
+
         assert AgentProtocol is not None
         assert create_chat_app is not None
         assert BedrockLLM is not None
@@ -499,6 +478,7 @@ class TestV1AgentSubclassImports:
         """ToolCallingCmdAgent should be importable."""
         try:
             from dcaf.agents.tool_calling_cmd_agent import ToolCallingCmdAgent
+
             assert ToolCallingCmdAgent is not None
         except ImportError as e:
             pytest.fail(f"Failed to import ToolCallingCmdAgent: {e}")
@@ -507,6 +487,7 @@ class TestV1AgentSubclassImports:
         """EchoAgent should be importable."""
         try:
             from dcaf.agents.echo_agent import EchoAgent
+
             assert EchoAgent is not None
         except ImportError as e:
             pytest.fail(f"Failed to import EchoAgent: {e}")
@@ -515,6 +496,7 @@ class TestV1AgentSubclassImports:
         """BoilerplateAgent should be importable."""
         try:
             from dcaf.agents.boilerplate_agent import BoilerplateAgent
+
             assert BoilerplateAgent is not None
         except ImportError as e:
             pytest.fail(f"Failed to import BoilerplateAgent: {e}")
@@ -523,6 +505,7 @@ class TestV1AgentSubclassImports:
         """LLMPassthroughAgent should be importable."""
         try:
             from dcaf.agents.llm_passthrough_agent import LLMPassthroughAgent
+
             assert LLMPassthroughAgent is not None
         except ImportError as e:
             pytest.fail(f"Failed to import LLMPassthroughAgent: {e}")

@@ -90,16 +90,13 @@ async def test_agent_dispatches_tool_call_started_event():
 def test_convert_to_new_event_maps_stream_event_types():
     """_convert_to_new_event correctly maps StreamEvent types to Event types."""
     from dcaf.core.adapters.outbound.agno.adapter import AgnoAdapter
-    from dcaf.core.application.dto.responses import StreamEvent, StreamEventType
+    from dcaf.core.application.dto.responses import StreamEvent
 
     # Create adapter instance (minimal config)
     adapter = AgnoAdapter(model_id="test-model", provider="anthropic")
 
     # Test tool_use_start mapping
-    stream_event = StreamEvent.tool_use_start(
-        tool_call_id="test-123",
-        tool_name="weather"
-    )
+    stream_event = StreamEvent.tool_use_start(tool_call_id="test-123", tool_name="weather")
     new_event = adapter._convert_to_new_event(stream_event)
 
     assert new_event is not None

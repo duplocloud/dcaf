@@ -230,7 +230,9 @@ class AgentService:
                         )
                         conversation.complete_tool_call(str(tool_call.id), result)
                         executed_results.append((tool_call, result))
-                    except Exception as e:  # Intentional catch-all: user-provided tools can raise anything
+                    except (
+                        Exception
+                    ) as e:  # Intentional catch-all: user-provided tools can raise anything
                         conversation.fail_tool_call(str(tool_call.id), str(e))
                         executed_results.append((tool_call, str(e)))
 
@@ -383,7 +385,9 @@ class AgentService:
                         )
                         tool_call.start_execution()
                         tool_call.complete(result)
-                    except Exception as e:  # Intentional catch-all: user-provided tools can raise anything
+                    except (
+                        Exception
+                    ) as e:  # Intentional catch-all: user-provided tools can raise anything
                         tool_call.start_execution()
                         tool_call.fail(str(e))
 

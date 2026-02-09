@@ -200,7 +200,9 @@ class AgnoA2AServer(A2AServerAdapter):
             },
         )
 
-    def create_routes(self, agent: "Agent", agent_card: "AgentCard | dict[str, Any] | None" = None) -> list["APIRouter"]:
+    def create_routes(
+        self, agent: "Agent", agent_card: "AgentCard | dict[str, Any] | None" = None
+    ) -> list["APIRouter"]:
         """
         Create FastAPI routes for A2A endpoints.
 

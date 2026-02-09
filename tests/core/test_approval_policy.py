@@ -3,7 +3,6 @@
 from dcaf.core.domain.services.approval_policy import ApprovalDecision, ApprovalPolicy
 from dcaf.core.domain.value_objects.platform_context import PlatformContext
 
-
 # =============================================================================
 # Helper: simple ToolLike stub
 # =============================================================================

@@ -15,13 +15,12 @@ import json
 from collections.abc import AsyncIterator, Iterator
 from typing import Any
 
-from fastapi.testclient import TestClient
 import pytest
+from fastapi.testclient import TestClient
 
 from dcaf.core import create_app
 from dcaf.core.schemas.events import DoneEvent, TextDeltaEvent
 from dcaf.core.schemas.messages import AgentMessage
-
 
 # ---------------------------------------------------------------------------
 # Mock agents that capture what they receive
@@ -173,9 +172,7 @@ class TestStreamRequestFields:
         self, sync_client: TestClient, sync_agent: CapturingSyncAgent
     ):
         """Top-level fields are attached as _request_fields in the dict passed to invoke_stream."""
-        response = sync_client.post(
-            "/api/chat-stream", json=REQUEST_WITH_FIELDS
-        )
+        response = sync_client.post("/api/chat-stream", json=REQUEST_WITH_FIELDS)
         assert response.status_code == 200
 
         assert sync_agent.last_stream_input is not None
@@ -185,9 +182,7 @@ class TestStreamRequestFields:
 
     def test_no_extra_fields_stream_still_works(self, sync_client: TestClient):
         """Streaming without extra fields works normally."""
-        response = sync_client.post(
-            "/api/chat-stream", json=REQUEST_WITHOUT_FIELDS
-        )
+        response = sync_client.post("/api/chat-stream", json=REQUEST_WITHOUT_FIELDS)
         assert response.status_code == 200
 
         events = [json.loads(line) for line in response.text.strip().split("\n") if line.strip()]
@@ -223,7 +218,7 @@ class TestWebSocketRequestFields:
         assert rf["tenant_id"] == "32d6aa2b-xxxx"
 
     def test_no_extra_fields_websocket_still_works(
-        self, sync_client: TestClient, sync_agent: CapturingSyncAgent
+        self, sync_client: TestClient, sync_agent: CapturingSyncAgent  # noqa: ARG002
     ):
         """WebSocket without extra fields works normally."""
         with sync_client.websocket_connect("/api/chat-ws") as ws:
@@ -271,9 +266,9 @@ class TestBackwardCompatibility:
 class TestLegacyEndpoints:
     """Verify that legacy v1 endpoints work in the unified app.
 
-    V1 endpoints exercise V1 code paths, which means:
-    - No _request_fields forwarding (V2-only feature)
-    - V1-style response format
+    Legacy endpoints (/api/sendMessage, /api/sendMessageStream) are now
+    aliases to V2 handlers, so they behave identically to V2 endpoints
+    including _request_fields forwarding.
     """
 
     def test_send_message_endpoint_exists(self, sync_client: TestClient):
@@ -304,13 +299,15 @@ class TestLegacyEndpoints:
         assert "text_delta" in types
         assert "done" in types
 
-    def test_v1_endpoints_do_not_forward_request_fields(
+    def test_legacy_endpoints_forward_request_fields(
         self, sync_client: TestClient, sync_agent: CapturingSyncAgent
     ):
-        """V1 endpoints use V1 code path which does NOT forward _request_fields."""
+        """Legacy endpoints are aliases to V2 and forward _request_fields."""
         response = sync_client.post("/api/sendMessage", json=REQUEST_WITH_FIELDS)
         assert response.status_code == 200
 
-        # V1 code path does NOT include _request_fields (that's a V2-only feature)
+        # Legacy endpoints are now V2 aliases, so they forward _request_fields
         rf = sync_agent.last_invoke_input.get("_request_fields")
-        assert rf is None, "V1 endpoints should NOT forward _request_fields"
+        assert rf is not None, "Legacy endpoints should forward _request_fields (V2 alias)"
+        assert rf["thread_id"] == "ai-260204162205"
+        assert rf["source"] == "help-desk"

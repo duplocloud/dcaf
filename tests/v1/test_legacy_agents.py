@@ -1,11 +1,14 @@
 """Tests for legacy agent base class and subclasses."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
-from dcaf.agents.base_command_agent import BaseCommandAgent, LEGACY_DEFAULT_MODEL_ID, LEGACY_MAX_TOKENS
-
+from dcaf.agents.base_command_agent import (
+    LEGACY_DEFAULT_MODEL_ID,
+    LEGACY_MAX_TOKENS,
+    BaseCommandAgent,
+)
 
 # =============================================================================
 # Helpers
@@ -154,9 +157,7 @@ class TestExtractCommands:
         llm = _create_fake_llm()
         agent = ConcreteAgent(llm)
 
-        result = agent._extract_commands(
-            {"terminal_commands": [{"command": "ls -la"}]}
-        )
+        result = agent._extract_commands({"terminal_commands": [{"command": "ls -la"}]})
         assert result == [{"command": "ls -la"}]
 
     def test_without_commands(self):
@@ -181,30 +182,30 @@ class TestExtractCommands:
 
 class TestInvoke:
     def test_basic_invoke(self):
-        llm = _create_fake_llm({
-            "content": "Run this command",
-            "terminal_commands": [{"command": "ls"}],
-        })
+        llm = _create_fake_llm(
+            {
+                "content": "Run this command",
+                "terminal_commands": [{"command": "ls"}],
+            }
+        )
         agent = ConcreteAgent(llm)
 
-        result = agent.invoke({"messages": [
-            {"role": "user", "content": "List files"}
-        ]})
+        result = agent.invoke({"messages": [{"role": "user", "content": "List files"}]})
 
         assert result.content == "Run this command"
         assert len(result.data.cmds) == 1
         assert result.data.cmds[0].command == "ls"
 
     def test_invoke_with_no_commands(self):
-        llm = _create_fake_llm({
-            "content": "Just text",
-            "terminal_commands": [],
-        })
+        llm = _create_fake_llm(
+            {
+                "content": "Just text",
+                "terminal_commands": [],
+            }
+        )
         agent = ConcreteAgent(llm)
 
-        result = agent.invoke({"messages": [
-            {"role": "user", "content": "Hello"}
-        ]})
+        result = agent.invoke({"messages": [{"role": "user", "content": "Hello"}]})
 
         assert result.content == "Just text"
         assert len(result.data.cmds) == 0
@@ -220,12 +221,14 @@ class TestProcessMessages:
         llm = _create_fake_llm()
         agent = ConcreteAgent(llm)
 
-        processed, executed = agent.process_messages({
-            "messages": [
-                {"role": "user", "content": "Hello"},
-                {"role": "assistant", "content": "Hi there"},
-            ]
-        })
+        processed, executed = agent.process_messages(
+            {
+                "messages": [
+                    {"role": "user", "content": "Hello"},
+                    {"role": "assistant", "content": "Hi there"},
+                ]
+            }
+        )
 
         assert len(processed) == 2
         assert processed[0]["role"] == "user"
@@ -236,12 +239,14 @@ class TestProcessMessages:
         llm = _create_fake_llm()
         agent = ConcreteAgent(llm)
 
-        processed, _ = agent.process_messages({
-            "messages": [
-                {"role": "system", "content": "System msg"},
-                {"role": "user", "content": "Hello"},
-            ]
-        })
+        processed, _ = agent.process_messages(
+            {
+                "messages": [
+                    {"role": "system", "content": "System msg"},
+                    {"role": "user", "content": "Hello"},
+                ]
+            }
+        )
 
         assert len(processed) == 1
         assert processed[0]["role"] == "user"
@@ -264,30 +269,36 @@ class TestProcessMessages:
 class TestSubclassImports:
     def test_command_agent_imports(self):
         from dcaf.agents.cmd_agent import CommandAgent
+
         assert issubclass(CommandAgent, BaseCommandAgent)
 
     def test_aws_agent_imports(self):
         from dcaf.agents.aws_agent import AWSAgent
+
         assert issubclass(AWSAgent, BaseCommandAgent)
 
     def test_k8s_agent_imports(self):
         from dcaf.agents.k8s_agent import K8sAgent
+
         assert issubclass(K8sAgent, BaseCommandAgent)
 
     def test_command_agent_creates_successfully(self):
         from dcaf.agents.cmd_agent import CommandAgent
+
         llm = _create_fake_llm()
         agent = CommandAgent(llm)
         assert agent.system_prompt is not None
 
     def test_aws_agent_creates_successfully(self):
         from dcaf.agents.aws_agent import AWSAgent
+
         llm = _create_fake_llm()
         agent = AWSAgent(llm)
         assert agent.system_prompt is not None
 
     def test_k8s_agent_creates_successfully(self):
         from dcaf.agents.k8s_agent import K8sAgent
+
         llm = _create_fake_llm()
         agent = K8sAgent(llm)
         assert agent.system_prompt is not None
@@ -301,12 +312,13 @@ class TestSubclassImports:
 class TestK8sAgentExtractCommands:
     def test_handles_string_commands(self):
         from dcaf.agents.k8s_agent import K8sAgent
+
         llm = _create_fake_llm()
         agent = K8sAgent(llm)
 
-        result = agent._extract_commands({
-            "terminal_commands": ["kubectl get pods", "kubectl get svc"]
-        })
+        result = agent._extract_commands(
+            {"terminal_commands": ["kubectl get pods", "kubectl get svc"]}
+        )
 
         assert len(result) == 2
         assert result[0] == {"command": "kubectl get pods"}
@@ -314,26 +326,30 @@ class TestK8sAgentExtractCommands:
 
     def test_handles_dict_commands(self):
         from dcaf.agents.k8s_agent import K8sAgent
+
         llm = _create_fake_llm()
         agent = K8sAgent(llm)
 
-        result = agent._extract_commands({
-            "terminal_commands": [{"command": "kubectl get pods -n default"}]
-        })
+        result = agent._extract_commands(
+            {"terminal_commands": [{"command": "kubectl get pods -n default"}]}
+        )
 
         assert len(result) == 1
         assert result[0]["command"] == "kubectl get pods -n default"
 
     def test_handles_mixed_commands(self):
         from dcaf.agents.k8s_agent import K8sAgent
+
         llm = _create_fake_llm()
         agent = K8sAgent(llm)
 
-        result = agent._extract_commands({
-            "terminal_commands": [
-                "kubectl get pods",
-                {"command": "helm list", "explanation": "List helm releases"},
-            ]
-        })
+        result = agent._extract_commands(
+            {
+                "terminal_commands": [
+                    "kubectl get pods",
+                    {"command": "helm list", "explanation": "List helm releases"},
+                ]
+            }
+        )
 
         assert len(result) == 2

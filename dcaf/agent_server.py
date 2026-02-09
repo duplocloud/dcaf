@@ -1,16 +1,19 @@
-from typing import Protocol, runtime_checkable, Dict, Any, List, Optional, Iterator
-from fastapi import FastAPI, HTTPException, Body
-from pydantic import ValidationError
-from .schemas.messages import AgentMessage, Messages
-from .schemas.events import DoneEvent, ErrorEvent, StreamEvent
+import inspect
+import json
 import logging
 import os
 import traceback
-from .channel_routing import ChannelResponseRouter, SlackResponseRouter
-from fastapi.responses import StreamingResponse
-import inspect
-import json
+from collections.abc import Iterator
 from pathlib import Path
+from typing import Any, Protocol, runtime_checkable
+
+from fastapi import Body, FastAPI, HTTPException
+from fastapi.responses import StreamingResponse
+from pydantic import ValidationError
+
+from .channel_routing import ChannelResponseRouter
+from .schemas.events import DoneEvent, ErrorEvent
+from .schemas.messages import AgentMessage, Messages
 
 logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO"),
@@ -19,10 +22,14 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
+
 @runtime_checkable
 class AgentProtocol(Protocol):
     """Any agent that can respond to a chat."""
-    def invoke(self, messages: Dict[str, List[Dict[str, Any]]], thread_id: Optional[str] = None) -> AgentMessage: ...
+
+    def invoke(
+        self, messages: dict[str, list[dict[str, Any]]], thread_id: str | None = None
+    ) -> AgentMessage: ...
 
 
 # ---------------------------------------------------------------------------
@@ -32,8 +39,8 @@ class AgentProtocol(Protocol):
 
 def handle_send_message_v1(
     agent: AgentProtocol,
-    raw_body: Dict[str, Any],
-    router: Optional[ChannelResponseRouter] = None,
+    raw_body: dict[str, Any],
+    router: ChannelResponseRouter | None = None,
 ) -> AgentMessage:
     """
     V1 handler for /api/sendMessage endpoint.
@@ -46,13 +53,15 @@ def handle_send_message_v1(
     logger.info(str(raw_body))
 
     source = raw_body.get("source")
-    logger.info("V1 Request Source: %s", source if source else "No Source Provided. Defaulting to 'help-desk'")
+    logger.info(
+        "V1 Request Source: %s",
+        source if source else "No Source Provided. Defaulting to 'help-desk'",
+    )
 
-    if source == "slack":
-        if router:
-            should_respond = router.should_agent_respond(raw_body["messages"])
-            if not should_respond["should_respond"]:
-                return AgentMessage(role="assistant", content="")
+    if source == "slack" and router:
+        should_respond = router.should_agent_respond(raw_body["messages"])
+        if not should_respond["should_respond"]:
+            return AgentMessage(role="assistant", content="")
 
     # 1. validate presence of 'messages'
     if "messages" not in raw_body:
@@ -61,7 +70,7 @@ def handle_send_message_v1(
     try:
         msgs_obj = Messages.model_validate({"messages": raw_body["messages"]})
     except ValidationError as ve:
-        raise HTTPException(status_code=422, detail=ve.errors())
+        raise HTTPException(status_code=422, detail=ve.errors()) from ve
 
     # 2. delegate to agent
     try:
@@ -97,18 +106,18 @@ def handle_send_message_v1(
 
     except ValidationError as ve:
         logger.error("V1 Validation error in agent: %s", ve)
-        raise HTTPException(status_code=500, detail=f"Agent returned invalid Message: {ve}")
+        raise HTTPException(status_code=500, detail=f"Agent returned invalid Message: {ve}") from ve
 
     except Exception as e:
-        traceback_error = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
+        traceback_error = "".join(traceback.format_exception(type(e), e, e.__traceback__))
         logger.error("V1 Unhandled exception in agent:\n%s", traceback_error)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 def handle_send_message_stream_v1(
     agent: AgentProtocol,
-    raw_body: Dict[str, Any],
-    router: Optional[ChannelResponseRouter] = None,
+    raw_body: dict[str, Any],
+    router: ChannelResponseRouter | None = None,
 ) -> StreamingResponse:
     """
     V1 handler for /api/sendMessageStream endpoint.
@@ -119,15 +128,19 @@ def handle_send_message_stream_v1(
     logger.info("V1 Stream Request Body: %s", raw_body)
 
     source = raw_body.get("source")
-    logger.info("V1 Request Source: %s", source if source else "No Source Provided. Defaulting to 'help-desk'")
+    logger.info(
+        "V1 Request Source: %s",
+        source if source else "No Source Provided. Defaulting to 'help-desk'",
+    )
 
-    if source == "slack":
-        if router:
-            should_respond = router.should_agent_respond(raw_body["messages"])
-            if not should_respond["should_respond"]:
-                def done_generator():
-                    yield DoneEvent().model_dump_json() + '\n'
-                return StreamingResponse(done_generator(), media_type='application/x-ndjson')
+    if source == "slack" and router:
+        should_respond = router.should_agent_respond(raw_body["messages"])
+        if not should_respond["should_respond"]:
+
+            def done_generator():
+                yield DoneEvent().model_dump_json() + "\n"
+
+            return StreamingResponse(done_generator(), media_type="application/x-ndjson")
 
     # Validate
     if "messages" not in raw_body:
@@ -136,7 +149,7 @@ def handle_send_message_stream_v1(
     try:
         msgs_obj = Messages.model_validate({"messages": raw_body["messages"]})
     except ValidationError as ve:
-        raise HTTPException(status_code=422, detail=ve.errors())
+        raise HTTPException(status_code=422, detail=ve.errors()) from ve
 
     # Extract thread_id from raw_body if present
     thread_id = raw_body.get("thread_id")
@@ -144,12 +157,12 @@ def handle_send_message_stream_v1(
     # Generator function
     def event_generator() -> Iterator[str]:
         # Accumulate events for logging
-        text_parts: List[str] = []
-        event_counts: Dict[str, int] = {}
-        executed_commands: List[Any] = []
-        executed_tool_calls: List[Any] = []
-        tool_calls: List[Any] = []
-        commands: List[Any] = []
+        text_parts: list[str] = []
+        event_counts: dict[str, int] = {}
+        executed_commands: list[Any] = []
+        executed_tool_calls: list[Any] = []
+        tool_calls: list[Any] = []
+        commands: list[Any] = []
         stop_reason = None
 
         try:
@@ -180,13 +193,13 @@ def handle_send_message_stream_v1(
                 elif event_type == "done":
                     stop_reason = event.stop_reason
 
-                yield event.model_dump_json() + '\n'
+                yield event.model_dump_json() + "\n"
 
             # Log final aggregated response
             logger.info("V1 Stream completed - Event counts: %s", event_counts)
             if text_parts:
-                full_text = ''.join(text_parts)
-                logger.info("V1 Streamed assistant message: %s", f'{full_text}')
+                full_text = "".join(text_parts)
+                logger.info("V1 Streamed assistant message: %s", f"{full_text}")
             if executed_tool_calls:
                 logger.info("V1 Executed tool calls: %s", executed_tool_calls)
             if tool_calls:
@@ -199,15 +212,15 @@ def handle_send_message_stream_v1(
         except Exception as e:
             logger.error("V1 Stream error: %s", str(e), exc_info=True)
             error_event = ErrorEvent(error=str(e))
-            yield error_event.model_dump_json() + '\n'
+            yield error_event.model_dump_json() + "\n"
 
-    return StreamingResponse(event_generator(), media_type='application/x-ndjson')
+    return StreamingResponse(event_generator(), media_type="application/x-ndjson")
 
 
 def create_chat_app(
     agent: AgentProtocol,
     router: ChannelResponseRouter = None,
-    a2a_agent_card_path: Optional[str] = None,
+    a2a_agent_card_path: str | None = None,
 ) -> FastAPI:
     """
     Create a V1 FastAPI application for the agent.
@@ -231,7 +244,7 @@ def create_chat_app(
 
     # ----- health check ------------------------------------------------------
     @app.get("/health", tags=["system"])
-    def health() -> Dict[str, str]:
+    def health() -> dict[str, str]:
         return {"status": "ok"}
 
     # ----- agent card (A2A) --------------------------------------------------
@@ -239,7 +252,7 @@ def create_chat_app(
         card_path = Path(a2a_agent_card_path)
 
         @app.get("/.well-known/agent.json", tags=["system"])
-        def get_agent_card() -> Dict[str, Any]:
+        def get_agent_card() -> dict[str, Any]:
             """
             Serves the Agent2Agent agent card JSON.
             https://agent2agent.info/docs/concepts/agentcard/
@@ -258,22 +271,22 @@ def create_chat_app(
                 raise HTTPException(
                     status_code=500,
                     detail=f"Invalid JSON in agent card file: {card_path}",
-                )
+                ) from e
             except Exception as e:
                 logger.error("Failed reading agent card file %s: %s", card_path, str(e))
                 raise HTTPException(
                     status_code=500,
                     detail=f"Failed reading agent card file: {card_path}",
-                )
+                ) from e
 
     # ----- V1 chat endpoints (using extracted handler functions) -------------
     @app.post("/api/sendMessage", response_model=AgentMessage, tags=["chat"])
-    def send_message(raw_body: Dict[str, Any] = Body(...)) -> AgentMessage:
+    def send_message(raw_body: dict[str, Any] = Body(...)) -> AgentMessage:
         """V1 synchronous chat endpoint."""
         return handle_send_message_v1(agent, raw_body, router)
 
     @app.post("/api/sendMessageStream", tags=["chat"])
-    def send_message_stream(raw_body: Dict[str, Any] = Body(...)) -> StreamingResponse:
+    def send_message_stream(raw_body: dict[str, Any] = Body(...)) -> StreamingResponse:
         """V1 streaming chat endpoint (NDJSON)."""
         return handle_send_message_stream_v1(agent, raw_body, router)
 

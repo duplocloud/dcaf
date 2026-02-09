@@ -318,7 +318,7 @@ class CachingAwsBedrock(AwsBedrock):
         self,
         messages: list[Message],
         assistant_message: Message,
-        response_format: dict | type[BaseModel] | None = None,
+        response_format: dict | type[BaseModel] | None = None,  # noqa: ARG002
         tools: list[dict[str, Any]] | None = None,
         tool_choice: str | dict[str, Any] | None = None,  # noqa: ARG002
         run_response: RunOutput | None = None,

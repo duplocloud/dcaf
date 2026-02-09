@@ -6,7 +6,6 @@ import pytest
 
 from dcaf.core.session import Session, _deserialize_value, _serialize_value
 
-
 # =============================================================================
 # Helper types for testing serialization
 # =============================================================================

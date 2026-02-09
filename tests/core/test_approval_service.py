@@ -6,9 +6,8 @@ from dcaf.core.application.dto.requests import ApprovalRequest, ToolCallApproval
 from dcaf.core.application.services.approval_service import ApprovalService
 from dcaf.core.domain.entities import Conversation, ToolCall
 from dcaf.core.domain.exceptions import ToolCallNotFound
-from dcaf.core.domain.value_objects import ConversationId, ToolCallId, ToolInput
+from dcaf.core.domain.value_objects import ToolCallId, ToolInput
 from dcaf.core.testing import FakeConversationRepository, FakeEventPublisher
-
 
 # =============================================================================
 # Helpers

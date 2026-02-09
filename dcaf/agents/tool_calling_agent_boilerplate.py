@@ -1,5 +1,4 @@
 import logging
-import os
 from collections.abc import Callable
 from typing import Any
 
@@ -477,6 +476,7 @@ Be surgical, simple and less wordy."""
 # Usage example:
 if __name__ == "__main__":
     import dotenv
+
     from dcaf.llm import BedrockLLM
 
     dotenv.load_dotenv(override=True)

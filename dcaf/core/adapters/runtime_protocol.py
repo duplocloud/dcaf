@@ -19,7 +19,10 @@ Example:
 """
 
 from collections.abc import AsyncGenerator
-from typing import Any, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
+
+if TYPE_CHECKING:
+    from dcaf.core.events import EventRegistry
 
 
 @runtime_checkable
@@ -75,6 +78,7 @@ class RuntimeAdapter(Protocol):
         messages: list[Any],
         tools: list[Any],
         system_prompt: str | None = None,
+        event_registry: "EventRegistry | None" = None,
     ) -> AsyncGenerator[Any, None]:  # Yields StreamEvent
         """
         Execute with async streaming response.
@@ -86,6 +90,7 @@ class RuntimeAdapter(Protocol):
             messages: List of conversation messages
             tools: List of tools available to the agent
             system_prompt: Optional system instructions
+            event_registry: Optional event registry for subscription-based events
 
         Yields:
             StreamEvent objects

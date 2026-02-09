@@ -230,7 +230,6 @@ class AgnoResponseConverter:
 
         return text
 
-
     def _extract_from_last_assistant_message(self, run_output: Any) -> str | None:
         """
         Extract text from the last assistant message in run_output.messages.
@@ -290,7 +289,9 @@ class AgnoResponseConverter:
                     text_parts.append(str(block.text))
             if text_parts:
                 result = " ".join(text_parts)
-                logger.debug(f"Extracted text from last assistant message blocks: {repr(result)[:200]}")
+                logger.debug(
+                    f"Extracted text from last assistant message blocks: {repr(result)[:200]}"
+                )
                 return result
         elif hasattr(content, "text"):
             return str(content.text)
@@ -406,7 +407,11 @@ class AgnoResponseConverter:
         # Define patterns for Claude's internal tags (order matters - process <result> last)
         internal_tag_patterns = [
             # Remove reflection tags entirely
-            (r"<search_quality_reflection>.*?</search_quality_reflection>", "", "search_quality_reflection"),
+            (
+                r"<search_quality_reflection>.*?</search_quality_reflection>",
+                "",
+                "search_quality_reflection",
+            ),
             # Remove score tags entirely
             (r"<search_quality_score>.*?</search_quality_score>", "", "search_quality_score"),
             # Remove thinking tags entirely

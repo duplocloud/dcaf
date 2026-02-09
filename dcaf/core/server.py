@@ -53,10 +53,12 @@ from .agent import Agent
 
 if TYPE_CHECKING:
     from fastapi import APIRouter, FastAPI
+    from starlette.websockets import WebSocket
 
     from ..channel_routing import ChannelResponseRouter
-    from .schemas.messages import AgentMessage
+    from .a2a.models import AgentCard
     from .primitives import AgentResult
+    from .schemas.messages import AgentMessage
     from .session import Session
 
 logger = logging.getLogger(__name__)
@@ -241,7 +243,14 @@ def serve(
         )
 
     # Create the FastAPI app
-    app = create_app(agent, additional_routers=additional_routers, channel_router=channel_router, a2a=a2a, a2a_adapter=a2a_adapter, a2a_agent_card=a2a_agent_card)
+    app = create_app(
+        agent,
+        additional_routers=additional_routers,
+        channel_router=channel_router,
+        a2a=a2a,
+        a2a_adapter=a2a_adapter,
+        a2a_agent_card=a2a_agent_card,
+    )
 
     logger.info(f"Starting DCAF server at http://{host}:{port}")
     logger.info("Endpoints:")
@@ -393,7 +402,9 @@ def create_app(
         """V2 handler for synchronous chat endpoints."""
         # Validate messages field
         if "messages" not in raw_body:
-            raise HTTPException(status_code=400, detail="'messages' field missing from request body")
+            raise HTTPException(
+                status_code=400, detail="'messages' field missing from request body"
+            )
 
         # Extract _request_fields (all top-level fields except 'messages')
         request_fields = {k: v for k, v in raw_body.items() if k != "messages"}
@@ -428,7 +439,7 @@ def create_app(
 
         except Exception as e:
             logger.exception(f"V2 Chat endpoint error: {e}")
-            raise HTTPException(status_code=500, detail=str(e))
+            raise HTTPException(status_code=500, detail=str(e)) from e
 
     async def _handle_chat_stream_v2(raw_body: dict[str, Any]) -> StreamingResponse:
         """V2 handler for streaming chat endpoints."""
@@ -436,7 +447,9 @@ def create_app(
 
         # Validate messages field
         if "messages" not in raw_body:
-            raise HTTPException(status_code=400, detail="'messages' field missing from request body")
+            raise HTTPException(
+                status_code=400, detail="'messages' field missing from request body"
+            )
 
         # Extract _request_fields (all top-level fields except 'messages')
         request_fields = {k: v for k, v in raw_body.items() if k != "messages"}
@@ -446,8 +459,10 @@ def create_app(
         if source == "slack" and channel_router:
             should_respond = channel_router.should_agent_respond(raw_body["messages"])
             if not should_respond.get("should_respond", True):
+
                 def done_generator() -> Iterator[str]:
                     yield DoneEvent().model_dump_json() + "\n"
+
                 return StreamingResponse(done_generator(), media_type="application/x-ndjson")
 
         # Build the input dict for the agent
@@ -462,6 +477,7 @@ def create_app(
                         yield event.model_dump_json() + "\n"
                     else:
                         import json
+
                         yield json.dumps(event) + "\n"
             except Exception as e:
                 logger.exception(f"V2 Stream error: {e}")
@@ -554,7 +570,7 @@ def _create_adapter(agent: Union["Agent", AgentHandler]) -> Any:
         return ServerAdapter(agent)
 
     # Check if it's an object with invoke method (AgentProtocol-like)
-    if hasattr(agent, "invoke") and callable(getattr(agent, "invoke")):
+    if hasattr(agent, "invoke") and callable(agent.invoke):
         # Return as-is, it can be used directly by the server
         return agent
 
@@ -662,7 +678,9 @@ def _add_websocket_endpoint(
 
                 # Validate messages field
                 if "messages" not in data:
-                    await websocket.send_json({"type": "error", "error": "Missing 'messages' field"})
+                    await websocket.send_json(
+                        {"type": "error", "error": "Missing 'messages' field"}
+                    )
                     continue
 
                 # Check channel router for Slack
@@ -708,7 +726,9 @@ def _add_websocket_endpoint(
                         # Fallback to invoke if no streaming
                         result = adapter.invoke(agent_input)
                         if hasattr(result, "content") and result.content:
-                            await websocket.send_json({"type": "text_delta", "text": result.content})
+                            await websocket.send_json(
+                                {"type": "text_delta", "text": result.content}
+                            )
                         await websocket.send_json({"type": "done"})
 
                 except Exception as e:  # Intentional catch-all: agent code can raise anything
@@ -832,8 +852,8 @@ class CallableAdapter:
         Calls the user's handler function and converts the result
         to the HelpDesk protocol format.
         """
-        from .schemas.messages import AgentMessage
         from .primitives import AgentResult
+        from .schemas.messages import AgentMessage
 
         # Extract messages and context
         messages_list = messages.get("messages", [])

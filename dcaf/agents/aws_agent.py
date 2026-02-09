@@ -48,7 +48,9 @@ class AWSAgent(BaseCommandAgent):
                             cmd_str = c.get("command", "")
                             logger.info("Executing approved command: %s", cmd_str)
                             output = self.execute_cmd(cmd_str)
-                            executed_cmds_current_turn.append({"command": cmd_str, "output": output})
+                            executed_cmds_current_turn.append(
+                                {"command": cmd_str, "output": output}
+                            )
                             content += f"\n\nExecuted command: {cmd_str}\nOutput:\n{output}"
 
             processed_messages.append({"role": role, "content": content})
@@ -79,9 +81,7 @@ When users ask about AWS resources in DuploCloud, they're typically referring to
         return (
             "You are a seasoned AWS CLI expert agent for DuploCloud. "
             "Help users troubleshoot and operate AWS resources concisely.\n\n"
-            "DuploCloud AWS Concepts Context:\n"
-            + self._duplocloud_context()
-            + "\n\n"
+            "DuploCloud AWS Concepts Context:\n" + self._duplocloud_context() + "\n\n"
             "Guidelines:\n"
             "1. Suggest precise, safe AWS CLI commands. \n"
             "2. Keep answers short and actionable.\n"

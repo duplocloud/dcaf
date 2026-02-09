@@ -5,14 +5,13 @@ from typing import Any
 import pytest
 
 from dcaf.core.application.dto.requests import AgentRequest
-from dcaf.core.application.dto.responses import AgentResponse, DataDTO, ToolCallDTO
+from dcaf.core.application.dto.responses import AgentResponse, ToolCallDTO
 from dcaf.core.application.services.agent_service import AgentService
 from dcaf.core.domain.entities import Message
 from dcaf.core.testing import (
     FakeConversationRepository,
     FakeEventPublisher,
 )
-
 
 # =============================================================================
 # Async-compatible fake runtime for service tests
@@ -35,9 +34,7 @@ class AsyncFakeRuntime:
         return self._invoke_calls[-1] if self._invoke_calls else None
 
     def will_respond_with_text(self, text: str) -> "AsyncFakeRuntime":
-        self._responses.append(
-            AgentResponse.text_only("test-conv", text)
-        )
+        self._responses.append(AgentResponse.text_only("test-conv", text))
         return self
 
     def will_respond_with_tool_call(
@@ -54,9 +51,7 @@ class AsyncFakeRuntime:
             requires_approval=requires_approval,
             status="pending" if requires_approval else "approved",
         )
-        self._responses.append(
-            AgentResponse.with_tool_calls("test-conv", [tc])
-        )
+        self._responses.append(AgentResponse.with_tool_calls("test-conv", [tc]))
         return self
 
     def will_respond_with(self, response: AgentResponse) -> "AsyncFakeRuntime":
@@ -72,14 +67,16 @@ class AsyncFakeRuntime:
         dynamic_system: str | None = None,
         platform_context: dict | None = None,
     ) -> AgentResponse:
-        self._invoke_calls.append({
-            "messages": messages,
-            "tools": tools,
-            "system_prompt": system_prompt,
-            "static_system": static_system,
-            "dynamic_system": dynamic_system,
-            "platform_context": platform_context,
-        })
+        self._invoke_calls.append(
+            {
+                "messages": messages,
+                "tools": tools,
+                "system_prompt": system_prompt,
+                "static_system": static_system,
+                "dynamic_system": dynamic_system,
+                "platform_context": platform_context,
+            }
+        )
         if self._responses:
             return self._responses.pop(0)
         return AgentResponse.text_only("test-conv", "Default response")
@@ -94,7 +91,9 @@ class AsyncFakeRuntime:
 
 
 class FakeTool:
-    def __init__(self, name: str, requires_approval: bool = False, requires_platform_context: bool = False):
+    def __init__(
+        self, name: str, requires_approval: bool = False, requires_platform_context: bool = False
+    ):
         self._name = name
         self._requires_approval = requires_approval
         self._requires_platform_context = requires_platform_context
@@ -287,7 +286,7 @@ class TestAgentServiceExecute:
 
         tool = FakeTool(name="list_pods", requires_approval=False)
         request = AgentRequest(content="List pods", tools=[tool])
-        response = await service.execute(request)
+        await service.execute(request)
 
         # Tool should have been executed automatically
         assert len(tool.execute_calls) == 1

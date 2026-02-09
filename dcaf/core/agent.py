@@ -46,24 +46,13 @@ from typing import TYPE_CHECKING, Any, cast
 if TYPE_CHECKING:
     from dcaf.core.schemas.messages import AgentMessage
 
-from .schemas.events import (
-    DoneEvent,
-    ErrorEvent,
-    TextDeltaEvent,
-    ToolCallsEvent,
-)
-
-# Import stream event types from schemas (server-side types)
-from .schemas.events import (
-    StreamEvent as ServerStreamEvent,
-)
-from .schemas.messages import ToolCall as SchemaToolCall
 from .adapters.loader import load_adapter
+from .adapters.outbound.agno.types import DEFAULT_FRAMEWORK, DEFAULT_MODEL_ID, DEFAULT_PROVIDER
 from .adapters.outbound.persistence import InMemoryConversationRepository
 from .application.dto import AgentRequest
 from .application.services import AgentService, ApprovalService
 from .domain.entities import Conversation, ToolCall
-from .domain.events import DomainEvent
+from .events import EventRegistry
 
 # Import interceptor types and utilities
 from .interceptors import (
@@ -77,16 +66,23 @@ from .interceptors import (
     create_response_from_text,
     normalize_interceptors,
 )
-from .adapters.outbound.agno.types import DEFAULT_FRAMEWORK, DEFAULT_MODEL_ID, DEFAULT_PROVIDER
-from .events import EventRegistry
 from .models import ChatMessage, normalize_messages
+from .schemas.events import (
+    DoneEvent,
+    ErrorEvent,
+    TextDeltaEvent,
+    ToolCallsEvent,
+)
+
+# Import stream event types from schemas (server-side types)
+from .schemas.events import (
+    StreamEvent as ServerStreamEvent,
+)
+from .schemas.messages import ToolCall as SchemaToolCall
 from .session import Session
 
 logger = logging.getLogger(__name__)
 
-
-# Type alias for event handlers
-EventHandler = Callable[[DomainEvent], None]
 
 # Type alias for request interceptors (for external use)
 RequestInterceptor = Callable[[LLMRequest], LLMRequest]
@@ -449,7 +445,6 @@ class Agent:
         system_prompt: str | None = None,
         system_context: str | Callable[[dict], str] | None = None,
         model_config: dict | None = None,
-        on_event: EventHandler | list[EventHandler] | None = None,
         # Interceptor configuration
         request_interceptors: RequestInterceptorInput = None,
         response_interceptors: ResponseInterceptorInput = None,
@@ -520,24 +515,7 @@ class Agent:
             ]
             logger.debug(f"Response interceptors configured: {interceptor_names}")
 
-        # Normalize event handlers to a list
-        if on_event is not None:
-            import warnings
-            warnings.warn(
-                "on_event parameter is deprecated. Use @agent.on('event_type') decorator instead. "
-                "See docs/guides/event-subscriptions.md for the new subscription-based approach.",
-                DeprecationWarning,
-                stacklevel=2
-            )
-            # Keep existing behavior for backward compatibility
-            if callable(on_event):
-                self._event_handlers = [on_event]
-            else:
-                self._event_handlers = list(on_event)
-        else:
-            self._event_handlers = []
-
-        # New subscription-based event registry
+        # Subscription-based event registry
         self._event_registry = EventRegistry()
 
         # Create internal services using dynamic adapter loading
@@ -599,10 +577,12 @@ class Agent:
                 if event.type == "text_delta":
                     print(event.text, end="")
         """
+
         def decorator(handler):
             for event_type in event_types:
                 self._event_registry.subscribe(event_type, handler)
             return handler
+
         return decorator
 
     def _build_system_parts(
@@ -1156,23 +1136,10 @@ class Agent:
         return self._convert_response(internal)
 
     def _create_event_publisher(self) -> Any:
-        """Create an event publisher that calls our handlers."""
-        if not self._event_handlers:
-            return None
+        """Create an event publisher for domain events.
 
-        class CallbackEventPublisher:
-            def __init__(self, handlers: list[EventHandler]):
-                self.handlers = handlers
-
-            def publish(self, event: DomainEvent) -> None:
-                for handler in self.handlers:
-                    try:
-                        handler(event)
-                    except Exception as e:  # Intentional catch-all: user event handlers can raise anything
-                        logger.warning(f"Event handler error: {e}")
-
-            def publish_all(self, events: list[DomainEvent]) -> None:
-                for event in events:
-                    self.publish(event)
-
-        return CallbackEventPublisher(self._event_handlers)
+        Returns None as domain events are handled separately from streaming events.
+        The new subscription-based event system (@agent.on decorator) handles
+        streaming events through the EventRegistry.
+        """
+        return None
