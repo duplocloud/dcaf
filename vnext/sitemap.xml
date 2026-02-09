@@ -2,242 +2,242 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://duplocloud.github.io/dcaf/vnext/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://duplocloud.github.io/dcaf/vnext/agno-bug-report/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://duplocloud.github.io/dcaf/vnext/architecture/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://duplocloud.github.io/dcaf/vnext/engineering-handoff/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://duplocloud.github.io/dcaf/vnext/getting-started/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://duplocloud.github.io/dcaf/vnext/logging-architecture/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://duplocloud.github.io/dcaf/vnext/raw-llm-logging/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://duplocloud.github.io/dcaf/vnext/adrs/000-template/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://duplocloud.github.io/dcaf/vnext/adrs/001-clean-architecture/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://duplocloud.github.io/dcaf/vnext/adrs/002-ddd-tactical-patterns/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://duplocloud.github.io/dcaf/vnext/adrs/003-adapter-pattern-for-frameworks/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://duplocloud.github.io/dcaf/vnext/adrs/004-approval-first-design/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://duplocloud.github.io/dcaf/vnext/adrs/005-cohesive-provider-modules/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://duplocloud.github.io/dcaf/vnext/adrs/006-strangler-fig-migration/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://duplocloud.github.io/dcaf/vnext/adrs/007-lowercase-chat-endpoints/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://duplocloud.github.io/dcaf/vnext/api-reference/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://duplocloud.github.io/dcaf/vnext/api-reference/agent-server/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://duplocloud.github.io/dcaf/vnext/api-reference/agents/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://duplocloud.github.io/dcaf/vnext/api-reference/channel-routing/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://duplocloud.github.io/dcaf/vnext/api-reference/cli/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://duplocloud.github.io/dcaf/vnext/api-reference/llm/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://duplocloud.github.io/dcaf/vnext/api-reference/schemas/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://duplocloud.github.io/dcaf/vnext/api-reference/tools/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://duplocloud.github.io/dcaf/vnext/core/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://duplocloud.github.io/dcaf/vnext/core/a2a/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://duplocloud.github.io/dcaf/vnext/core/adapters/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://duplocloud.github.io/dcaf/vnext/core/application/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://duplocloud.github.io/dcaf/vnext/core/domain/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://duplocloud.github.io/dcaf/vnext/core/helpdesk-protocol/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://duplocloud.github.io/dcaf/vnext/core/server/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://duplocloud.github.io/dcaf/vnext/core/testing/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://duplocloud.github.io/dcaf/vnext/examples/examples/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://duplocloud.github.io/dcaf/vnext/guides/building-tools/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://duplocloud.github.io/dcaf/vnext/guides/creating-custom-agents/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://duplocloud.github.io/dcaf/vnext/guides/custom-agents/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://duplocloud.github.io/dcaf/vnext/guides/environment-configuration/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://duplocloud.github.io/dcaf/vnext/guides/event-subscriptions/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://duplocloud.github.io/dcaf/vnext/guides/framework-adapters/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://duplocloud.github.io/dcaf/vnext/guides/interceptors/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://duplocloud.github.io/dcaf/vnext/guides/mcp-tools/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://duplocloud.github.io/dcaf/vnext/guides/message-protocol/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://duplocloud.github.io/dcaf/vnext/guides/migration/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://duplocloud.github.io/dcaf/vnext/guides/prompt-caching/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://duplocloud.github.io/dcaf/vnext/guides/response-conversion/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://duplocloud.github.io/dcaf/vnext/guides/session-management/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://duplocloud.github.io/dcaf/vnext/guides/streaming/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://duplocloud.github.io/dcaf/vnext/guides/tracing-observability/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://duplocloud.github.io/dcaf/vnext/guides/versioning/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://duplocloud.github.io/dcaf/vnext/guides/working-with-bedrock/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://duplocloud.github.io/dcaf/vnext/guides/working-with-gemini/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://duplocloud.github.io/dcaf/vnext/plans/2025-02-02-mcp-approval-test-server-design/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://duplocloud.github.io/dcaf/vnext/plans/2025-02-05-merge-resolution-plan/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://duplocloud.github.io/dcaf/vnext/plans/bedrock-prompt-caching-plan/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://duplocloud.github.io/dcaf/vnext/plans/message-response-gap-analysis/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://duplocloud.github.io/dcaf/vnext/plans/response-conversion-feature-summary/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://duplocloud.github.io/dcaf/vnext/plans/schema-reuse-analysis/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://duplocloud.github.io/dcaf/vnext/plans/server-integration-plan/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://duplocloud.github.io/dcaf/vnext/presenation/dcaf-core-evolution/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://duplocloud.github.io/dcaf/vnext/responses/tool-context-injection-response/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
     <url>
          <loc>https://duplocloud.github.io/dcaf/vnext/review/review-1/</loc>
-         <lastmod>2026-02-06</lastmod>
+         <lastmod>2026-02-09</lastmod>
     </url>
 </urlset>
