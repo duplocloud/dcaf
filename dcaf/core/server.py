@@ -296,17 +296,17 @@ def create_app(
     """
     Create a FastAPI application for the agent without starting the server.
 
-    This creates a unified server with both v2 (preferred) and v1 (legacy) endpoints:
+    This creates a server with the following endpoints:
 
-    V2 Endpoints (Preferred) - Uses V2 code path:
+    Endpoints:
         GET  /health           - Health check
         POST /api/chat         - Synchronous chat
         POST /api/chat-stream  - Streaming chat (NDJSON)
         WS   /api/chat-ws      - WebSocket bidirectional streaming
 
-    V1 Legacy Endpoints (Deprecated) - Uses V1 code path:
-        POST /api/sendMessage       - Synchronous chat (V1 code)
-        POST /api/sendMessageStream - Streaming chat (V1 code, NDJSON)
+    Legacy Aliases (Deprecated):
+        POST /api/sendMessage       - Alias for /api/chat
+        POST /api/sendMessageStream - Alias for /api/chat-stream
 
     Args:
         agent: Either an Agent instance OR a callable function.
@@ -373,9 +373,6 @@ def create_app(
     """
     from fastapi import Body, FastAPI, HTTPException
     from fastapi.responses import StreamingResponse
-
-    # Import V1 handlers for legacy endpoints
-    from ..agent_server import handle_send_message_v1, handle_send_message_stream_v1
 
     # Create the appropriate adapter based on agent type
     adapter = _create_adapter(agent)
@@ -487,26 +484,26 @@ def create_app(
         return await _handle_chat_stream_v2(raw_body)
 
     # -------------------------------------------------------------------------
-    # V1 Legacy Endpoints (Deprecated) - Uses V1 code path
+    # Legacy Endpoint Aliases (Deprecated) - Aliases to V2 endpoints
     # -------------------------------------------------------------------------
 
     @app.post("/api/sendMessage", tags=["legacy"], deprecated=True)
-    def send_message(raw_body: dict[str, Any] = Body(...)) -> Any:
+    async def send_message(raw_body: dict[str, Any] = Body(...)) -> dict[str, Any]:
         """
-        Synchronous chat endpoint (V1 code path).
+        Synchronous chat endpoint (alias for /api/chat).
 
         Deprecated: Use POST /api/chat instead.
         """
-        return handle_send_message_v1(adapter, raw_body, channel_router)
+        return await _handle_chat_v2(raw_body)
 
     @app.post("/api/sendMessageStream", tags=["legacy"], deprecated=True)
-    def send_message_stream(raw_body: dict[str, Any] = Body(...)) -> StreamingResponse:
+    async def send_message_stream(raw_body: dict[str, Any] = Body(...)) -> StreamingResponse:
         """
-        Streaming chat endpoint (V1 code path, NDJSON).
+        Streaming chat endpoint (alias for /api/chat-stream).
 
         Deprecated: Use POST /api/chat-stream instead.
         """
-        return handle_send_message_stream_v1(adapter, raw_body, channel_router)
+        return await _handle_chat_stream_v2(raw_body)
 
     # -------------------------------------------------------------------------
     # WebSocket endpoint (V2 only)
