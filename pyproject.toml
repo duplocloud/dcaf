@@ -35,7 +35,7 @@ dependencies = [
     "requests",
     "duplocloud-client",
     # LLM provider dependencies (all included by default)
-    "agno==2.3.21",               # Agno SDK - pinned to avoid [] bug in 2.3.26
+    "agno==2.4.8",               # Agno SDK - pinned to avoid [] bug in 2.3.26
     "aioboto3>=13.0.0",           # AWS Bedrock async support
     "httpx>=0.27.0",              # A2A protocol, HTTP client
     "google-generativeai==0.8.6", # Google Gemini support (pinned)
