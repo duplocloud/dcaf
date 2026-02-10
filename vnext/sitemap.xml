@@ -13,6 +13,10 @@
          <lastmod>2026-02-10</lastmod>
     </url>
     <url>
+         <loc>https://duplocloud.github.io/dcaf/vnext/dcaf-feature-catalog/</loc>
+         <lastmod>2026-02-10</lastmod>
+    </url>
+    <url>
          <loc>https://duplocloud.github.io/dcaf/vnext/engineering-handoff/</loc>
          <lastmod>2026-02-10</lastmod>
     </url>
@@ -201,11 +205,19 @@
          <lastmod>2026-02-10</lastmod>
     </url>
     <url>
+         <loc>https://duplocloud.github.io/dcaf/vnext/plans/2025-01-23-mcp-tool-approval-design/</loc>
+         <lastmod>2026-02-10</lastmod>
+    </url>
+    <url>
          <loc>https://duplocloud.github.io/dcaf/vnext/plans/2025-02-02-mcp-approval-test-server-design/</loc>
          <lastmod>2026-02-10</lastmod>
     </url>
     <url>
          <loc>https://duplocloud.github.io/dcaf/vnext/plans/2025-02-05-merge-resolution-plan/</loc>
+         <lastmod>2026-02-10</lastmod>
+    </url>
+    <url>
+         <loc>https://duplocloud.github.io/dcaf/vnext/plans/2025-02-06-event-subscription-system/</loc>
          <lastmod>2026-02-10</lastmod>
     </url>
     <url>
