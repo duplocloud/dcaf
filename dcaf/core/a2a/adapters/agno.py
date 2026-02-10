@@ -6,6 +6,7 @@ It wraps Agno's A2A interfaces to provide a clean DCAF-compatible API.
 """
 
 import logging
+import os
 from typing import TYPE_CHECKING, Any
 
 from ..models import AgentCard, Task, TaskResult
@@ -29,13 +30,28 @@ class AgnoA2AClient(A2AClientAdapter):
     """
 
     def __init__(self) -> None:
-        """Initialize the Agno A2A client."""
+        """Initialize the Agno A2A client.
+
+        Environment Variables:
+            BOTO3_READ_TIMEOUT: Read timeout in seconds (default: 20)
+            BOTO3_CONNECT_TIMEOUT: Connect timeout in seconds (default: 10)
+        """
         # Import Agno here to avoid hard dependency
         try:
             import httpx
 
+            # Configure timeouts from environment variables
+            read_timeout = float(os.getenv("BOTO3_READ_TIMEOUT", "20"))
+            connect_timeout = float(os.getenv("BOTO3_CONNECT_TIMEOUT", "10"))
+
             # trust_env=False to avoid proxy issues
-            self._http_client = httpx.Client(timeout=60.0, trust_env=False)
+            self._http_client = httpx.Client(
+                timeout=httpx.Timeout(
+                    timeout=read_timeout,  # default timeout for all operations
+                    connect=connect_timeout,
+                ),
+                trust_env=False,
+            )
         except ImportError:
             raise RuntimeError(
                 "httpx is required for A2A client. Install with: pip install httpx"

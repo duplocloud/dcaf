@@ -660,6 +660,37 @@ agent = Agent(
 
 ---
 
+## Client Configuration
+
+### Environment Variables
+
+The A2A client (used by `RemoteAgent`) supports timeout configuration via environment variables:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `BOTO3_READ_TIMEOUT` | `20` | Read timeout in seconds for HTTP operations |
+| `BOTO3_CONNECT_TIMEOUT` | `10` | Connection timeout in seconds |
+
+These are the same variables used by the [Bedrock LLM](../api-reference/llm.md#environment-variables), allowing unified timeout configuration across your application.
+
+**Example:**
+
+```bash
+# Set longer timeouts for slow networks
+export BOTO3_READ_TIMEOUT=60
+export BOTO3_CONNECT_TIMEOUT=30
+```
+
+```python
+from dcaf.core.a2a import RemoteAgent
+
+# Client will use environment-configured timeouts
+remote = RemoteAgent(url="http://k8s-agent:8000")
+result = remote.send("List pods")
+```
+
+---
+
 ## Best Practices
 
 ### 1. Name Your Agents

@@ -10,8 +10,11 @@ Once Agno supports caching natively, this module should be removed.
 
 import json
 import logging
+import os
 from collections.abc import AsyncIterator
 from typing import Any
+
+from botocore.config import Config
 
 from agno.models.aws import AwsBedrock
 from agno.models.message import Message
@@ -73,6 +76,82 @@ class CachingAwsBedrock(AwsBedrock):
 
         if cache_system_prompt:
             logger.info(f"CachingAwsBedrock: Prompt caching enabled for model {self.id}")
+
+    def get_async_client(self):
+        """
+        Get the async Bedrock client context manager with timeout configuration.
+
+        Overrides parent method to add timeout and retry settings from environment variables:
+            BOTO3_READ_TIMEOUT: Read timeout in seconds (default: 20)
+            BOTO3_CONNECT_TIMEOUT: Connect timeout in seconds (default: 10)
+            BOTO3_MAX_ATTEMPTS: Max retry attempts (default: 3)
+            BOTO3_RETRY_MODE: Retry mode - 'standard', 'adaptive', or 'legacy' (default: 'standard')
+
+        Returns:
+            The async Bedrock client context manager.
+        """
+        import aioboto3
+
+        if self.async_session is None:
+            self.aws_access_key_id = self.aws_access_key_id or os.getenv("AWS_ACCESS_KEY_ID")
+            self.aws_secret_access_key = self.aws_secret_access_key or os.getenv(
+                "AWS_SECRET_ACCESS_KEY"
+            )
+            self.aws_region = self.aws_region or os.getenv("AWS_REGION")
+            self.async_session = aioboto3.Session()
+
+        # Build timeout and retry configuration from environment variables
+        read_timeout = int(os.getenv("BOTO3_READ_TIMEOUT", "20"))
+        connect_timeout = int(os.getenv("BOTO3_CONNECT_TIMEOUT", "10"))
+        max_attempts = int(os.getenv("BOTO3_MAX_ATTEMPTS", "3"))
+        retry_mode = os.getenv("BOTO3_RETRY_MODE", "standard")
+
+        boto3_config = Config(
+            read_timeout=read_timeout,
+            connect_timeout=connect_timeout,
+            tcp_keepalive=True,
+            retries={
+                "max_attempts": max_attempts,
+                "mode": retry_mode,
+            },
+        )
+
+        logger.debug(
+            f"Bedrock client config: read_timeout={read_timeout}s, "
+            f"connect_timeout={connect_timeout}s, max_attempts={max_attempts}, "
+            f"retry_mode={retry_mode}"
+        )
+
+        client_kwargs = {
+            "service_name": "bedrock-runtime",
+            "region_name": self.aws_region,
+            "config": boto3_config,
+        }
+
+        if self.aws_sso_auth:
+            pass
+        else:
+            if not self.aws_access_key_id or not self.aws_secret_access_key:
+                env_access_key = os.environ.get("AWS_ACCESS_KEY_ID")
+                env_secret_key = os.environ.get("AWS_SECRET_ACCESS_KEY")
+                env_region = os.environ.get("AWS_REGION")
+
+                if env_access_key and env_secret_key:
+                    self.aws_access_key_id = env_access_key
+                    self.aws_secret_access_key = env_secret_key
+                    if env_region:
+                        self.aws_region = env_region
+                        client_kwargs["region_name"] = self.aws_region
+
+            if self.aws_access_key_id and self.aws_secret_access_key:
+                client_kwargs.update(
+                    {
+                        "aws_access_key_id": self.aws_access_key_id,
+                        "aws_secret_access_key": self.aws_secret_access_key,
+                    }
+                )
+
+        return self.async_session.client(**client_kwargs)
 
     def _format_messages(
         self, messages: list[Message], compress_tool_results: bool = False

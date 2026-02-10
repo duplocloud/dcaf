@@ -143,6 +143,28 @@ DCAF_DISABLE_HISTORY=false          # Disable message history
 DCAF_DISABLE_TOOL_FILTERING=false   # Disable tool filtering
 ```
 
+### Timeout Configuration
+
+Configure timeouts for Bedrock LLM and A2A client operations:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `BOTO3_READ_TIMEOUT` | `20` | Read timeout in seconds |
+| `BOTO3_CONNECT_TIMEOUT` | `10` | Connection timeout in seconds |
+| `BOTO3_MAX_ATTEMPTS` | `3` | Max retry attempts (Bedrock only) |
+| `BOTO3_RETRY_MODE` | `standard` | Retry mode: `standard`, `adaptive`, or `legacy` (Bedrock only) |
+
+These variables apply to:
+
+- **Bedrock LLM**: Controls boto3 client timeouts for model invocations
+- **A2A Client**: Controls httpx client timeouts for agent-to-agent communication
+
+```bash
+# Example: Longer timeouts for slow networks
+export BOTO3_READ_TIMEOUT=60
+export BOTO3_CONNECT_TIMEOUT=30
+```
+
 ## Configuration Patterns
 
 ### Pattern 1: Pure Environment
