@@ -169,16 +169,21 @@ Focus primarily on the LATEST message, but use thread context to understand if t
 
         return formatted_conversation
 
-    def should_agent_respond(self, slack_thread: str) -> dict[str, Any]:
+    def should_agent_respond(
+        self, slack_thread: str | list[dict[str, Any]]
+    ) -> dict[str, Any]:
         """
         Determines if a DuploCloud agent should respond to the latest message in a Slack thread.
 
         Args:
-            slack_thread: Complete Slack thread conversation as string
+            slack_thread: Slack thread as a string or list of message dicts
+                          with 'role' and 'content' keys.
 
         Returns:
             dict: {"should_respond": bool, "reasoning": str}
         """
+        if isinstance(slack_thread, list):
+            slack_thread = self._format_slack_messages(slack_thread)
 
         # Tool schema for structured response
         routing_tool = {
@@ -199,22 +204,6 @@ Focus primarily on the LATEST message, but use thread context to understand if t
                 "required": ["should_respond"],
             },
         }
-
-        # # Tool schema for structured response
-        # routing_tool = {
-        #     "name": "slack_routing_decision",
-        #     "description": "Make a decision about whether the agent should respond to the latest Slack message",
-        #     "input_schema": {
-        #         "type": "object",
-        #         "properties": {
-        #             "should_respond": {
-        #                 "type": "boolean",
-        #                 "description": "True if the agent should respond, False if it should stay silent"
-        #             }
-        #         },
-        #         "required": ["should_respond"]
-        #     }
-        # }
 
         system_prompt = self._get_system_prompt()
 
