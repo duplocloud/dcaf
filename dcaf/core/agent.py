@@ -544,7 +544,7 @@ class Agent:
             events=self._create_event_publisher(),
         )
 
-    def on(self, *event_types: str):
+    def on(self, *event_types: str) -> Callable[[Callable], Callable]:
         """
         Decorator to subscribe a handler to one or more event types.
 
@@ -578,7 +578,7 @@ class Agent:
                     print(event.text, end="")
         """
 
-        def decorator(handler):
+        def decorator(handler: Callable) -> Callable:
             for event_type in event_types:
                 self._event_registry.subscribe(event_type, handler)
             return handler

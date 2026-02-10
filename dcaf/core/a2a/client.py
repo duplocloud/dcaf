@@ -238,7 +238,7 @@ class RemoteAgent:
         remote_agent_call.__doc__ = self.description
 
         # Decorate with @tool
-        return tool(
+        return tool(  # type: ignore[operator]
             description=f"{self.description} (remote agent at {self.url})",
             requires_approval=False,
         )(remote_agent_call)

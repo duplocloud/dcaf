@@ -18,7 +18,7 @@ class Tool(BaseModel):
     func: Callable
     name: str
     description: str
-    schema: dict[str, Any]
+    schema: dict[str, Any]  # type: ignore[assignment]  # Intentionally shadows BaseModel.schema
     requires_approval: bool = False
     requires_platform_context: bool = False
 
@@ -54,7 +54,9 @@ class Tool(BaseModel):
         print(f"Has Platform Context: {self.requires_platform_context}")
         print(f"Schema: {json.dumps(self.schema, indent=2)}")
 
-    def execute(self, input_args: dict[str, Any], platform_context: dict[str, Any] = None) -> str:
+    def execute(
+        self, input_args: dict[str, Any], platform_context: dict[str, Any] | None = None
+    ) -> str:
         """
         Execute the tool with given input and optional platform context.
 

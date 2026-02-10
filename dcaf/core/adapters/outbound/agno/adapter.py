@@ -437,7 +437,7 @@ class AgnoAdapter:
                             for handler in event_registry.get_handlers(new_event.type):
                                 try:
                                     result = handler(new_event)
-                                    if hasattr(result, "__await__"):
+                                    if result is not None and hasattr(result, "__await__"):
                                         await result
                                 except Exception as e:
                                     logger.warning(f"Event handler error: {e}")
