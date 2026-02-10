@@ -149,10 +149,12 @@ async def handle(event):
 ## Example: SSE Streaming to UI
 
 ```python
+import asyncio
+import json
+
 from fastapi import FastAPI
 from fastapi.responses import StreamingResponse
 from dcaf.core import Agent, tool
-import json
 
 app = FastAPI()
 
@@ -165,17 +167,29 @@ agent = Agent(tools=[search])
 
 @app.get("/chat")
 async def chat(message: str):
+    queue: asyncio.Queue[str | None] = asyncio.Queue()
+
+    @agent.on("tool_call_started")
+    async def on_tool(event):
+        await queue.put(f"data: {json.dumps({'type': 'tool', 'name': event.tool_name})}\n\n")
+
+    @agent.on("text_delta")
+    async def on_text(event):
+        await queue.put(f"data: {json.dumps({'type': 'text', 'content': event.text})}\n\n")
+
+    async def run_agent():
+        await agent.invoke(message)
+        await queue.put(f"data: {json.dumps({'type': 'done'})}\n\n")
+        await queue.put(None)  # Signal completion
+
     async def event_stream():
-        @agent.on("tool_call_started")
-        async def on_tool(event):
-            yield f"data: {json.dumps({'type': 'tool', 'name': event.tool_name})}\n\n"
-
-        @agent.on("text_delta")
-        async def on_text(event):
-            yield f"data: {json.dumps({'type': 'text', 'content': event.text})}\n\n"
-
-        response = await agent.invoke(message)
-        yield f"data: {json.dumps({'type': 'done'})}\n\n"
+        task = asyncio.create_task(run_agent())
+        while True:
+            item = await queue.get()
+            if item is None:
+                break
+            yield item
+        await task
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
 ```
