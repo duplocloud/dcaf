@@ -583,14 +583,14 @@ def _create_adapter(agent: Union["Agent", AgentHandler]) -> Any:
 
 async def _invoke_agent(adapter: Any, agent_input: dict[str, Any]) -> "AgentMessage":
     """Invoke the agent, handling both sync and async adapters."""
-    import asyncio
+    import inspect
 
     from .schemas.messages import AgentMessage
 
     if hasattr(adapter, "invoke"):
         result = adapter.invoke(agent_input)
-        # Handle coroutine result
-        if asyncio.iscoroutine(result):
+        # Handle coroutine result (async def invoke)
+        if inspect.iscoroutine(result):
             result = await result
         # Ensure we return an AgentMessage
         if isinstance(result, AgentMessage):
@@ -603,25 +603,29 @@ async def _invoke_agent(adapter: Any, agent_input: dict[str, Any]) -> "AgentMess
 
 async def _stream_agent(adapter: Any, agent_input: dict[str, Any]) -> Any:
     """Stream from the agent, handling both sync and async generators."""
-    import asyncio
+    import inspect
 
     from .schemas.events import DoneEvent, TextDeltaEvent
 
     if hasattr(adapter, "invoke_stream"):
         result = adapter.invoke_stream(agent_input)
 
-        # Handle coroutine result
-        if asyncio.iscoroutine(result):
-            result = await result
-
-        # Handle async generator
+        # Check for generators BEFORE coroutines to avoid Python 3.11
+        # asyncio.iscoroutine misidentifying generators.
         if hasattr(result, "__anext__"):
+            # Async generator (async def + yield)
             async for event in result:
                 yield event
-        # Handle sync generator
         elif hasattr(result, "__next__"):
+            # Sync generator (def + yield)
             for event in result:
                 yield event
+        elif inspect.iscoroutine(result):
+            # Coroutine (async def that returns a value)
+            result = await result
+            if hasattr(result, "content") and result.content:
+                yield TextDeltaEvent(text=result.content)
+            yield DoneEvent()
         else:
             # Single result - wrap in text_delta + done
             if hasattr(result, "content") and result.content:
@@ -655,7 +659,7 @@ def _add_websocket_endpoint(
           - {"type": "done"}
           - {"type": "error", "error": "..."}
     """
-    import asyncio
+    import inspect
     import json
 
     from fastapi import WebSocket, WebSocketDisconnect
@@ -703,22 +707,21 @@ def _add_websocket_endpoint(
                 try:
                     # Check if adapter has invoke_stream
                     if hasattr(adapter, "invoke_stream"):
-                        invoke_stream = adapter.invoke_stream
-                        result = invoke_stream(agent_input)
+                        result = adapter.invoke_stream(agent_input)
 
-                        # Handle different generator types
-                        if asyncio.iscoroutine(result):
-                            # It's a coroutine, await it
-                            result = await result
-
+                        # Check generators BEFORE coroutines (Python 3.11 compat)
                         if hasattr(result, "__anext__"):
                             # Async generator
                             async for event in result:
                                 await _send_event(websocket, event)
                         elif hasattr(result, "__next__"):
-                            # Sync generator - iterate directly (we're in async context)
+                            # Sync generator
                             for event in result:
                                 await _send_event(websocket, event)
+                        elif inspect.iscoroutine(result):
+                            # Coroutine - await then send
+                            result = await result
+                            await _send_event(websocket, result)
                         else:
                             # Not a generator, treat as single result
                             await _send_event(websocket, result)
