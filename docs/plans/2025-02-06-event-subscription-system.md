@@ -1120,8 +1120,8 @@ Events are created **lazily** - if nobody subscribes to `text_delta`, those even
 
 ## See Also
 
-- [Streaming Guide](./streaming.md) - NDJSON streaming format
-- [Building Tools](./building-tools.md) - Creating tools for agents
+- [Streaming Guide](../guides/streaming.md) - NDJSON streaming format
+- [Building Tools](../guides/building-tools.md) - Creating tools for agents
 ```
 
 **Step 2: Add to mkdocs.yml navigation**
