@@ -148,7 +148,7 @@ nav:
     - Framework Adapters: guides/framework-adapters.md
     - Migration (v1 → Core): guides/migration.md
     - Working with Bedrock: guides/working-with-bedrock.md
-    - Working with Gemini: guides/working-with-gemini.md
+    - Working with Google Vertex AI: guides/working-with-gemini.md
     - Prompt Caching: guides/prompt-caching.md
     - Message Protocol: guides/message-protocol.md
     - Streaming Responses: guides/streaming.md
