@@ -167,13 +167,13 @@ def handle_send_message_stream_v1(
 
         try:
             # Check if the agent's invoke_stream method accepts thread_id parameter
-            sig = inspect.signature(agent.invoke_stream)
+            sig = inspect.signature(agent.invoke_stream)  # type: ignore[attr-defined]
             if "thread_id" in sig.parameters:
                 logger.info("V1 Invoking stream agent with messages and thread_id: %s", thread_id)
-                event_stream = agent.invoke_stream(msgs_obj.model_dump(), thread_id=thread_id)
+                event_stream = agent.invoke_stream(msgs_obj.model_dump(), thread_id=thread_id)  # type: ignore[attr-defined]
             else:
                 logger.info("V1 Invoking stream agent with messages (no thread_id support)")
-                event_stream = agent.invoke_stream(msgs_obj.model_dump())
+                event_stream = agent.invoke_stream(msgs_obj.model_dump())  # type: ignore[attr-defined]
 
             for event in event_stream:
                 event_type = event.type
@@ -219,7 +219,7 @@ def handle_send_message_stream_v1(
 
 def create_chat_app(
     agent: AgentProtocol,
-    router: ChannelResponseRouter = None,
+    router: ChannelResponseRouter | None = None,
     a2a_agent_card_path: str | None = None,
 ) -> FastAPI:
     """
@@ -265,7 +265,7 @@ def create_chat_app(
 
             try:
                 raw = card_path.read_text(encoding="utf-8")
-                return json.loads(raw)
+                return json.loads(raw)  # type: ignore[no-any-return]
             except json.JSONDecodeError as e:
                 logger.error("Invalid JSON in agent card file %s: %s", card_path, str(e))
                 raise HTTPException(

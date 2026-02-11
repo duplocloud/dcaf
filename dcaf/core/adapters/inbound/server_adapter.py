@@ -90,7 +90,7 @@ class ServerAdapter:
         platform_context = self._extract_platform_context(messages_list)
 
         # Merge top-level request fields into context (platform_context takes precedence)
-        request_fields = messages.get("_request_fields", {})
+        request_fields: dict[str, Any] = messages.get("_request_fields", {})  # type: ignore[assignment]
         context = {**request_fields, **platform_context} if request_fields else platform_context
 
         # Check for approved tool calls that need to be processed
@@ -114,13 +114,13 @@ class ServerAdapter:
 
             # Add any executed tool calls from this request
             if executed_tool_calls:
-                agent_msg.data.executed_tool_calls.extend(executed_tool_calls)
+                agent_msg.data.executed_tool_calls.extend(executed_tool_calls)  # type: ignore[arg-type]
 
             # If there are pending approvals, ensure helpful content
             if response.needs_approval and not agent_msg.content:
                 agent_msg.content = "I need your approval to execute the following tools:"
 
-            return agent_msg
+            return agent_msg  # type: ignore[return-value]
 
         except Exception as e:
             logger.exception(f"Error in agent execution: {e}")
@@ -148,7 +148,7 @@ class ServerAdapter:
         platform_context = self._extract_platform_context(messages_list)
 
         # Merge top-level request fields into context (platform_context takes precedence)
-        request_fields = messages.get("_request_fields", {})
+        request_fields: dict[str, Any] = messages.get("_request_fields", {})  # type: ignore[assignment]
         context = {**request_fields, **platform_context} if request_fields else platform_context
 
         # Convert to Core format
@@ -167,7 +167,7 @@ class ServerAdapter:
                 # Echo top-level request fields in DoneEvent for client correlation
                 if isinstance(event, DoneEvent) and request_fields:
                     event.meta_data["request_context"] = request_fields
-                yield event
+                yield event  # type: ignore[misc]
 
         except Exception as e:
             logger.exception(f"Stream error: {e}")

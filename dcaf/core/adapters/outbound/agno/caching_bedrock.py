@@ -14,12 +14,11 @@ import os
 from collections.abc import AsyncIterator
 from typing import Any
 
-from botocore.config import Config
-
 from agno.models.aws import AwsBedrock
 from agno.models.message import Message
 from agno.models.response import ModelResponse
 from agno.run.agent import RunOutput
+from botocore.config import Config
 from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
@@ -77,7 +76,7 @@ class CachingAwsBedrock(AwsBedrock):
         if cache_system_prompt:
             logger.info(f"CachingAwsBedrock: Prompt caching enabled for model {self.id}")
 
-    def get_async_client(self):
+    def get_async_client(self) -> Any:
         """
         Get the async Bedrock client context manager with timeout configuration.
 

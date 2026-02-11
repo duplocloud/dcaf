@@ -281,7 +281,11 @@ class AgnoModelFactory:
 
     def _create_google_model(self) -> Any:
         """
-        Create a Google Vertex AI (Gemini) model.
+        Create a Google Vertex AI model.
+
+        Automatically selects the correct Agno model class based on the model ID:
+        - Claude models (model_id starts with "claude") use agno.models.vertexai.claude
+        - All other models use agno.models.google.Gemini
 
         Uses Vertex AI with Application Default Credentials (ADC):
         - Works with GKE Workload Identity
@@ -290,17 +294,10 @@ class AgnoModelFactory:
 
         Raises:
             ValueError: If project_id or location cannot be determined
-            ImportError: If google-generativeai is not installed
+            ImportError: If required packages are not installed
         """
-        try:
-            from agno.models.google import Gemini
-        except ImportError as e:
-            raise ImportError(
-                "Google provider requires the 'google-generativeai' package. "
-                "Install it with: pip install google-generativeai"
-            ) from e
-
         config = self._config
+        is_claude = config.model_id.lower().startswith("claude")
 
         # Auto-detect GCP project using the metadata manager
         project_id = config.google_project_id or self._gcp_metadata_manager.get_project()
@@ -331,10 +328,77 @@ class AgnoModelFactory:
                 "Google provider requires a model location. "
                 "Set DCAF_GOOGLE_MODEL_LOCATION environment variable. "
                 "See https://cloud.google.com/vertex-ai/generative-ai/docs/learn/locations "
-                "for regions where Gemini is available (e.g., us-central1, us-west1)."
+                "for available regions (e.g., us-central1, us-east5)."
             )
 
         logger.info(f"GCP model location: {location} ({location_source})")
+
+        if is_claude:
+            return self._create_vertex_claude_model(project_id=project_id, location=location)
+
+        return self._create_vertex_gemini_model(project_id=project_id, location=location)
+
+    def _create_vertex_claude_model(self, *, project_id: str, location: str) -> Any:
+        """
+        Create a Claude model via Google Vertex AI.
+
+        Uses agno.models.vertexai.claude for Anthropic Claude models hosted
+        on Vertex AI. Authentication is handled via Application Default
+        Credentials (ADC), same as the Gemini path.
+
+        Args:
+            project_id: GCP project ID
+            location: GCP region (e.g., us-east5)
+
+        Raises:
+            ImportError: If agno vertex AI claude package is not installed
+        """
+        try:
+            from agno.models.vertexai.claude import Claude as VertexClaude
+        except ImportError as e:
+            raise ImportError(
+                "Google provider with Claude models requires the "
+                "'anthropic[vertex]' package. "
+                "Install it with: pip install 'anthropic[vertex]'"
+            ) from e
+
+        config = self._config
+
+        model_kwargs: dict[str, Any] = {
+            "id": config.model_id,
+            "project_id": project_id,
+            "region": location,
+            "max_tokens": config.max_tokens,
+            "temperature": config.temperature,
+        }
+
+        logger.info(
+            f"Creating Vertex AI Claude model: {config.model_id} "
+            f"(project={project_id}, region={location})"
+        )
+
+        return VertexClaude(**model_kwargs)
+
+    def _create_vertex_gemini_model(self, *, project_id: str, location: str) -> Any:
+        """
+        Create a Gemini model via Google Vertex AI.
+
+        Args:
+            project_id: GCP project ID
+            location: GCP region (e.g., us-central1)
+
+        Raises:
+            ImportError: If google-generativeai is not installed
+        """
+        try:
+            from agno.models.google import Gemini
+        except ImportError as e:
+            raise ImportError(
+                "Google provider requires the 'google-generativeai' package. "
+                "Install it with: pip install google-generativeai"
+            ) from e
+
+        config = self._config
 
         model_kwargs: dict[str, Any] = {
             "id": config.model_id,

@@ -60,7 +60,7 @@ docs = [
 dev = [
     "pytest>=7.0.0",
     "pytest-asyncio>=0.21.0",
-    "ruff>=0.8.0",
+    "ruff==0.15.0",
     "mypy>=1.8.0",
     "types-requests>=2.31.0",
 ]
@@ -164,6 +164,14 @@ exclude = [
 module = "dcaf.core.*"
 disallow_untyped_defs = true  # Stricter for new core code
 
+[[tool.mypy.overrides]]
+module = "dcaf.agents.*"
+ignore_errors = true  # Legacy agents, not strictly typed
+
+[[tool.mypy.overrides]]
+module = "dcaf.llm.*"
+ignore_errors = true  # Legacy LLM code, not strictly typed
+
 # =============================================================================
 # Pytest
 # =============================================================================
@@ -176,5 +184,6 @@ asyncio_mode = "auto"
 
 [dependency-groups]
 dev = [
+    "ruff==0.15.0",
     "types-requests>=2.32.4.20260107",
 ]

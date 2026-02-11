@@ -218,7 +218,9 @@ class TestWebSocketRequestFields:
         assert rf["tenant_id"] == "32d6aa2b-xxxx"
 
     def test_no_extra_fields_websocket_still_works(
-        self, sync_client: TestClient, sync_agent: CapturingSyncAgent  # noqa: ARG002
+        self,
+        sync_client: TestClient,
+        sync_agent: CapturingSyncAgent,  # noqa: ARG002
     ):
         """WebSocket without extra fields works normally."""
         with sync_client.websocket_connect("/api/chat-ws") as ws:

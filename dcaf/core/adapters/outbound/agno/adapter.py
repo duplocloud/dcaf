@@ -288,15 +288,9 @@ class AgnoAdapter:
         for tool in tools:
             tool_name = getattr(tool, "name", None) or getattr(tool, "__name__", str(tool))
             logger.debug(f"    - {tool_name}")
-        logger.debug(
-            f"  System Prompt: {system_prompt[:200] + '...' if system_prompt and len(system_prompt) > 200 else system_prompt}"
-        )
-        logger.debug(
-            f"  Static System: {static_system[:200] + '...' if static_system and len(static_system) > 200 else static_system}"
-        )
-        logger.debug(
-            f"  Dynamic System: {dynamic_system[:200] + '...' if dynamic_system and len(dynamic_system) > 200 else dynamic_system}"
-        )
+        logger.debug(f"  System Prompt: {system_prompt}")
+        logger.debug(f"  Static System Prompt: {static_system}")
+        logger.debug(f"  Dynamic System Prompt: {dynamic_system}")
         logger.debug(f"  Platform Context: {platform_context}")
 
         # Store system prompt parts for model creation (if using caching)
@@ -388,15 +382,9 @@ class AgnoAdapter:
         for tool in tools:
             tool_name = getattr(tool, "name", None) or getattr(tool, "__name__", str(tool))
             logger.debug(f"    - {tool_name}")
-        logger.debug(
-            f"  System Prompt: {system_prompt[:200] + '...' if system_prompt and len(system_prompt) > 200 else system_prompt}"
-        )
-        logger.debug(
-            f"  Static System: {static_system[:200] + '...' if static_system and len(static_system) > 200 else static_system}"
-        )
-        logger.debug(
-            f"  Dynamic System: {dynamic_system[:200] + '...' if dynamic_system and len(dynamic_system) > 200 else dynamic_system}"
-        )
+        logger.debug(f"  System Prompt: {system_prompt}")
+        logger.debug(f"  Static System Prompt: {static_system}")
+        logger.debug(f"  Dynamic System Prompt: {dynamic_system}")
         logger.debug(f"  Platform Context: {platform_context}")
 
         # Store system prompt parts for model creation (if using caching)
@@ -437,7 +425,7 @@ class AgnoAdapter:
                             for handler in event_registry.get_handlers(new_event.type):
                                 try:
                                     result = handler(new_event)
-                                    if hasattr(result, "__await__"):
+                                    if result is not None and hasattr(result, "__await__"):
                                         await result
                                 except Exception as e:
                                     logger.warning(f"Event handler error: {e}")
