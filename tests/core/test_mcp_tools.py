@@ -883,6 +883,7 @@ class TestMCPToolAutoApproveConnect:
 
     async def test_create_agno_mcp_tools_wraps_when_patterns_set(self):
         """_create_agno_mcp_tools should wrap build_tools when auto_approve_tools is set."""
+        pytest.importorskip("mcp", reason="MCP package not installed")
         from dcaf.mcp import MCPTool
 
         mcp = MCPTool(
@@ -905,6 +906,7 @@ class TestMCPToolAutoApproveConnect:
 
     async def test_create_agno_mcp_tools_skips_wrap_without_patterns(self):
         """_create_agno_mcp_tools should NOT wrap build_tools when auto_approve_tools is None."""
+        pytest.importorskip("mcp", reason="MCP package not installed")
         from dcaf.mcp import MCPTool
 
         mcp = MCPTool(

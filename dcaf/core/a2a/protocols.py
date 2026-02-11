@@ -142,7 +142,9 @@ class A2AServerAdapter(Protocol):
         """
         ...
 
-    def create_routes(self, agent: Any) -> list:
+    def create_routes(
+        self, agent: Any, agent_card: AgentCard | dict[Any, Any] | None = None
+    ) -> list:
         """
         Create FastAPI routes for A2A endpoints.
 
@@ -153,6 +155,7 @@ class A2AServerAdapter(Protocol):
 
         Args:
             agent: DCAF Agent instance to expose
+            agent_card: Optional pre-built agent card (if None, generated from agent)
 
         Returns:
             List of FastAPI APIRouter instances

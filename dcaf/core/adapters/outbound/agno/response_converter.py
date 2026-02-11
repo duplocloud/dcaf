@@ -258,7 +258,13 @@ class AgnoResponseConverter:
         for msg in reversed(run_output.messages):
             role = getattr(msg, "role", None)
             # Handle both string roles and enum roles
-            role_str = role.value if hasattr(role, "value") else str(role) if role else ""
+            role_str = (
+                role.value
+                if role is not None and hasattr(role, "value")
+                else str(role)
+                if role
+                else ""
+            )
             if role_str.lower() == "assistant":
                 last_assistant_msg = msg
                 break

@@ -1,23 +1,37 @@
-# Working with Google Gemini
+# Working with Google Vertex AI
 
-DCAF supports Google's Gemini models through Vertex AI, providing zero-configuration deployment on Google Cloud Platform.
+DCAF supports Google Vertex AI as a unified provider for both **Google Gemini** and **Anthropic Claude** models, providing zero-configuration deployment on Google Cloud Platform.
 
 ## Overview
 
-Google Gemini offers:
+The `google` provider offers access to multiple model families through Vertex AI:
+
+**Google Gemini Models:**
+
 - **Gemini 3**: Latest generation with advanced reasoning
 - **Gemini 2.x**: High-performance models with thinking budgets
 - **Gemini 1.5**: Large context windows and efficient inference
-- **Vertex AI**: Enterprise integration through Google Cloud Platform
+
+**Anthropic Claude Models (via Vertex AI):**
+
+- **Claude Opus 4**: Most capable Claude model for complex tasks
+- **Claude Sonnet 4**: Balanced performance and cost
+- **Claude Haiku 3.5**: Fast, cost-effective for simple tasks
+
+DCAF automatically detects which model family you're using based on the model ID and routes to the correct backend — no extra configuration needed.
 
 ## Installation
 
-Install the required Google AI dependencies:
+Install the required dependencies for the models you plan to use:
 
 ```bash
+# For Gemini models
 pip install google-generativeai google-auth
 
-# Or install DCAF with Gemini support
+# For Claude models on Vertex AI
+pip install 'anthropic[vertex]'
+
+# Or install DCAF with full Google/Vertex AI support
 pip install dcaf[gemini]
 ```
 
@@ -30,13 +44,22 @@ When running on GCP (GKE, GCE, Cloud Run), DCAF automatically detects your proje
 ```python
 from dcaf.core import Agent
 
-# That's it! Project/location auto-detected on GCP
+# Gemini — project/location auto-detected on GCP
 agent = Agent(
     provider="google",
     model="gemini-2.5-pro",
     system_prompt="You are a helpful assistant."
 )
+
+# Claude on Vertex AI — same provider, just change the model ID
+agent = Agent(
+    provider="google",
+    model="claude-sonnet-4@20250514",
+    system_prompt="You are a helpful assistant."
+)
 ```
+
+DCAF detects the model family from the model ID (e.g., IDs starting with `claude` are routed to the Anthropic Vertex AI backend) and uses the appropriate Agno model class automatically.
 
 ### Environment Variables (Optional)
 
@@ -57,6 +80,24 @@ from dcaf.core import Agent
 agent = Agent(
     provider="google",
     model="gemini-2.5-pro",
+    system_prompt="You are a helpful assistant."
+)
+
+response = agent.run([
+    {"role": "user", "content": "What's the capital of France?"}
+])
+
+print(response.text)
+```
+
+### Basic Claude on Vertex AI Agent
+
+```python
+from dcaf.core import Agent
+
+agent = Agent(
+    provider="google",
+    model="claude-sonnet-4@20250514",
     system_prompt="You are a helpful assistant."
 )
 
@@ -109,6 +150,35 @@ agent = Agent(provider="google", model="gemini-1.5-flash")
 ```python
 agent = Agent(provider="google", model="gemini-1.5-pro")
 ```
+
+## Available Claude Models (via Vertex AI)
+
+Anthropic Claude models are available through Vertex AI using the same `provider="google"` configuration. DCAF automatically detects Claude model IDs and routes them through the Vertex AI Anthropic backend.
+
+!!! note "Model ID Format"
+    Vertex AI Claude model IDs use the format `model-name@version` (e.g., `claude-sonnet-4@20250514`). This differs from the direct Anthropic API format.
+
+### Claude 4
+
+**claude-opus-4@20250805** - Most capable model for complex, multi-step tasks
+```python
+agent = Agent(provider="google", model="claude-opus-4@20250805")
+```
+
+**claude-sonnet-4@20250514** - Balanced performance and cost
+```python
+agent = Agent(provider="google", model="claude-sonnet-4@20250514")
+```
+
+### Claude 3.5
+
+**claude-3-5-haiku@20241022** - Fast and cost-effective
+```python
+agent = Agent(provider="google", model="claude-3-5-haiku@20241022")
+```
+
+!!! tip "Check Vertex AI Model Garden"
+    Available Claude model versions may change. Check the [Vertex AI Model Garden](https://console.cloud.google.com/vertex-ai/model-garden) or [Google Cloud documentation](https://cloud.google.com/vertex-ai/generative-ai/docs/partner-models/claude) for the latest available models and versions.
 
 ## Model Configuration
 
@@ -265,15 +335,21 @@ response = orchestrator.run([
 
 ## Vertex AI (Default)
 
-The Google provider always uses Vertex AI. Project and location are auto-detected on GCP:
+The Google provider always uses Vertex AI for both Gemini and Claude models. Project and location are auto-detected on GCP:
 
 ```python
 from dcaf.core import Agent
 
-# On GCP - this is all you need!
+# Gemini on Vertex AI - auto-detected!
 agent = Agent(
     provider="google",
     model="gemini-2.5-pro",
+)
+
+# Claude on Vertex AI - same provider, same auto-detection!
+agent = Agent(
+    provider="google",
+    model="claude-sonnet-4@20250514",
 )
 ```
 
@@ -313,8 +389,11 @@ export GOOGLE_CLOUD_LOCATION="us-central1"
    - **GKE**: Workload Identity with appropriate IAM bindings
    - **GCE/Cloud Run**: Attached service account
 3. IAM role: `roles/aiplatform.user` on the service account
+4. **For Claude models**: Claude must be enabled in your project's [Vertex AI Model Garden](https://console.cloud.google.com/vertex-ai/model-garden)
 
 ## Model Selection Guide
+
+### Gemini Models
 
 | Model | Best For | Context | Speed | Cost |
 |-------|----------|---------|-------|------|
@@ -325,16 +404,24 @@ export GOOGLE_CLOUD_LOCATION="us-central1"
 | **gemini-1.5-pro** | Huge context (2M tokens) | Massive | Medium | Medium |
 | **gemini-1.5-flash** | Quick tasks, simple queries | Large | Very Fast | Very Low |
 
+### Claude Models (via Vertex AI)
+
+| Model | Best For | Context | Speed | Cost |
+|-------|----------|---------|-------|------|
+| **claude-opus-4@20250805** | Complex reasoning, agentic tasks | 200K | Slow | High |
+| **claude-sonnet-4@20250514** | Balanced performance, tool use | 200K | Fast | Medium |
+| **claude-3-5-haiku@20241022** | Quick tasks, high throughput | 200K | Very Fast | Low |
+
 ## Error Handling
 
-Handle Gemini-specific errors:
+Handle provider-specific errors:
 
 ```python
 from dcaf.core import Agent
 
 agent = Agent(
     provider="google",
-    model="gemini-3-flash",
+    model="gemini-3-flash",  # or "claude-sonnet-4@20250514"
 )
 
 try:
@@ -343,11 +430,12 @@ try:
     ])
     print(response.text)
 except ImportError as e:
-    print("Google AI package not installed:")
-    print("  pip install google-generativeai google-auth")
+    print("Required package not installed:")
+    print("  Gemini: pip install google-generativeai google-auth")
+    print("  Claude: pip install 'anthropic[vertex]'")
 except ValueError as e:
     print(f"Configuration error: {e}")
-    print("Ensure GOOGLE_CLOUD_PROJECT and GOOGLE_CLOUD_LOCATION are set")
+    print("Ensure GOOGLE_CLOUD_PROJECT and DCAF_GOOGLE_MODEL_LOCATION are set")
 except Exception as e:
     print(f"Error: {e}")
 ```
@@ -403,14 +491,14 @@ agent = Agent(
 
 ## Comparison: Gemini vs Claude vs GPT
 
-| Feature | Gemini | Claude (Bedrock) | GPT-4 |
-|---------|--------|------------------|-------|
-| **Tool Use** | Excellent | Excellent | Good |
-| **Reasoning** | Strong (G3) | Excellent | Strong |
-| **Speed** | Very Fast (Flash) | Fast | Medium |
-| **Context** | 2M (1.5 Pro) | 200K | 128K |
-| **Cost** | Low (Flash) | Medium | High |
-| **Deployment** | Direct API or Vertex | AWS Bedrock | OpenAI or Azure |
+| Feature | Gemini (Vertex AI) | Claude (Vertex AI) | Claude (Bedrock) | GPT-4 |
+|---------|--------------------|--------------------|------------------|-------|
+| **Tool Use** | Excellent | Excellent | Excellent | Good |
+| **Reasoning** | Strong (G3) | Excellent | Excellent | Strong |
+| **Speed** | Very Fast (Flash) | Fast (Haiku) | Fast | Medium |
+| **Context** | 2M (1.5 Pro) | 200K | 200K | 128K |
+| **Cost** | Low (Flash) | Low (Haiku) | Medium | High |
+| **Provider** | `google` | `google` | `bedrock` | `openai` / `azure` |
 
 ## Troubleshooting
 
@@ -432,11 +520,14 @@ gcloud auth application-default login
 ### Import Error
 
 ```bash
-# Install the Google AI packages
+# For Gemini models
 pip install google-generativeai google-auth
 
+# For Claude models on Vertex AI
+pip install 'anthropic[vertex]'
+
 # Or upgrade if already installed
-pip install --upgrade google-generativeai
+pip install --upgrade google-generativeai anthropic
 ```
 
 ### Rate Limiting
@@ -473,22 +564,39 @@ Complete examples available in the repository:
 
 - [Vertex AI Documentation](https://cloud.google.com/vertex-ai/docs)
 - [Gemini API Documentation](https://ai.google.dev/docs)
+- [Claude on Vertex AI](https://cloud.google.com/vertex-ai/generative-ai/docs/partner-models/claude)
 - [Agno Gemini Guide](https://docs.agno.com/models/google)
+- [Agno Vertex AI Claude Guide](https://docs.agno.com/models/providers/cloud/vertexai-claude/overview)
 - [DCAF Documentation](../index.md)
 
 ## Support
 
-For issues with Gemini in DCAF:
+For issues with the Google provider in DCAF:
 
 1. Check this guide
-2. Review [Agno's Gemini docs](https://docs.agno.com/models/google)
+2. Review [Agno's Gemini docs](https://docs.agno.com/models/google) or [Agno's Vertex AI Claude docs](https://docs.agno.com/models/providers/cloud/vertexai-claude/overview)
 3. Verify ADC is configured: `gcloud auth application-default login`
 4. Check Vertex AI quotas in GCP Console
-5. Open an issue on GitHub with logs
+5. For Claude models, verify access is enabled in [Model Garden](https://console.cloud.google.com/vertex-ai/model-garden)
+6. Open an issue on GitHub with logs
+
+---
+
+## How Model Detection Works
+
+When you set `provider="google"`, DCAF inspects the `model` ID to determine which Vertex AI backend to use:
+
+| Model ID Pattern | Backend | Agno Class |
+|-----------------|---------|------------|
+| Starts with `claude` | Anthropic on Vertex AI | `agno.models.vertexai.claude.Claude` |
+| Everything else | Google Gemini on Vertex AI | `agno.models.google.Gemini` |
+
+This means you can switch between Gemini and Claude models by changing only the model ID — no provider or configuration changes required.
 
 ---
 
 **Next Steps:**
+
 - [Building Tools](building-tools.md)
 - [Multi-Agent Systems](../core/a2a.md)
 - [Working with Bedrock](working-with-bedrock.md)

@@ -126,7 +126,7 @@ class AgentMessage(Message):
     @classmethod
     def from_agent_response(
         cls,
-        response,  # AgentResponse from core
+        response: Any,  # AgentResponse from core
         include_timestamp: bool = True,
         agent_name: str | None = None,
         agent_id: str | None = None,

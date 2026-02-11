@@ -255,7 +255,7 @@ class Tool(BaseModel):
         """Get the tool's schema (alias for input_schema)."""
         return self.input_schema
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         """Pretty representation showing key attributes."""
         return (
             f"Tool(name='{self.name}', "
@@ -271,7 +271,7 @@ class Tool(BaseModel):
             "input_schema": self.input_schema,
         }
 
-    def describe(self):
+    def describe(self) -> None:
         """Print detailed description of the tool."""
         print(f"Tool: {self.name}")
         print(f"Description: {self.description}")
@@ -307,7 +307,7 @@ def tool(
     name: str | None = None,
     requires_approval: bool = True,  # V1 default: True (safe by default)
     schema: dict[str, Any] | type[BaseModel] | Any | None = None,
-):
+) -> Tool | Callable[[Callable], Tool]:
     """
     Decorator to create a tool from a function.
 

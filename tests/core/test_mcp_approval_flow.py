@@ -11,6 +11,8 @@ import sys
 
 import pytest
 
+pytest.importorskip("mcp", reason="MCP package not installed")
+
 from dcaf.mcp import MCPTool
 
 # Path to the test MCP server, resolved relative to this file

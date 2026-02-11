@@ -92,7 +92,8 @@ def example_static_and_dynamic():
         """
         * 3,
         # Dynamic part - NOT cached (changes per request)
-        system_context=lambda ctx: f"""
+        system_context=lambda ctx: (
+            f"""
         === CURRENT CONTEXT ===
         Tenant: {ctx.get("tenant_name", "unknown")}
         Namespace: {ctx.get("k8s_namespace", "default")}
@@ -100,7 +101,8 @@ def example_static_and_dynamic():
         Environment: {ctx.get("environment", "production")}
 
         You MUST scope all operations to the above context.
-        """,
+        """
+        ),
         tools=[list_pods, get_pod],
         model_config={"cache_system_prompt": True},
     )
