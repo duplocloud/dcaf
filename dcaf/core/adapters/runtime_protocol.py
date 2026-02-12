@@ -59,6 +59,9 @@ class RuntimeAdapter(Protocol):
         messages: list[Any],
         tools: list[Any],
         system_prompt: str | None = None,
+        static_system: str | None = None,
+        dynamic_system: str | None = None,
+        platform_context: dict[str, Any] | None = None,
     ) -> Any:  # Returns AgentResponse
         """
         Execute a single request and return the response.
@@ -67,6 +70,9 @@ class RuntimeAdapter(Protocol):
             messages: List of conversation messages
             tools: List of tools available to the agent
             system_prompt: Optional system instructions
+            static_system: Static portion of system prompt (for caching)
+            dynamic_system: Dynamic portion of system prompt (not cached)
+            platform_context: Optional platform context to inject into tools
 
         Returns:
             AgentResponse with the result
@@ -78,6 +84,9 @@ class RuntimeAdapter(Protocol):
         messages: list[Any],
         tools: list[Any],
         system_prompt: str | None = None,
+        static_system: str | None = None,
+        dynamic_system: str | None = None,
+        platform_context: dict[str, Any] | None = None,
         event_registry: "EventRegistry | None" = None,
     ) -> AsyncGenerator[Any, None]:  # Yields StreamEvent
         """
@@ -90,6 +99,9 @@ class RuntimeAdapter(Protocol):
             messages: List of conversation messages
             tools: List of tools available to the agent
             system_prompt: Optional system instructions
+            static_system: Static portion of system prompt (for caching)
+            dynamic_system: Dynamic portion of system prompt (not cached)
+            platform_context: Optional platform context to inject into tools
             event_registry: Optional event registry for subscription-based events
 
         Yields:

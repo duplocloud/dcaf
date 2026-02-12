@@ -92,6 +92,19 @@ ResponseInterceptor = Callable[[LLMResponse], LLMResponse]
 
 
 @dataclass
+class _PreparedRequest:
+    """Internal result of shared request pre-processing for run() and run_stream()."""
+
+    messages: list[dict]
+    current_message: str
+    session: Session
+    system_prompt: str | None
+    static_system: str | None
+    dynamic_system: str | None
+    context: dict
+
+
+@dataclass
 class PendingToolCall:
     """
     A tool call awaiting user approval.
@@ -614,6 +627,84 @@ class Agent:
 
         return static, dynamic
 
+    async def _prepare_request(
+        self,
+        messages: list[ChatMessage | dict],
+        context: dict | None = None,
+        session: Session | dict | None = None,
+    ) -> _PreparedRequest:
+        """
+        Shared pre-processing for run() and run_stream().
+
+        Handles session hydration, message normalization, request
+        interceptors, and system prompt construction.
+
+        Args:
+            messages: The conversation messages
+            context: Optional platform context
+            session: Optional session data
+
+        Returns:
+            _PreparedRequest with all resolved values
+
+        Raises:
+            InterceptorError: If a request interceptor blocks the request
+        """
+        # === HYDRATE SESSION ===
+        if session is None:
+            effective_session = Session()
+        elif isinstance(session, dict):
+            effective_session = Session.from_dict(session)
+        else:
+            effective_session = session
+
+        # Normalize to ChatMessage instances
+        normalized = normalize_messages(messages)
+        current_message = normalized[-1].content
+        messages_as_dicts = [m.to_dict() for m in normalized]
+
+        # === RUN REQUEST INTERCEPTORS ===
+        if self._request_interceptors:
+            llm_request = create_request_from_messages(
+                messages=messages_as_dicts,
+                tools=self.tools,
+                system_prompt=self.system_prompt,
+                context=context or {},
+                session=effective_session,
+            )
+
+            try:
+                llm_request = await self._run_request_interceptors(llm_request)
+            except InterceptorError:
+                raise
+            except Exception as unexpected_error:
+                if self._on_interceptor_error == "abort":
+                    raise
+                else:
+                    logger.warning(f"Request interceptor error (continuing): {unexpected_error}")
+
+            messages_as_dicts = llm_request.messages
+            current_message = llm_request.get_latest_user_message()
+            effective_system_prompt = llm_request.system
+            effective_context = llm_request.context
+        else:
+            effective_system_prompt = self.system_prompt
+            effective_context = context or {}
+
+        # === BUILD SYSTEM PROMPT PARTS ===
+        static_system, dynamic_system = self._build_system_parts(effective_context)
+        final_system_prompt = None if static_system or dynamic_system else effective_system_prompt
+
+        return _PreparedRequest(
+            messages=messages_as_dicts,
+            current_message=current_message,
+            session=effective_session,
+            system_prompt=final_system_prompt,
+            static_system=static_system,
+            dynamic_system=dynamic_system,
+            context=effective_context,
+        )
+
     async def run(
         self,
         messages: list[ChatMessage | dict],
@@ -682,106 +773,40 @@ class Agent:
                 # The interceptor blocked the request
                 print(f"Blocked: {error.user_message}")
         """
-        # Validate input
         if not messages:
             raise ValueError("messages cannot be empty")
 
-        # === HYDRATE SESSION ===
-        # Convert dict to Session if needed, or create empty Session
-        if session is None:
-            effective_session = Session()
-        elif isinstance(session, dict):
-            effective_session = Session.from_dict(session)
-        else:
-            effective_session = session
-
-        # Normalize to ChatMessage instances (accepts both dicts and ChatMessage)
-        normalized_messages = normalize_messages(messages)
-
-        # Extract the current message (last one) - this is the user's latest message
-        current_user_message = normalized_messages[-1].content
-
-        # Convert to dict format for processing
-        messages_as_dicts = [msg.to_dict() for msg in normalized_messages]
-
-        # === RUN REQUEST INTERCEPTORS ===
-        # These can modify the request or block it entirely
-
-        if self._request_interceptors:
-            # Create the normalized LLMRequest for interceptors
-            llm_request = create_request_from_messages(
-                messages=messages_as_dicts,
-                tools=self.tools,
-                system_prompt=self.system_prompt,
-                context=context or {},
-                session=effective_session,
-            )
-
-            # Run the request interceptor pipeline
-            try:
-                llm_request = await self._run_request_interceptors(llm_request)
-            except InterceptorError:
-                # InterceptorError is intentional - let it propagate to caller
-                raise
-            except Exception as unexpected_error:
-                # Handle unexpected errors based on configuration
-                if self._on_interceptor_error == "abort":
-                    raise
-                else:
-                    # Log and continue with original request
-                    logger.warning(f"Request interceptor error (continuing): {unexpected_error}")
-
-            # Use the potentially modified values from interceptors
-            messages_as_dicts = llm_request.messages
-            current_user_message = llm_request.get_latest_user_message()
-            # Update system prompt if interceptors modified it
-            effective_system_prompt = llm_request.system
-            effective_context = llm_request.context
-        else:
-            # No interceptors - use original values
-            effective_system_prompt = self.system_prompt
-            effective_context = context or {}
+        # Shared pre-processing: session, normalization, interceptors, system prompt
+        prepared = await self._prepare_request(messages, context, session)
 
         # === CALL THE LLM ===
-
-        # Build system prompt parts for caching
-        static_system, dynamic_system = self._build_system_parts(effective_context)
-
-        # If we have separate parts, use them; otherwise use effective_system_prompt
-        final_system_prompt = None if static_system or dynamic_system else effective_system_prompt
-
-        # Create the internal request
         internal_request = AgentRequest(
-            content=current_user_message,
-            messages=messages_as_dicts,
+            content=prepared.current_message,
+            messages=prepared.messages,
             tools=self.tools,
-            system_prompt=final_system_prompt,
-            static_system=static_system,
-            dynamic_system=dynamic_system,
-            context=effective_context,
-            session=effective_session.to_dict(),
+            system_prompt=prepared.system_prompt,
+            static_system=prepared.static_system,
+            dynamic_system=prepared.dynamic_system,
+            context=prepared.context,
+            session=prepared.session.to_dict(),
         )
 
-        # Execute the agent service (calls the LLM)
         internal_response = await self._agent_service.execute(internal_request)
 
         # === RUN RESPONSE INTERCEPTORS ===
-        # These can modify the response before returning to the user
+        effective_session = prepared.session
 
         if self._response_interceptors and internal_response.text:
-            # Create the normalized LLMResponse for interceptors
             llm_response = create_response_from_text(
                 text=internal_response.text or "",
-                tool_calls=[],  # Tool calls are handled separately
+                tool_calls=[],
                 raw=internal_response,
                 session=effective_session,
             )
 
-            # Run the response interceptor pipeline
             try:
                 llm_response = await self._run_response_interceptors(llm_response)
             except InterceptorError as interceptor_error:
-                # Response interceptor blocked - return the error message
                 return AgentResponse(
                     text=interceptor_error.user_message,
                     needs_approval=False,
@@ -791,20 +816,14 @@ class Agent:
                     _agent=self,
                 )
             except Exception as unexpected_error:
-                # Handle unexpected errors based on configuration
                 if self._on_interceptor_error == "abort":
                     raise
                 else:
-                    # Log and continue with original response
                     logger.warning(f"Response interceptor error (continuing): {unexpected_error}")
             else:
-                # Update the internal response with the modified text
-                # We create a modified version since the original may be immutable
                 internal_response.text = llm_response.text
-                # Update session from response interceptors if modified
                 effective_session = llm_response.session or Session()
 
-        # Convert to the user-facing response format
         return self._convert_response(internal_response, session=effective_session)
 
     async def chat(
@@ -942,6 +961,7 @@ class Agent:
         self,
         messages: list[ChatMessage | dict],
         context: dict | None = None,
+        session: Session | dict | None = None,
     ) -> AsyncIterator[ServerStreamEvent]:
         """
         Run the agent with streaming response.
@@ -953,6 +973,9 @@ class Agent:
         Args:
             messages: The conversation messages (same format as run())
             context: Optional platform context (tenant, namespace, etc.)
+            session: Optional session data that persists across conversation turns.
+                     Can be a Session instance or a dict. Session data is available
+                     in interceptors and tools.
 
         Yields:
             StreamEvent objects for NDJSON streaming:
@@ -987,32 +1010,24 @@ class Agent:
             return
 
         try:
-            # Normalize to ChatMessage instances
-            normalized = normalize_messages(messages)
+            # Shared pre-processing: session, normalization, interceptors, system prompt
+            try:
+                prepared = await self._prepare_request(messages, context, session)
+            except InterceptorError:
+                yield ErrorEvent(error="Request blocked by interceptor")
+                return
 
-            # Extract the current message (last one)
-            current_message = normalized[-1].content
-
-            # Convert to dict format for the internal request
-            messages_as_dicts = [m.to_dict() for m in normalized]
-
-            # Use the streaming version of the agent service
-            # For now, we'll use the runtime's stream capability directly
-            # and handle the event conversion here
-
-            # Get or create conversation for this request
-            # (Similar logic to AgentService.execute but for streaming)
+            # === BUILD CONVERSATION ===
             from .domain.value_objects import PlatformContext
 
-            platform_context = PlatformContext.from_dict(context or {})
+            platform_context = PlatformContext.from_dict(prepared.context)
 
-            # Create conversation from message history
             conversation = Conversation.create(context=platform_context)
-            if self.system_prompt:
-                conversation = conversation.with_system_prompt(self.system_prompt)
+            if prepared.system_prompt:
+                conversation = conversation.with_system_prompt(prepared.system_prompt)
 
             # Add messages from history
-            for msg in messages_as_dicts[:-1]:  # All except last
+            for msg in prepared.messages[:-1]:  # All except last
                 role = msg.get("role")
                 content = msg.get("content", "")
                 if role == "user":
@@ -1021,7 +1036,7 @@ class Agent:
                     conversation.add_assistant_message(content)
 
             # Add current message
-            conversation.add_user_message(current_message)
+            conversation.add_user_message(prepared.current_message)
 
             # Stream from the runtime
             pending_tool_calls: list[SchemaToolCall] = []
@@ -1029,7 +1044,10 @@ class Agent:
             async for event in self._runtime.invoke_stream(
                 messages=conversation.messages,
                 tools=self.tools,
-                system_prompt=self.system_prompt,
+                system_prompt=prepared.system_prompt,
+                static_system=prepared.static_system,
+                dynamic_system=prepared.dynamic_system,
+                platform_context=platform_context.to_dict() if platform_context else None,
                 event_registry=self._event_registry,
             ):
                 # Convert internal stream events to server stream events
