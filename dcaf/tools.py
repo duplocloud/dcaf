@@ -10,6 +10,58 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict
 
 
+def _normalize_schema(
+    schema: Any,
+    tool_name: str,
+    tool_description: str,
+) -> dict[str, Any]:
+    """
+    Normalize a schema to a full Anthropic tool spec dict.
+
+    Accepts:
+    - Pydantic model class: converted via model_json_schema() and wrapped
+    - Raw JSON schema dict (type/properties/required): wrapped with name/description
+    - Full Anthropic tool spec (name/description/input_schema): passed through as-is
+
+    Args:
+        schema: A dict or Pydantic BaseModel class
+        tool_name: The tool name to use when wrapping
+        tool_description: The tool description to use when wrapping
+
+    Returns:
+        Full Anthropic tool spec dict with name, description, and input_schema
+
+    Raises:
+        TypeError: If schema is not a supported type
+    """
+    # Pydantic model class
+    if isinstance(schema, type) and issubclass(schema, BaseModel):
+        return {
+            "name": tool_name,
+            "description": tool_description,
+            "input_schema": schema.model_json_schema(),
+        }
+
+    # Already a dict
+    if isinstance(schema, dict):
+        # Full Anthropic tool spec — pass through
+        if "input_schema" in schema and "name" in schema and "description" in schema:
+            return schema
+        # Raw JSON schema dict — wrap it
+        return {
+            "name": tool_name,
+            "description": tool_description,
+            "input_schema": schema,
+        }
+
+    raise TypeError(
+        f"schema must be a dict or Pydantic BaseModel class, got {type(schema).__name__}. "
+        f"Examples:\n"
+        f"  @tool(schema={{'type': 'object', ...}})\n"
+        f"  @tool(schema=MyPydanticModel)"
+    )
+
+
 class Tool(BaseModel):
     """Container for tool metadata and configuration."""
 
@@ -31,20 +83,20 @@ class Tool(BaseModel):
         )
 
     def get_schema(self) -> dict[str, Any]:
-        """Get the tool's JSON schema for LLM consumption."""
-        # Check if self.schema is already a full tool specification
-        if (
-            isinstance(self.schema, dict)
-            and "input_schema" in self.schema
-            and "name" in self.schema
-            and "description" in self.schema
-        ):
-            # Schema is already a full tool spec, return it as-is
-            return self.schema
-        else:
-            raise Exception(
-                "The schema does not have all the necessary fields: ['name', 'description', 'input_schema']"
-            )
+        """Get the full tool specification for LLM consumption."""
+        # Schema is already a full tool spec (has input_schema key)
+        if isinstance(self.schema, dict) and "input_schema" in self.schema:
+            return {
+                "name": self.schema.get("name", self.name),
+                "description": self.schema.get("description", self.description),
+                "input_schema": self.schema["input_schema"],
+            }
+        # Schema is a raw JSON schema dict — wrap it
+        return {
+            "name": self.name,
+            "description": self.description,
+            "input_schema": self.schema,
+        }
 
     def describe(self):
         """Print detailed description of the tool."""
@@ -78,7 +130,7 @@ class Tool(BaseModel):
 
 
 def tool(
-    schema: dict[str, Any],
+    schema: dict[str, Any] | type[BaseModel],
     requires_approval: bool = True,
     name: str | None = None,
     description: str | None = None,
@@ -87,29 +139,27 @@ def tool(
     Decorator to create a tool from a function.
 
     Args:
-        schema: JSON schema for the tool's input parameters (Anthropic format)
-                Must be a valid JSON schema with "type": "object" at root
+        schema: Tool input schema. Accepts three formats:
+                - Pydantic BaseModel class (converted via model_json_schema())
+                - Raw JSON schema dict (type/properties/required)
+                - Full Anthropic tool spec dict (name/description/input_schema)
         requires_approval: Whether tool needs user approval before execution
         name: Override the function name as tool name
         description: Override the function docstring as description
 
-    The schema should follow Anthropic's tool input_schema format:
-    {
-        "type": "object",
-        "properties": {
-            "param_name": {
-                "type": "string|integer|number|boolean|array|object",
-                "description": "Description of the parameter",
-                "enum": ["option1", "option2"],  # Optional: for enums
-                "items": {...},                   # Required for arrays
-                "default": value                  # Optional: default value
-            }
-        },
-        "required": ["param1", "param2"]  # List of required parameters
-    }
-
     Examples:
-        # Tool without platform_context
+        # With a Pydantic model
+        from pydantic import BaseModel, Field
+
+        class WeatherInput(BaseModel):
+            city: str = Field(..., description="City name")
+
+        @tool(schema=WeatherInput)
+        def get_weather(city: str) -> str:
+            '''Get weather for a city.'''
+            return f"Weather in {city}: Sunny"
+
+        # With a raw JSON schema dict
         @tool(
             schema={
                 "type": "object",
@@ -122,26 +172,34 @@ def tool(
         def get_weather(location: str) -> str:
             return f"Weather in {location}: Sunny"
 
-        # Tool with platform_context
+        # With a full Anthropic tool spec
         @tool(
             schema={
-                "type": "object",
-                "properties": {
-                    "filename": {"type": "string", "description": "File to delete"}
-                },
-                "required": ["filename"]
-            },
-            requires_approval=True
+                "name": "get_weather",
+                "description": "Get weather",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "location": {"type": "string", "description": "City name"}
+                    },
+                    "required": ["location"]
+                }
+            }
         )
-        def delete_file(filename: str, platform_context: dict) -> str:
-            user = platform_context.get("user_id", "unknown")
-            return f"User {user} deleted {filename}"
+        def get_weather(location: str) -> str:
+            return f"Weather in {location}: Sunny"
     """
 
     def decorator(func: Callable) -> Tool:
         # Get function metadata
         func_name = func.__name__
         func_doc = func.__doc__ or ""
+
+        tool_name = name or func_name
+        tool_description = description or func_doc.split("\n")[0].strip() or f"Execute {func_name}"
+
+        # Normalize schema to full Anthropic tool spec
+        resolved_schema = _normalize_schema(schema, tool_name, tool_description)
 
         # Check if function has platform_context parameter
         sig = inspect.signature(func)
@@ -150,9 +208,9 @@ def tool(
         # Create the Tool
         return Tool(
             func=func,
-            name=name or func_name,
-            description=description or func_doc.split("\n")[0].strip() or f"Execute {func_name}",
-            schema=schema,
+            name=tool_name,
+            description=tool_description,
+            schema=resolved_schema,
             requires_approval=requires_approval,
             requires_platform_context=requires_platform_context,
         )
@@ -162,7 +220,7 @@ def tool(
 
 def create_tool(
     func: Callable,
-    schema: dict[str, Any],
+    schema: dict[str, Any] | type[BaseModel],
     name: str | None = None,
     description: str | None = None,
     requires_approval: bool = False,
@@ -172,13 +230,13 @@ def create_tool(
 
     Args:
         func: The function to wrap as a tool
-        schema: JSON schema for the tool's input
+        schema: Tool input schema. Accepts Pydantic BaseModel class, raw JSON
+                schema dict, or full Anthropic tool spec dict.
         name: Tool name (defaults to function name)
         description: Tool description (defaults to function docstring)
         requires_approval: Whether tool needs user approval
 
     Example:
-        # Function without platform_context
         def add(x: int, y: int) -> str:
             return f"Sum: {x + y}"
 
@@ -197,15 +255,21 @@ def create_tool(
     func_name = func.__name__
     func_doc = func.__doc__ or ""
 
+    tool_name = name or func_name
+    tool_description = description or func_doc.split("\n")[0].strip() or f"Execute {func_name}"
+
+    # Normalize schema to full Anthropic tool spec
+    resolved_schema = _normalize_schema(schema, tool_name, tool_description)
+
     # Check if function has platform_context parameter
     sig = inspect.signature(func)
     requires_platform_context = "platform_context" in sig.parameters
 
     return Tool(
         func=func,
-        name=name or func_name,
-        description=description or func_doc.split("\n")[0].strip() or f"Execute {func_name}",
-        schema=schema,
+        name=tool_name,
+        description=tool_description,
+        schema=resolved_schema,
         requires_approval=requires_approval,
         requires_platform_context=requires_platform_context,
     )
