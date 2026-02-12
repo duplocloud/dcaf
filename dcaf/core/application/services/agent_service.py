@@ -14,7 +14,7 @@ from ...domain.value_objects import (
     ToolInput,
 )
 from ..dto.requests import AgentRequest
-from ..dto.responses import AgentResponse, DataDTO, StreamEvent, ToolCallDTO
+from ..dto.responses import AgentResponse, DataDTO, StreamEvent, StreamEventType, ToolCallDTO
 from ..ports.agent_runtime import AgentRuntime
 from ..ports.conversation_repository import ConversationRepository
 from ..ports.event_publisher import EventPublisher
@@ -152,6 +152,7 @@ class AgentService:
         # 4. Stream from runtime (async)
         collected_text: list[str] = []
         collected_tool_calls: list[ToolCallDTO] = []
+        has_pending_approvals = False
 
         async for event in self._runtime.invoke_stream(
             messages=conversation.messages,
@@ -165,6 +166,13 @@ class AgentService:
             if event.event_type.value == "text_delta":
                 collected_text.append(event.data.get("text", ""))
 
+            # Track tool calls that need approval
+            if event.event_type == StreamEventType.TOOL_CALLS:
+                for tc_data in event.data.get("tool_calls", []):
+                    tc = ToolCallDTO.from_dict(tc_data) if isinstance(tc_data, dict) else tc_data
+                    collected_tool_calls.append(tc)
+                has_pending_approvals = True
+
             yield event
 
         # 5. Build final response
@@ -174,7 +182,8 @@ class AgentService:
             conversation_id=str(conversation.id),
             text=final_text,
             data=DataDTO(tool_calls=collected_tool_calls),
-            is_complete=True,
+            has_pending_approvals=has_pending_approvals,
+            is_complete=not has_pending_approvals,
         )
 
         # 6. Add assistant message to conversation

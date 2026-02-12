@@ -183,6 +183,25 @@ class AgnoResponseConverter:
                 data={},
             )
 
+        elif event_type in ("RunPausedEvent", "RunPaused"):
+            # Agno paused because a tool requires confirmation (HITL)
+            paused_tools = getattr(agno_event, "tools", None) or []
+            tool_calls = []
+            for tool_exec in paused_tools:
+                if getattr(tool_exec, "requires_confirmation", False):
+                    tool_calls.append(
+                        ToolCallDTO(
+                            id=getattr(tool_exec, "tool_call_id", "") or "",
+                            name=getattr(tool_exec, "tool_name", "") or "",
+                            input=getattr(tool_exec, "tool_args", {}) or {},
+                            requires_approval=True,
+                            status="pending",
+                        )
+                    )
+            if tool_calls:
+                return StreamEvent.tool_calls_event(tool_calls)
+            return None
+
         return None
 
     def _extract_text_content(self, run_output: Any) -> str | None:
