@@ -806,9 +806,11 @@ class AgnoAdapter:
             # Use Agno's @tool decorator
             # Note: Agno infers parameter schema from function signature automatically.
             # We only pass name and description - 'parameters' is NOT a valid Agno arg.
+            # requires_confirmation tells Agno to pause before executing (HITL).
             decorated_tool = agno_tool_decorator(
                 name=tool_schema["name"],
                 description=tool_schema["description"],
+                requires_confirmation=tool_obj.requires_approval or None,
             )(func_to_wrap)
 
             agno_tools.append(decorated_tool)
