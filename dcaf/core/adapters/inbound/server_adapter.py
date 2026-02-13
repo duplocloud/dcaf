@@ -21,6 +21,7 @@ from typing import Any, cast
 from ....schemas.events import (
     DoneEvent,
     ErrorEvent,
+    ExecutedToolCallsEvent,
     StreamEvent,
 )
 from ....schemas.messages import AgentMessage, ExecutedToolCall
@@ -99,6 +100,17 @@ class ServerAdapter:
         # Convert to Core format (simple list of dicts with role/content)
         core_messages = self._convert_messages(messages_list)
 
+        # Inject executed tool results into conversation so the LLM can see them
+        if executed_tool_calls:
+            for executed_tool in executed_tool_calls:
+                core_messages.append({
+                    "role": "user",
+                    "content": (
+                        f"Tool result for {executed_tool.name} "
+                        f"with inputs {executed_tool.input}: {executed_tool.output}"
+                    ),
+                })
+
         if not core_messages:
             return AgentMessage(content="No messages provided.")
 
@@ -151,8 +163,24 @@ class ServerAdapter:
         request_fields: dict[str, Any] = messages.get("_request_fields", {})  # type: ignore[assignment]
         context = {**request_fields, **platform_context} if request_fields else platform_context
 
+        # Execute any approved tool calls before streaming
+        executed_tool_calls = self._process_approved_tool_calls(messages_list, context)
+        if executed_tool_calls:
+            yield ExecutedToolCallsEvent(executed_tool_calls=executed_tool_calls)
+
         # Convert to Core format
         core_messages = self._convert_messages(messages_list)
+
+        # Inject executed tool results into conversation so the LLM can see them
+        if executed_tool_calls:
+            for executed_tool in executed_tool_calls:
+                core_messages.append({
+                    "role": "user",
+                    "content": (
+                        f"Tool result for {executed_tool.name} "
+                        f"with inputs {executed_tool.input}: {executed_tool.output}"
+                    ),
+                })
 
         if not core_messages:
             yield ErrorEvent(error="No messages provided")
