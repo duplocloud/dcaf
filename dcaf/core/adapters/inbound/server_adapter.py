@@ -100,18 +100,19 @@ class ServerAdapter:
         # Convert to Core format (simple list of dicts with role/content)
         core_messages = self._convert_messages(messages_list)
 
-        # Inject executed tool results into conversation so the LLM can see them
+        # Inject executed tool results into conversation so the LLM can see them.
+        # Replace the last user message (the approval text) to maintain strict
+        # user/assistant alternation required by Bedrock.
         if executed_tool_calls:
-            for executed_tool in executed_tool_calls:
-                core_messages.append(
-                    {
-                        "role": "user",
-                        "content": (
-                            f"Tool result for {executed_tool.name} "
-                            f"with inputs {executed_tool.input}: {executed_tool.output}"
-                        ),
-                    }
-                )
+            result_parts = [
+                f"Tool result for {tc.name} with inputs {tc.input}: {tc.output}"
+                for tc in executed_tool_calls
+            ]
+            result_content = "\n\n".join(result_parts)
+            if core_messages and core_messages[-1]["role"] == "user":
+                core_messages[-1]["content"] = result_content
+            else:
+                core_messages.append({"role": "user", "content": result_content})
 
         if not core_messages:
             return AgentMessage(content="No messages provided.")
@@ -173,18 +174,19 @@ class ServerAdapter:
         # Convert to Core format
         core_messages = self._convert_messages(messages_list)
 
-        # Inject executed tool results into conversation so the LLM can see them
+        # Inject executed tool results into conversation so the LLM can see them.
+        # Replace the last user message (the approval text) to maintain strict
+        # user/assistant alternation required by Bedrock.
         if executed_tool_calls:
-            for executed_tool in executed_tool_calls:
-                core_messages.append(
-                    {
-                        "role": "user",
-                        "content": (
-                            f"Tool result for {executed_tool.name} "
-                            f"with inputs {executed_tool.input}: {executed_tool.output}"
-                        ),
-                    }
-                )
+            result_parts = [
+                f"Tool result for {tc.name} with inputs {tc.input}: {tc.output}"
+                for tc in executed_tool_calls
+            ]
+            result_content = "\n\n".join(result_parts)
+            if core_messages and core_messages[-1]["role"] == "user":
+                core_messages[-1]["content"] = result_content
+            else:
+                core_messages.append({"role": "user", "content": result_content})
 
         if not core_messages:
             yield ErrorEvent(error="No messages provided")
