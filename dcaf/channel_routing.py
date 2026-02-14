@@ -7,12 +7,35 @@ intelligent decisions about when the bot should engage.
 """
 
 import logging
+import os
 import traceback
 from typing import Any
 
-from .llm import BedrockLLM
+from .llm import LLM, BedrockLLM, VertexLLM
 
 logger = logging.getLogger(__name__)
+
+# Env var names
+_ENV_PROVIDER = "DCAF_PROVIDER"
+_ENV_SILENCE_MODEL = "DCAF_SILENCE_MODEL_ID"
+
+# Provider defaults
+_DEFAULT_PROVIDER = "bedrock"
+_PROVIDER_MODEL_DEFAULTS = {
+    "bedrock": "us.anthropic.claude-3-5-haiku-20241022-v1:0",
+    "google": "gemini-2.0-flash",
+}
+
+
+def _create_llm_from_env() -> tuple[LLM, str]:
+    """Create an LLM client and resolve model ID from environment variables."""
+    provider = os.getenv(_ENV_PROVIDER, _DEFAULT_PROVIDER).lower()
+    model_id = os.getenv(_ENV_SILENCE_MODEL) or _PROVIDER_MODEL_DEFAULTS.get(provider, "")
+
+    if provider == "google":
+        return VertexLLM(), model_id
+    else:
+        return BedrockLLM(), model_id
 
 
 class ChannelResponseRouter:
@@ -34,7 +57,7 @@ class SlackResponseRouter(ChannelResponseRouter):
 
     def __init__(
         self,
-        llm_client: BedrockLLM,
+        llm_client: LLM | None = None,
         agent_name: str = "Assistant",
         agent_description: str = "",
         model_id: str | None = None,
@@ -43,14 +66,20 @@ class SlackResponseRouter(ChannelResponseRouter):
         Initialize the Slack Response Router.
 
         Args:
-            llm_client: The Bedrock Anthropic LLM instance
+            llm_client: LLM instance. If None, auto-created from DCAF_PROVIDER env var.
             agent_name: The name of the agent for context in decision making
             agent_description: The description of the agent for context in decision making
+            model_id: Model ID override. If None, uses DCAF_SILENCE_MODEL_ID env var
+                      or provider default.
         """
-        self.llm_client = llm_client
+        if llm_client is not None:
+            self.llm_client = llm_client
+            self.model_id = model_id
+        else:
+            self.llm_client, default_model = _create_llm_from_env()
+            self.model_id = model_id or default_model
         self.agent_name = agent_name
         self.agent_description = agent_description
-        self.model_id = model_id
 
     def _get_system_prompt(self) -> str:
         """
@@ -140,16 +169,21 @@ Focus primarily on the LATEST message, but use thread context to understand if t
 
         return formatted_conversation
 
-    def should_agent_respond(self, slack_thread: str) -> dict[str, Any]:
+    def should_agent_respond(
+        self, slack_thread: str | list[dict[str, Any]]
+    ) -> dict[str, Any]:
         """
         Determines if a DuploCloud agent should respond to the latest message in a Slack thread.
 
         Args:
-            slack_thread: Complete Slack thread conversation as string
+            slack_thread: Slack thread as a string or list of message dicts
+                          with 'role' and 'content' keys.
 
         Returns:
             dict: {"should_respond": bool, "reasoning": str}
         """
+        if isinstance(slack_thread, list):
+            slack_thread = self._format_slack_messages(slack_thread)
 
         # Tool schema for structured response
         routing_tool = {
@@ -171,22 +205,6 @@ Focus primarily on the LATEST message, but use thread context to understand if t
             },
         }
 
-        # # Tool schema for structured response
-        # routing_tool = {
-        #     "name": "slack_routing_decision",
-        #     "description": "Make a decision about whether the agent should respond to the latest Slack message",
-        #     "input_schema": {
-        #         "type": "object",
-        #         "properties": {
-        #             "should_respond": {
-        #                 "type": "boolean",
-        #                 "description": "True if the agent should respond, False if it should stay silent"
-        #             }
-        #         },
-        #         "required": ["should_respond"]
-        #     }
-        # }
-
         system_prompt = self._get_system_prompt()
 
         # Prepare messages for LLM
@@ -201,16 +219,12 @@ Focus primarily on the LATEST message, but use thread context to understand if t
             # Call LLM with forced tool use
             response = self.llm_client.invoke(
                 messages=messages,
-                model_id=self.model_id
-                if self.model_id
-                else "us.anthropic.claude-3-5-haiku-20241022-v1:0",
+                model_id=self.model_id,
                 system_prompt=system_prompt,
                 tools=[routing_tool],
                 tool_choice={"type": "tool", "name": "slack_routing_decision"},
                 max_tokens=200,
                 temperature=0.0,
-                latency="optimized",
-                # latency="standard"
             )
 
             logger.info("Slack Channel Router LLM Response: %s", response)
