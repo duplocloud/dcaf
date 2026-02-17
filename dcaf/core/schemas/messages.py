@@ -72,6 +72,9 @@ class PlatformContext(BaseModel):
     aws_credentials: dict[str, Any] | None = None
     aws_region: str | None = None
 
+    # Scopes (evolving — kept generic intentionally)
+    scopes: list[dict[str, Any]] = Field(default_factory=list)
+
     model_config = ConfigDict(extra="allow")  # Allow additional fields to pass through
 
 
