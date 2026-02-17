@@ -10,6 +10,7 @@ from urllib.parse import urlparse
 
 import httpx
 from agno.skills import LocalSkills, Skills
+from agno.skills.loaders.base import SkillLoader
 
 from dcaf.core.config import EnvVars
 from dcaf.core.domain.value_objects.skill_definition import SkillDefinition
@@ -243,7 +244,7 @@ class SkillManager:
         if not definitions:
             return None
 
-        loaders: list[LocalSkills] = []
+        loaders: list[SkillLoader] = []
 
         for skill in definitions:
             path = self.get_local_skill_path(skill)

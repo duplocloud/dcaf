@@ -21,6 +21,7 @@ from typing import Any
 
 # Agno SDK imports
 from agno.agent import Agent as AgnoAgent
+from agno.skills import Skills
 from agno.tools import tool as agno_tool_decorator
 from agno.utils.log import set_log_level_to_debug, set_log_level_to_info
 
@@ -30,7 +31,9 @@ from ....application.dto.responses import (
     StreamEventType,
 )
 from ....application.ports.mcp_protocol import MCPToolLike
+from ....domain.value_objects.skill_definition import SkillDefinition
 from ....events import Event, EventRegistry
+from ....services.skill_manager import SkillManager
 from .gcp_metadata import GCPMetadataManager, get_default_gcp_metadata_manager
 from .message_converter import AgnoMessageConverter
 from .model_factory import AgnoModelFactory, ModelConfig
@@ -44,8 +47,6 @@ from .types import (
     DEFAULT_TEMPERATURE,
     DEFAULT_TOOL_CALL_LIMIT,
 )
-from ....domain.value_objects.skill_definition import SkillDefinition
-from ....services.skill_manager import SkillManager
 
 logger = logging.getLogger(__name__)
 
@@ -669,7 +670,7 @@ class AgnoAdapter:
 
     async def _resolve_skills(
         self, platform_context: dict[str, Any] | None
-    ) -> "Skills | None":
+    ) -> Skills | None:
         """
         Extract and resolve skills from platform context.
 

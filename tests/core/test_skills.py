@@ -410,21 +410,23 @@ class TestAgnoAdapterSkillsIntegration:
         mock_model = MagicMock()
         adapter._get_or_create_model_async = AsyncMock(return_value=mock_model)
 
-        with patch.object(SkillManager, "__init__", lambda self, **kwargs: setattr(self, "storage_path", str(tmp_path)) or None):
-            with patch.object(SkillManager, "get_local_skill_path", return_value=str(skill_dir)):
-                with patch("dcaf.core.adapters.outbound.agno.adapter.AgnoAgent") as mock_agno_agent:
-                    mock_agno_agent.return_value = MagicMock()
+        with (
+            patch.object(SkillManager, "__init__", lambda self, **_kw: setattr(self, "storage_path", str(tmp_path)) or None),
+            patch.object(SkillManager, "get_local_skill_path", return_value=str(skill_dir)),
+            patch("dcaf.core.adapters.outbound.agno.adapter.AgnoAgent") as mock_agno_agent,
+        ):
+            mock_agno_agent.return_value = MagicMock()
 
-                    await adapter._create_agent_async(
-                        tools=[],
-                        system_prompt="test",
-                        platform_context=platform_context,
-                    )
+            await adapter._create_agent_async(
+                tools=[],
+                system_prompt="test",
+                platform_context=platform_context,
+            )
 
-                    # Verify AgnoAgent was called with skills parameter
-                    call_kwargs = mock_agno_agent.call_args[1]
-                    assert "skills" in call_kwargs
-                    assert call_kwargs["skills"] is not None
+            # Verify AgnoAgent was called with skills parameter
+            call_kwargs = mock_agno_agent.call_args[1]
+            assert "skills" in call_kwargs
+            assert call_kwargs["skills"] is not None
 
     @pytest.mark.asyncio
     async def test_create_agent_without_skills(self):
