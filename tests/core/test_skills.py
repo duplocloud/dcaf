@@ -453,3 +453,65 @@ class TestEnvVarsConfig:
         from dcaf.core.config import EnvVars
 
         assert EnvVars.PERSISTENT_VOLUME_STORAGE == "PERSISTENT_VOLUME_STORAGE"
+
+
+class TestSkillsEndToEnd:
+    @pytest.mark.asyncio
+    async def test_full_flow_cached_skill(self, tmp_path, monkeypatch):
+        """End-to-end: cached skill flows from platform context to SkillManager resolution."""
+        from agno.skills import Skills
+
+        monkeypatch.setenv("PERSISTENT_VOLUME_STORAGE", str(tmp_path))
+
+        # Set up a cached skill
+        skill_dir = tmp_path / "skills" / "e2e-skill" / "1.0.0"
+        skill_dir.mkdir(parents=True)
+        (skill_dir / "SKILL.md").write_text(
+            "---\nname: e2e-skill\ndescription: End to end test skill\n---\n# E2E Skill"
+        )
+
+        # Build skill definitions as they'd appear in platform context
+        definitions = [
+            SkillDefinition(name="e2e-skill", version="1.0.0", url="https://example.com/unused"),
+        ]
+
+        manager = SkillManager()
+        result = await manager.resolve_skills(definitions)
+
+        assert isinstance(result, Skills)
+        assert "e2e-skill" in result.get_skill_names()
+
+    @pytest.mark.asyncio
+    async def test_full_flow_fetch_and_cache(self, tmp_path, monkeypatch):
+        """End-to-end: skill not cached -> fetched -> cached -> loaded."""
+        monkeypatch.setenv("PERSISTENT_VOLUME_STORAGE", str(tmp_path))
+
+        zip_bytes = _make_zip_bytes({
+            "SKILL.md": "---\nname: fetched\ndescription: Fetched skill\n---\n# Fetched",
+        })
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.content = zip_bytes
+        mock_response.headers = {"content-type": "application/zip"}
+        mock_response.raise_for_status = MagicMock()
+
+        definitions = [
+            SkillDefinition(name="fetched", version="1.0.0", url="https://example.com/skill.zip"),
+        ]
+
+        manager = SkillManager()
+
+        with patch("dcaf.core.services.skill_manager.httpx.AsyncClient") as mock_client_cls:
+            mock_client = AsyncMock()
+            mock_client.get = AsyncMock(return_value=mock_response)
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=False)
+            mock_client_cls.return_value = mock_client
+
+            result = await manager.resolve_skills(definitions)
+
+        assert result is not None
+        # Verify it was cached
+        cached = tmp_path / "skills" / "fetched" / "1.0.0" / "SKILL.md"
+        assert cached.is_file()
