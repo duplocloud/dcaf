@@ -50,7 +50,7 @@ class BedrockLLM(LLM):
                          over environment variables. If None, uses env vars or defaults.
 
         Environment Variables (used when boto3_config=None):
-            BOTO3_READ_TIMEOUT: Read timeout in seconds (default: 20)
+            BOTO3_READ_TIMEOUT: Read timeout in seconds (default: 300)
             BOTO3_CONNECT_TIMEOUT: Connect timeout in seconds (default: 10)
             BOTO3_MAX_ATTEMPTS: Max retry attempts (default: 3)
             BOTO3_RETRY_MODE: Retry mode - 'standard', 'adaptive', or 'legacy' (default: 'standard')
@@ -60,7 +60,7 @@ class BedrockLLM(LLM):
 
         if boto3_config is None:
             boto3_config = Config(
-                read_timeout=int(os.getenv("BOTO3_READ_TIMEOUT", "20")),
+                read_timeout=int(os.getenv("BOTO3_READ_TIMEOUT", "300")),
                 connect_timeout=int(os.getenv("BOTO3_CONNECT_TIMEOUT", "10")),
                 tcp_keepalive=True,
                 retries={
