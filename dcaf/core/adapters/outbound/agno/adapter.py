@@ -44,6 +44,8 @@ from .types import (
     DEFAULT_TEMPERATURE,
     DEFAULT_TOOL_CALL_LIMIT,
 )
+from ....domain.value_objects.skill_definition import SkillDefinition
+from ....services.skill_manager import SkillManager
 
 logger = logging.getLogger(__name__)
 
@@ -644,9 +646,13 @@ class AgnoAdapter:
         # This is necessary because Agno has a bug handling multiple toolUse blocks
         modified_prompt = self._get_modified_system_prompt(system_prompt)
 
+        # Resolve skills from platform context
+        agno_skills = await self._resolve_skills(platform_context)
+
         logger.info(
             f"Agno: Creating agent with {len(agno_tools)} tools "
-            f"(stream={stream}, tool_limit={self._tool_call_limit})"
+            f"(stream={stream}, tool_limit={self._tool_call_limit}, "
+            f"skills={'yes' if agno_skills else 'no'})"
         )
 
         # Create the agent
@@ -656,9 +662,37 @@ class AgnoAdapter:
             tools=agno_tools if agno_tools else None,
             stream=stream,
             tool_call_limit=self._tool_call_limit,
+            skills=agno_skills,
         )
 
         return agent
+
+    async def _resolve_skills(
+        self, platform_context: dict[str, Any] | None
+    ) -> "Skills | None":
+        """
+        Extract and resolve skills from platform context.
+
+        Args:
+            platform_context: The platform context dict, may contain a "skills" key.
+
+        Returns:
+            An Agno Skills object, or None if no skills are defined.
+        """
+        if not platform_context:
+            return None
+
+        raw_skills = platform_context.get("skills")
+        if not raw_skills:
+            return None
+
+        definitions = [
+            SkillDefinition(name=s["name"], version=s["version"], url=s["url"])
+            for s in raw_skills
+        ]
+
+        manager = SkillManager()
+        return await manager.resolve_skills(definitions)
 
     def _get_modified_system_prompt(self, system_prompt: str | None) -> str:
         """

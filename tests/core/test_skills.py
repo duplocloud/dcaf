@@ -385,3 +385,64 @@ class TestSkillManagerResolve:
         result = await manager.resolve_skills(definitions)
 
         assert result is None
+
+
+class TestAgnoAdapterSkillsIntegration:
+    @pytest.mark.asyncio
+    async def test_create_agent_with_skills(self, tmp_path):
+        """AgnoAgent is created with skills= parameter when platform_context has skills."""
+        # Create a cached skill
+        skill_dir = tmp_path / "skills" / "test-skill" / "1.0.0"
+        skill_dir.mkdir(parents=True)
+        (skill_dir / "SKILL.md").write_text("---\nname: test-skill\ndescription: A test\n---\n# Test")
+
+        platform_context = {
+            "skills": [
+                {"name": "test-skill", "version": "1.0.0", "url": "https://example.com/unused"},
+            ],
+        }
+
+        from dcaf.core.adapters.outbound.agno.adapter import AgnoAdapter
+
+        adapter = AgnoAdapter(model_id="test-model", provider="anthropic")
+
+        # Mock model creation to avoid real API calls
+        mock_model = MagicMock()
+        adapter._get_or_create_model_async = AsyncMock(return_value=mock_model)
+
+        with patch.object(SkillManager, "__init__", lambda self, **kwargs: setattr(self, "storage_path", str(tmp_path)) or None):
+            with patch.object(SkillManager, "get_local_skill_path", return_value=str(skill_dir)):
+                with patch("dcaf.core.adapters.outbound.agno.adapter.AgnoAgent") as mock_agno_agent:
+                    mock_agno_agent.return_value = MagicMock()
+
+                    await adapter._create_agent_async(
+                        tools=[],
+                        system_prompt="test",
+                        platform_context=platform_context,
+                    )
+
+                    # Verify AgnoAgent was called with skills parameter
+                    call_kwargs = mock_agno_agent.call_args[1]
+                    assert "skills" in call_kwargs
+                    assert call_kwargs["skills"] is not None
+
+    @pytest.mark.asyncio
+    async def test_create_agent_without_skills(self):
+        """AgnoAgent is created without skills when platform_context has no skills."""
+        from dcaf.core.adapters.outbound.agno.adapter import AgnoAdapter
+
+        adapter = AgnoAdapter(model_id="test-model", provider="anthropic")
+        mock_model = MagicMock()
+        adapter._get_or_create_model_async = AsyncMock(return_value=mock_model)
+
+        with patch("dcaf.core.adapters.outbound.agno.adapter.AgnoAgent") as mock_agno_agent:
+            mock_agno_agent.return_value = MagicMock()
+
+            await adapter._create_agent_async(
+                tools=[],
+                system_prompt="test",
+                platform_context={"tenant_id": "t1"},
+            )
+
+            call_kwargs = mock_agno_agent.call_args[1]
+            assert call_kwargs.get("skills") is None
