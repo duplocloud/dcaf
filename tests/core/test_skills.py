@@ -446,3 +446,10 @@ class TestAgnoAdapterSkillsIntegration:
 
             call_kwargs = mock_agno_agent.call_args[1]
             assert call_kwargs.get("skills") is None
+
+
+class TestEnvVarsConfig:
+    def test_persistent_volume_storage_constant_exists(self):
+        from dcaf.core.config import EnvVars
+
+        assert EnvVars.PERSISTENT_VOLUME_STORAGE == "PERSISTENT_VOLUME_STORAGE"

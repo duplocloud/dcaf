@@ -100,6 +100,9 @@ class EnvVars:
     DISABLE_HISTORY = "DCAF_DISABLE_HISTORY"
     DISABLE_TOOL_FILTERING = "DCAF_DISABLE_TOOL_FILTERING"
 
+    # Storage
+    PERSISTENT_VOLUME_STORAGE = "PERSISTENT_VOLUME_STORAGE"
+
 
 # ============================================================================
 # Configuration Loading

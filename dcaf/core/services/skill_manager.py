@@ -11,6 +11,7 @@ from urllib.parse import urlparse
 import httpx
 from agno.skills import LocalSkills, Skills
 
+from dcaf.core.config import EnvVars
 from dcaf.core.domain.value_objects.skill_definition import SkillDefinition
 
 logger = logging.getLogger(__name__)
@@ -35,7 +36,7 @@ class SkillManager:
 
     def __init__(self, storage_path: str | None = None) -> None:
         self.storage_path = (
-            storage_path or os.environ.get("PERSISTENT_VOLUME_STORAGE") or DEFAULT_STORAGE_PATH
+            storage_path or os.environ.get(EnvVars.PERSISTENT_VOLUME_STORAGE) or DEFAULT_STORAGE_PATH
         )
 
     def get_local_skill_path(self, skill: SkillDefinition) -> str | None:
