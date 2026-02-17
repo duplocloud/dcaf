@@ -40,11 +40,7 @@ class VertexLLM(LLM):
                       env var, then defaults to 'us-central1'.
         """
         self.project_id = project_id or os.getenv("GOOGLE_CLOUD_PROJECT")
-        self.location = (
-            location
-            or os.getenv("DCAF_GOOGLE_MODEL_LOCATION")
-            or "us-central1"
-        )
+        self.location = location or os.getenv("DCAF_GOOGLE_MODEL_LOCATION") or "us-central1"
 
         logger.info(
             f"Initializing Vertex AI client (project={self.project_id}, location={self.location})"
@@ -118,8 +114,8 @@ class VertexLLM(LLM):
             config_kwargs["tools"] = [self._format_tools(tools)]
             config_kwargs["tool_config"] = self._format_tool_choice(tool_choice)
             # Disable auto-execution so we get raw function calls back
-            config_kwargs["automatic_function_calling"] = (
-                types.AutomaticFunctionCallingConfig(disable=True)
+            config_kwargs["automatic_function_calling"] = types.AutomaticFunctionCallingConfig(
+                disable=True
             )
 
         config = types.GenerateContentConfig(**config_kwargs)
@@ -169,9 +165,7 @@ class VertexLLM(LLM):
             )
         return types.Tool(function_declarations=declarations)
 
-    def _format_tool_choice(
-        self, tool_choice: str | dict[str, Any] | None
-    ) -> types.ToolConfig:
+    def _format_tool_choice(self, tool_choice: str | dict[str, Any] | None) -> types.ToolConfig:
         """Convert tool_choice to google-genai ToolConfig."""
         if tool_choice is None or tool_choice == "auto":
             return types.ToolConfig(
@@ -179,9 +173,7 @@ class VertexLLM(LLM):
             )
 
         if tool_choice == "any":
-            return types.ToolConfig(
-                function_calling_config=types.FunctionCallingConfig(mode="ANY")
-            )
+            return types.ToolConfig(function_calling_config=types.FunctionCallingConfig(mode="ANY"))
 
         # Specific tool: {'name': 'X'} or {'type': 'tool', 'name': 'X'}
         if isinstance(tool_choice, dict) and "name" in tool_choice:
@@ -193,9 +185,7 @@ class VertexLLM(LLM):
             )
 
         # Fallback
-        return types.ToolConfig(
-            function_calling_config=types.FunctionCallingConfig(mode="AUTO")
-        )
+        return types.ToolConfig(function_calling_config=types.FunctionCallingConfig(mode="AUTO"))
 
     def _normalize_response(self, response: Any) -> dict[str, Any]:
         """
@@ -212,12 +202,16 @@ class VertexLLM(LLM):
             for part in candidate.content.parts:
                 if part.function_call:
                     has_tool_use = True
-                    content_blocks.append({
-                        "toolUse": {
-                            "name": part.function_call.name,
-                            "input": dict(part.function_call.args) if part.function_call.args else {},
+                    content_blocks.append(
+                        {
+                            "toolUse": {
+                                "name": part.function_call.name,
+                                "input": dict(part.function_call.args)
+                                if part.function_call.args
+                                else {},
+                            }
                         }
-                    })
+                    )
                 elif part.text:
                     content_blocks.append({"text": part.text})
 

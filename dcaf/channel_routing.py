@@ -169,9 +169,7 @@ Focus primarily on the LATEST message, but use thread context to understand if t
 
         return formatted_conversation
 
-    def should_agent_respond(
-        self, slack_thread: str | list[dict[str, Any]]
-    ) -> dict[str, Any]:
+    def should_agent_respond(self, slack_thread: str | list[dict[str, Any]]) -> dict[str, Any]:
         """
         Determines if a DuploCloud agent should respond to the latest message in a Slack thread.
 
