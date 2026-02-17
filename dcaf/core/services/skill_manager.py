@@ -9,6 +9,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 import httpx
+from agno.skills import LocalSkills, Skills
 
 from dcaf.core.domain.value_objects.skill_definition import SkillDefinition
 
@@ -117,7 +118,10 @@ class SkillManager:
                 if len(response.content) > MAX_SKILL_SIZE:
                     logger.error(
                         "Skill '%s' v%s: download too large (%d bytes, max %d)",
-                        skill.name, skill.version, len(response.content), MAX_SKILL_SIZE,
+                        skill.name,
+                        skill.version,
+                        len(response.content),
+                        MAX_SKILL_SIZE,
                     )
                     return None
         except Exception:
@@ -191,7 +195,9 @@ class SkillManager:
                     if not str(member_path).startswith(str(target.resolve())):
                         logger.error(
                             "Skill '%s' v%s: zip contains unsafe path: %s",
-                            skill.name, skill.version, member,
+                            skill.name,
+                            skill.version,
+                            member,
                         )
                         shutil.rmtree(target, ignore_errors=True)
                         return None
@@ -216,3 +222,48 @@ class SkillManager:
             return None
 
         return str(target)
+
+    async def resolve_skills(self, definitions: list[SkillDefinition]) -> Skills | None:
+        """
+        Resolve a list of skill definitions into an Agno Skills object.
+
+        For each skill:
+        1. Check local cache
+        2. If not cached, fetch and cache from URL
+        3. If fetch fails, skip and log error
+
+        Args:
+            definitions: List of skill definitions from platform context.
+
+        Returns:
+            An Agno Skills object with LocalSkills loaders, or None if
+            no skills were resolved.
+        """
+        if not definitions:
+            return None
+
+        loaders: list[LocalSkills] = []
+
+        for skill in definitions:
+            path = self.get_local_skill_path(skill)
+
+            if path is None:
+                path = await self.fetch_and_cache(skill)
+
+            if path is None:
+                logger.error(
+                    "Skipping skill '%s' v%s: could not resolve locally or from %s",
+                    skill.name,
+                    skill.version,
+                    skill.url,
+                )
+                continue
+
+            loaders.append(LocalSkills(path, validate=False))
+            logger.info("Loaded skill '%s' v%s from %s", skill.name, skill.version, path)
+
+        if not loaders:
+            logger.warning("No skills could be resolved")
+            return None
+
+        return Skills(loaders=loaders)

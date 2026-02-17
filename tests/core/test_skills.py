@@ -308,3 +308,80 @@ class TestSkillManagerFetch:
             path = await manager.fetch_and_cache(skill)
 
         assert path is None
+
+
+class TestSkillManagerResolve:
+    @pytest.mark.asyncio
+    async def test_resolve_cached_skills(self, tmp_path):
+        """resolve_skills returns an Agno Skills object for cached skills."""
+        from agno.skills import Skills
+
+        # Create two cached skills
+        for name, ver in [("skill-a", "1.0.0"), ("skill-b", "2.0.0")]:
+            d = tmp_path / "skills" / name / ver
+            d.mkdir(parents=True)
+            (d / "SKILL.md").write_text(f"# {name}")
+
+        manager = SkillManager(storage_path=str(tmp_path))
+        definitions = [
+            SkillDefinition(name="skill-a", version="1.0.0", url="https://example.com/a"),
+            SkillDefinition(name="skill-b", version="2.0.0", url="https://example.com/b"),
+        ]
+
+        result = await manager.resolve_skills(definitions)
+
+        assert isinstance(result, Skills)
+
+    @pytest.mark.asyncio
+    async def test_resolve_empty_list(self, tmp_path):
+        """Empty skills list returns None."""
+        manager = SkillManager(storage_path=str(tmp_path))
+
+        result = await manager.resolve_skills([])
+
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_resolve_skips_failed_skills(self, tmp_path):
+        """Skills that fail to fetch are skipped, others still load."""
+        from agno.skills import Skills
+
+        # One cached skill
+        d = tmp_path / "skills" / "good" / "1.0.0"
+        d.mkdir(parents=True)
+        (d / "SKILL.md").write_text("# Good skill")
+
+        manager = SkillManager(storage_path=str(tmp_path))
+        definitions = [
+            SkillDefinition(name="good", version="1.0.0", url="https://example.com/good"),
+            SkillDefinition(name="bad", version="1.0.0", url="https://down.example.com/bad"),
+        ]
+
+        # Mock fetch_and_cache to fail for the "bad" skill
+        original_fetch = manager.fetch_and_cache
+
+        async def selective_fetch(skill):
+            if skill.name == "bad":
+                return None
+            return await original_fetch(skill)
+
+        manager.fetch_and_cache = selective_fetch
+
+        result = await manager.resolve_skills(definitions)
+
+        assert isinstance(result, Skills)
+
+    @pytest.mark.asyncio
+    async def test_resolve_all_skills_fail(self, tmp_path):
+        """If all skills fail to resolve, return None."""
+        manager = SkillManager(storage_path=str(tmp_path))
+        definitions = [
+            SkillDefinition(name="fail1", version="1.0.0", url="https://down.example.com/a"),
+        ]
+
+        # Mock fetch to always fail
+        manager.fetch_and_cache = AsyncMock(return_value=None)
+
+        result = await manager.resolve_skills(definitions)
+
+        assert result is None
