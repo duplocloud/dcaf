@@ -140,6 +140,7 @@ nav:
   - Guides:
     - Custom Agents: guides/custom-agents.md
     - Building Tools: guides/building-tools.md
+    - Skills: guides/skills.md
     - MCP Tools (External): guides/mcp-tools.md
     - Tracing & Observability: guides/tracing-observability.md
     - Environment Configuration: guides/environment-configuration.md
@@ -167,6 +168,7 @@ nav:
       - "005: Cohesive Provider Modules": adrs/005-cohesive-provider-modules.md
       - "006: Strangler Fig Migration": adrs/006-strangler-fig-migration.md
       - "007: Lowercase Chat Endpoints": adrs/007-lowercase-chat-endpoints.md
+      - "008: Skills Design Decisions": adrs/008-skills-design-decisions.md
   
   - Examples: examples/examples.md
 
