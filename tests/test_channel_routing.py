@@ -2,8 +2,6 @@
 
 from unittest.mock import MagicMock
 
-import pytest
-
 from dcaf.channel_routing import SlackResponseRouter
 
 
@@ -53,9 +51,7 @@ class TestSlackResponseRouter:
         return router, llm
 
     def test_should_respond_true(self):
-        router, _ = self._create_router(
-            _tool_response(True, "User asked a direct question")
-        )
+        router, _ = self._create_router(_tool_response(True, "User asked a direct question"))
         result = router.should_agent_respond("@TestBot can you help?")
         assert result["should_respond"] is True
         assert result["reasoning"] == "User asked a direct question"
