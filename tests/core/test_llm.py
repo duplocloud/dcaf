@@ -333,11 +333,13 @@ class TestBuildMessages:
         assert messages[0].role == "user"
 
     def test_multiple_messages(self):
-        messages = LLM._build_messages([
-            {"role": "user", "content": "Hello"},
-            {"role": "assistant", "content": "Hi there"},
-            {"role": "user", "content": "Thanks"},
-        ])
+        messages = LLM._build_messages(
+            [
+                {"role": "user", "content": "Hello"},
+                {"role": "assistant", "content": "Hi there"},
+                {"role": "user", "content": "Thanks"},
+            ]
+        )
         assert len(messages) == 3
 
 
