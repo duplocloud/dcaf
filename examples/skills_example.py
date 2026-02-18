@@ -43,7 +43,7 @@ import dotenv
 dotenv.load_dotenv(override=True)
 
 from dcaf.core import Agent, serve  # noqa: E402
-from dcaf.tools import tool  # noqa: E402
+from dcaf.core.tools import tool  # noqa: E402
 
 SKILLS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "skills")
 SKILL_SERVER_PORT = 8001
