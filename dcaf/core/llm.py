@@ -360,12 +360,15 @@ class LLM:
 
         # Extract usage metrics
         usage: dict[str, int] = {}
-        if model_response.input_tokens is not None:
-            usage["input_tokens"] = model_response.input_tokens
-        if model_response.output_tokens is not None:
-            usage["output_tokens"] = model_response.output_tokens
-        if model_response.total_tokens is not None:
-            usage["total_tokens"] = model_response.total_tokens
+        input_tokens = getattr(model_response, "input_tokens", None)
+        if input_tokens is not None:
+            usage["input_tokens"] = input_tokens
+        output_tokens = getattr(model_response, "output_tokens", None)
+        if output_tokens is not None:
+            usage["output_tokens"] = output_tokens
+        total_tokens = getattr(model_response, "total_tokens", None)
+        if total_tokens is not None:
+            usage["total_tokens"] = total_tokens
 
         return LLMResponse(
             text=text,
