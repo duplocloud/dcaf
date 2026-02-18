@@ -43,7 +43,7 @@ import dotenv
 dotenv.load_dotenv(override=True)
 
 from dcaf.core import Agent, serve  # noqa: E402
-from dcaf.core.tools import tool  # noqa: E402
+from dcaf.core.tools import tool  # noqa: E402  # v2 decorator (auto-generates schema)
 
 SKILLS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "skills")
 SKILL_SERVER_PORT = 8001
@@ -53,6 +53,8 @@ AGENT_SERVER_PORT = 8000
 @tool(requires_approval=False, description="Run a git command and return its output")
 def run_command(command: str) -> str:
     """Execute a git command. Only git commands are allowed for safety."""
+    # NOTE: POC only. The startswith check is a basic guard.
+    # For production, allowlist specific git subcommands and avoid shell=True.
     if not command.strip().startswith("git"):
         return "Error: Only git commands are allowed"
     try:
@@ -70,7 +72,7 @@ def run_command(command: str) -> str:
 def start_skill_server(directory: str, port: int) -> HTTPServer:
     """Start a background HTTP server to serve skill files."""
     handler = partial(SimpleHTTPRequestHandler, directory=directory)
-    server = HTTPServer(("0.0.0.0", port), handler)
+    server = HTTPServer(("127.0.0.1", port), handler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     return server
