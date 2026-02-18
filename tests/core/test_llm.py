@@ -16,19 +16,12 @@ class TestLLMResponse:
     def test_defaults(self):
         resp = LLMResponse()
         assert resp.text is None
-        assert resp.tool_calls == []
         assert resp.usage == {}
         assert resp.raw is None
 
     def test_with_text(self):
         resp = LLMResponse(text="Hello")
         assert resp.text == "Hello"
-
-    def test_with_tool_calls(self):
-        calls = [{"name": "get_weather", "input": {"city": "NYC"}}]
-        resp = LLMResponse(tool_calls=calls)
-        assert len(resp.tool_calls) == 1
-        assert resp.tool_calls[0]["name"] == "get_weather"
 
     def test_with_usage(self):
         resp = LLMResponse(usage={"input_tokens": 10, "output_tokens": 5, "total_tokens": 15})
@@ -38,7 +31,6 @@ class TestLLMResponse:
     def test_is_dataclass(self):
         field_names = {f.name for f in fields(LLMResponse)}
         assert "text" in field_names
-        assert "tool_calls" in field_names
         assert "usage" in field_names
         assert "raw" in field_names
 
@@ -59,7 +51,6 @@ class TestAgentResponseInheritance:
 
         resp = AgentResponse()
         assert resp.text is None
-        assert resp.tool_calls == []
         assert resp.usage == {}
 
     def test_agent_response_has_agent_fields(self):
@@ -67,14 +58,12 @@ class TestAgentResponseInheritance:
 
         resp = AgentResponse(
             text="Hi",
-            tool_calls=[{"name": "t", "input": {}}],
             needs_approval=True,
             conversation_id="abc",
         )
         assert resp.text == "Hi"
         assert resp.needs_approval is True
         assert resp.conversation_id == "abc"
-        assert len(resp.tool_calls) == 1
 
 
 # =============================================================================
@@ -158,38 +147,6 @@ class TestLLMAInvoke:
         assert response.text == "Hello world"
         assert response.usage["input_tokens"] == 10
         assert response.usage["output_tokens"] == 5
-
-    @pytest.mark.asyncio
-    @patch("dcaf.core.llm.AgnoModelFactory")
-    @patch("dcaf.core.llm.get_default_gcp_metadata_manager")
-    async def test_extracts_tool_calls(self, mock_gcp, mock_factory_cls):
-        mock_gcp.return_value = MagicMock()
-
-        mock_model_response = MagicMock()
-        mock_model_response.content = None
-        mock_model_response.tool_calls = [
-            {"function": {"name": "get_weather", "arguments": '{"city": "NYC"}'}}
-        ]
-        mock_model_response.input_tokens = None
-        mock_model_response.output_tokens = None
-        mock_model_response.total_tokens = None
-
-        mock_model = MagicMock()
-        mock_model.ainvoke = AsyncMock(return_value=mock_model_response)
-
-        mock_factory = MagicMock()
-        mock_factory.create_model = AsyncMock(return_value=mock_model)
-        mock_factory_cls.return_value = mock_factory
-
-        llm = LLM(provider="bedrock", model="test-model")
-        response = await llm.ainvoke(
-            messages=[{"role": "user", "content": "Weather?"}],
-            tools=[{"name": "get_weather", "description": "Get weather", "input_schema": {}}],
-        )
-
-        assert len(response.tool_calls) == 1
-        assert response.tool_calls[0]["name"] == "get_weather"
-        assert response.tool_calls[0]["input"] == {"city": "NYC"}
 
     @pytest.mark.asyncio
     @patch("dcaf.core.llm.AgnoModelFactory")
@@ -352,32 +309,6 @@ class TestConvertResponse:
 
         result = LLM._convert_response(mock_resp)
         assert result.text is None
-
-    def test_tool_calls_with_json_string_arguments(self):
-        mock_resp = MagicMock()
-        mock_resp.content = None
-        mock_resp.tool_calls = [
-            {"function": {"name": "my_tool", "arguments": '{"key": "value"}'}}
-        ]
-        mock_resp.input_tokens = None
-        mock_resp.output_tokens = None
-        mock_resp.total_tokens = None
-
-        result = LLM._convert_response(mock_resp)
-        assert result.tool_calls[0]["input"] == {"key": "value"}
-
-    def test_tool_calls_with_dict_arguments(self):
-        mock_resp = MagicMock()
-        mock_resp.content = None
-        mock_resp.tool_calls = [
-            {"name": "my_tool", "input": {"key": "value"}}
-        ]
-        mock_resp.input_tokens = None
-        mock_resp.output_tokens = None
-        mock_resp.total_tokens = None
-
-        result = LLM._convert_response(mock_resp)
-        assert result.tool_calls[0]["input"] == {"key": "value"}
 
 
 # =============================================================================

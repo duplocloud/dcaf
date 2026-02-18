@@ -58,7 +58,6 @@ response = llm.invoke(
     system_prompt="You are helpful.",
 )
 print(response.text)
-print(response.tool_calls)
 print(response.usage)
 
 # Async call
@@ -227,17 +226,15 @@ Response from a direct LLM call. This is the **base class** for `AgentResponse`.
 @dataclass
 class LLMResponse:
     text: str | None = None
-    tool_calls: list[dict[str, Any]] = field(default_factory=list)
     usage: dict[str, int] = field(default_factory=dict)
     raw: ModelResponse | None = field(default=None, repr=False)
 ```
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `text` | `str \| None` | The model's text response, or `None` if only tool calls were returned |
-| `tool_calls` | `list[dict]` | Normalized tool calls. Each entry has `name` and `input` keys |
+| `text` | `str \| None` | The model's text response |
 | `usage` | `dict[str, int]` | Token usage: `input_tokens`, `output_tokens`, `total_tokens` |
-| `raw` | `ModelResponse \| None` | The underlying Agno `ModelResponse` for advanced use |
+| `raw` | `ModelResponse \| None` | The underlying Agno `ModelResponse` for advanced use (e.g., accessing tool calls) |
 
 #### Relationship to AgentResponse
 
@@ -246,7 +243,7 @@ class LLMResponse:
 ```python
 @dataclass
 class AgentResponse(LLMResponse):
-    # Inherits: text, tool_calls, usage, raw
+    # Inherits: text, usage, raw
     needs_approval: bool = False
     pending_tools: list[PendingToolCall] = field(default_factory=list)
     conversation_id: str = ""
@@ -255,42 +252,6 @@ class AgentResponse(LLMResponse):
 ```
 
 This means every `AgentResponse` is also an `LLMResponse`, and code that works with `LLMResponse` will also work with `AgentResponse`.
-
----
-
-## Tool Calling
-
-The LLM layer supports tool calling via the standard tool schema format:
-
-```python
-tools = [
-    {
-        "name": "get_weather",
-        "description": "Get the current weather for a location",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "location": {
-                    "type": "string",
-                    "description": "City and state",
-                }
-            },
-            "required": ["location"],
-        },
-    }
-]
-
-response = llm.invoke(
-    messages=[{"role": "user", "content": "What's the weather in NYC?"}],
-    tools=tools,
-    tool_choice={"name": "get_weather"},  # Force this tool
-)
-
-if response.tool_calls:
-    tool_call = response.tool_calls[0]
-    print(tool_call["name"])   # "get_weather"
-    print(tool_call["input"])  # {"location": "NYC"}
-```
 
 ---
 
@@ -325,7 +286,10 @@ response = llm.invoke(
     temperature=0.0,
 )
 
-should_respond = response.tool_calls[0]["input"]["should_respond"]
+# Tool call results are available on the raw response
+raw_tool_calls = getattr(response.raw, "tool_calls", None)
+if raw_tool_calls:
+    should_respond = raw_tool_calls[0]["input"]["should_respond"]
 ```
 
 ---

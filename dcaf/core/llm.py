@@ -74,8 +74,6 @@ class LLMResponse:
     Attributes:
         text: The model's text response, or None if the model only returned
               tool calls.
-        tool_calls: Raw tool calls from the model. Each entry is a dict with
-                    at minimum ``name`` and ``input`` keys.
         usage: Token usage metrics (``input_tokens``, ``output_tokens``,
                ``total_tokens``).
         raw: The underlying Agno ``ModelResponse`` for callers who need
@@ -83,7 +81,6 @@ class LLMResponse:
     """
 
     text: str | None = None
-    tool_calls: list[dict[str, Any]] = field(default_factory=list)
     usage: dict[str, int] = field(default_factory=dict)
     raw: ModelResponse | None = field(default=None, repr=False)
 
@@ -361,22 +358,6 @@ class LLM:
             if text_parts:
                 text = " ".join(text_parts)
 
-        # Extract tool calls — normalize to [{name, input}, ...]
-        tool_calls: list[dict[str, Any]] = []
-        for tc in model_response.tool_calls or []:
-            name = tc.get("function", {}).get("name", tc.get("name", ""))
-            arguments = tc.get("function", {}).get("arguments", tc.get("input", {}))
-
-            # Arguments may be a JSON string
-            if isinstance(arguments, str):
-                import contextlib
-                import json
-
-                with contextlib.suppress(json.JSONDecodeError, ValueError):
-                    arguments = json.loads(arguments)
-
-            tool_calls.append({"name": name, "input": arguments})
-
         # Extract usage metrics
         usage: dict[str, int] = {}
         if model_response.input_tokens is not None:
@@ -388,7 +369,6 @@ class LLM:
 
         return LLMResponse(
             text=text,
-            tool_calls=tool_calls,
             usage=usage,
             raw=model_response,
         )

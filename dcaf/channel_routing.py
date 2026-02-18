@@ -224,9 +224,15 @@ Focus primarily on the LATEST message, but use thread context to understand if t
 
             logger.info("Slack Channel Router LLM Response: %s", response)
 
-            # Extract tool call result from normalized LLMResponse
-            if response.tool_calls:
-                tool_input = response.tool_calls[0].get("input", {})
+            # Extract tool call result from raw model response
+            raw_tool_calls = getattr(response.raw, "tool_calls", None) if response.raw else None
+            if raw_tool_calls:
+                tc = raw_tool_calls[0]
+                tool_input = tc.get("function", {}).get("arguments", tc.get("input", {}))
+                if isinstance(tool_input, str):
+                    import json
+
+                    tool_input = json.loads(tool_input)
                 return {
                     "should_respond": tool_input.get("should_respond", False),
                     "reasoning": tool_input.get("reasoning", "No reasoning provided"),
