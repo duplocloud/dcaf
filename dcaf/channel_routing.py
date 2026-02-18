@@ -6,36 +6,25 @@ or remain silent. It uses an LLM to analyze the conversation context and make
 intelligent decisions about when the bot should engage.
 """
 
+from __future__ import annotations
+
 import logging
 import os
 import traceback
 from typing import Any
 
-from .llm import LLM, BedrockLLM, VertexLLM
-
 logger = logging.getLogger(__name__)
 
-# Env var names
-_ENV_PROVIDER = "DCAF_PROVIDER"
+
+def _get_llm_classes():
+    """Lazy import to avoid circular dependency with dcaf.core.__init__."""
+    from .core.llm import LLM, LLMResponse, create_llm
+
+    return LLM, LLMResponse, create_llm
+
+
+# Env var for silence model override
 _ENV_SILENCE_MODEL = "DCAF_SILENCE_MODEL_ID"
-
-# Provider defaults
-_DEFAULT_PROVIDER = "bedrock"
-_PROVIDER_MODEL_DEFAULTS = {
-    "bedrock": "us.anthropic.claude-3-5-haiku-20241022-v1:0",
-    "google": "gemini-2.0-flash",
-}
-
-
-def _create_llm_from_env() -> tuple[LLM, str]:
-    """Create an LLM client and resolve model ID from environment variables."""
-    provider = os.getenv(_ENV_PROVIDER, _DEFAULT_PROVIDER).lower()
-    model_id = os.getenv(_ENV_SILENCE_MODEL) or _PROVIDER_MODEL_DEFAULTS.get(provider, "")
-
-    if provider == "google":
-        return VertexLLM(), model_id
-    else:
-        return BedrockLLM(), model_id
 
 
 class ChannelResponseRouter:
@@ -53,11 +42,14 @@ class SlackResponseRouter(ChannelResponseRouter):
 
     This class uses an LLM to analyze conversation context and determine if
     the bot should engage or remain silent based on the conversation flow.
+
+    Uses the DCAF LLM layer for provider-agnostic model access. All provider
+    configuration (DCAF_PROVIDER, credentials, etc.) is handled automatically.
     """
 
     def __init__(
         self,
-        llm_client: LLM | None = None,
+        llm_client: Any | None = None,
         agent_name: str = "Assistant",
         agent_description: str = "",
         model_id: str | None = None,
@@ -66,18 +58,24 @@ class SlackResponseRouter(ChannelResponseRouter):
         Initialize the Slack Response Router.
 
         Args:
-            llm_client: LLM instance. If None, auto-created from DCAF_PROVIDER env var.
+            llm_client: LLM instance. If None, auto-created from env vars.
             agent_name: The name of the agent for context in decision making
             agent_description: The description of the agent for context in decision making
             model_id: Model ID override. If None, uses DCAF_SILENCE_MODEL_ID env var
                       or provider default.
         """
+        _LLM, _LLMResponse, _create_llm = _get_llm_classes()
+
         if llm_client is not None:
             self.llm_client = llm_client
-            self.model_id = model_id
         else:
-            self.llm_client, default_model = _create_llm_from_env()
-            self.model_id = model_id or default_model
+            # Use DCAF_SILENCE_MODEL_ID if set, otherwise use provider default
+            silence_model = model_id or os.getenv(_ENV_SILENCE_MODEL)
+            if silence_model:
+                self.llm_client = _create_llm(model=silence_model)
+            else:
+                self.llm_client = _create_llm()
+
         self.agent_name = agent_name
         self.agent_description = agent_description
 
@@ -214,38 +212,43 @@ Focus primarily on the LATEST message, but use thread context to understand if t
         ]
 
         try:
-            # Call LLM with forced tool use
+            # Call LLM with forced tool use — uses the DCAF LLM layer
             response = self.llm_client.invoke(
                 messages=messages,
-                model_id=self.model_id,
                 system_prompt=system_prompt,
                 tools=[routing_tool],
-                tool_choice={"type": "tool", "name": "slack_routing_decision"},
+                tool_choice={"name": "slack_routing_decision"},
                 max_tokens=200,
                 temperature=0.0,
             )
 
             logger.info("Slack Channel Router LLM Response: %s", response)
 
-            if isinstance(response, str):
-                if response == "1":
-                    return {
-                        "should_respond": True,
-                        "reasoning": "Agent should respond to the latest message",
-                    }
-                else:
-                    return {
-                        "should_respond": False,
-                        "reasoning": "Agent should not respond to the latest message",
-                    }
+            # Extract tool call result from raw model response
+            raw_tool_calls = getattr(response.raw, "tool_calls", None) if response.raw else None
+            if raw_tool_calls:
+                tc = raw_tool_calls[0]
+                tool_input = tc.get("function", {}).get("arguments", tc.get("input", {}))
+                if isinstance(tool_input, str):
+                    import json
 
-            else:
-                # Extract tool use input from Bedrock Converse API response format
-                tool_use_input = response["output"]["message"]["content"][0]["toolUse"]["input"]
+                    tool_input = json.loads(tool_input)
                 return {
-                    "should_respond": tool_use_input.get("should_respond", False),
-                    "reasoning": tool_use_input.get("reasoning", "No reasoning provided"),
+                    "should_respond": tool_input.get("should_respond", False),
+                    "reasoning": tool_input.get("reasoning", "No reasoning provided"),
                 }
+
+            # Fallback: if model returned text instead of tool call
+            if response.text:
+                return {
+                    "should_respond": response.text.strip() == "1",
+                    "reasoning": "Inferred from text response",
+                }
+
+            return {
+                "should_respond": False,
+                "reasoning": "No tool call or text in response",
+            }
 
         except Exception as e:
             # Fail safe - default to not responding if router fails

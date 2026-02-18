@@ -59,13 +59,16 @@ from .interceptors import (
     InterceptorError,
     InterceptorPipeline,
     LLMRequest,
-    LLMResponse,
     RequestInterceptorInput,
     ResponseInterceptorInput,
     create_request_from_messages,
     create_response_from_text,
     normalize_interceptors,
 )
+from .interceptors import (
+    LLMResponse as InterceptorLLMResponse,
+)
+from .llm import LLMResponse
 from .models import ChatMessage, normalize_messages
 from .schemas.events import (
     DoneEvent,
@@ -88,7 +91,7 @@ logger = logging.getLogger(__name__)
 RequestInterceptor = Callable[[LLMRequest], LLMRequest]
 
 # Type alias for response interceptors (for external use)
-ResponseInterceptor = Callable[[LLMResponse], LLMResponse]
+ResponseInterceptor = Callable[[InterceptorLLMResponse], InterceptorLLMResponse]
 
 
 @dataclass
@@ -146,12 +149,18 @@ class PendingToolCall:
 
 
 @dataclass
-class AgentResponse:
+class AgentResponse(LLMResponse):
     """
     Response from an agent execution.
 
+    Extends :class:`LLMResponse` (which provides ``text``, ``tool_calls``,
+    ``usage``, and ``raw``) with agent-level concerns like approval workflows,
+    conversation tracking, and session management.
+
     Attributes:
-        text: The agent's text response (if any)
+        text: The agent's text response (inherited from LLMResponse)
+        tool_calls: Raw tool calls from the model (inherited from LLMResponse)
+        usage: Token usage metrics (inherited from LLMResponse)
         needs_approval: Whether there are pending tool calls needing approval
         pending_tools: List of tool calls awaiting approval
         conversation_id: ID of the conversation (for continuing later)
@@ -172,7 +181,6 @@ class AgentResponse:
         print(response.session)  # dict of session values
     """
 
-    text: str | None = None
     needs_approval: bool = False
     pending_tools: list[PendingToolCall] = field(default_factory=list)
     conversation_id: str = ""
@@ -896,7 +904,9 @@ class Agent:
         result = await request_pipeline.run(llm_request)
         return cast(LLMRequest, result)
 
-    async def _run_response_interceptors(self, llm_response: LLMResponse) -> LLMResponse:
+    async def _run_response_interceptors(
+        self, llm_response: InterceptorLLMResponse
+    ) -> InterceptorLLMResponse:
         """
         Run all response interceptors on the LLM response.
 
@@ -921,7 +931,7 @@ class Agent:
 
         # Run the pipeline
         result = await response_pipeline.run(llm_response)
-        return cast(LLMResponse, result)
+        return cast(InterceptorLLMResponse, result)
 
     def resume(self, conversation_id: str) -> AgentResponse:
         """
