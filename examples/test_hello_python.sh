@@ -11,7 +11,7 @@ curl -s -X POST http://localhost:8000/api/chat \
         "platform_context": {
           "skills": [{
             "name": "hello-python",
-            "version": "1.0.1",
+            "version": "1.0.2",
             "url": "http://localhost:8001/hello-python.zip"
           }]
         }

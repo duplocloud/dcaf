@@ -62,11 +62,14 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import dotenv
 
 dotenv.load_dotenv(override=True)
+temp_folder = os.path.join(tempfile.gettempdir(), "dcaf")
 
 os.environ.setdefault("AWS_PROFILE", "test10")
 os.environ.setdefault(
-    "PERSISTENT_VOLUME_STORAGE", os.path.join(tempfile.gettempdir(), "dcaf")
+    "PERSISTENT_VOLUME_STORAGE", temp_folder
 )
+
+print(temp_folder)
 
 import uvicorn  # noqa: E402
 from fastapi import FastAPI  # noqa: E402
