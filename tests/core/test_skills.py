@@ -203,6 +203,100 @@ class TestSkillManagerFetch:
         assert not (tmp_path / "skills" / "bad-zip" / "1.0.0").exists()
 
     @pytest.mark.asyncio
+    async def test_fetch_zip_nested_skill_md_elevated(self, tmp_path):
+        """Zip with SKILL.md in a subdirectory gets elevated to root."""
+        zip_bytes = _make_zip_bytes({
+            "my-skill/SKILL.md": "# Nested Skill",
+            "my-skill/scripts/run.sh": "echo hello",
+        })
+        skill = SkillDefinition(
+            name="nested-skill", version="1.0.0", url="https://example.com/nested.zip"
+        )
+        manager = SkillManager(storage_path=str(tmp_path))
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.content = zip_bytes
+        mock_response.headers = {"content-type": "application/zip"}
+        mock_response.raise_for_status = MagicMock()
+
+        with patch("dcaf.core.services.skill_manager.httpx.AsyncClient") as mock_client_cls:
+            mock_client = AsyncMock()
+            mock_client.get = AsyncMock(return_value=mock_response)
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=False)
+            mock_client_cls.return_value = mock_client
+
+            path = await manager.fetch_and_cache(skill)
+
+        assert path is not None
+        assert (Path(path) / "SKILL.md").read_text() == "# Nested Skill"
+        assert (Path(path) / "scripts" / "run.sh").read_text() == "echo hello"
+
+    @pytest.mark.asyncio
+    async def test_fetch_zip_nested_with_macos_metadata_elevated(self, tmp_path):
+        """Zip with __MACOSX metadata and nested SKILL.md still works."""
+        zip_bytes = _make_zip_bytes({
+            "hello-python/SKILL.md": "# Hello Skill",
+            "hello-python/scripts/hello.py": "print('hi')",
+            "__MACOSX/._hello-python": "",
+            "__MACOSX/hello-python/._SKILL.md": "",
+        })
+        skill = SkillDefinition(
+            name="macos-skill", version="1.0.0", url="https://example.com/macos.zip"
+        )
+        manager = SkillManager(storage_path=str(tmp_path))
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.content = zip_bytes
+        mock_response.headers = {"content-type": "application/zip"}
+        mock_response.raise_for_status = MagicMock()
+
+        with patch("dcaf.core.services.skill_manager.httpx.AsyncClient") as mock_client_cls:
+            mock_client = AsyncMock()
+            mock_client.get = AsyncMock(return_value=mock_response)
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=False)
+            mock_client_cls.return_value = mock_client
+
+            path = await manager.fetch_and_cache(skill)
+
+        assert path is not None
+        assert (Path(path) / "SKILL.md").read_text() == "# Hello Skill"
+        assert (Path(path) / "scripts" / "hello.py").read_text() == "print('hi')"
+        # __MACOSX junk should not be present at root
+        assert not (Path(path) / "__MACOSX").exists()
+
+    @pytest.mark.asyncio
+    async def test_fetch_zip_deeply_nested_skill_md_rejected(self, tmp_path):
+        """Zip with SKILL.md nested more than one level deep is rejected."""
+        zip_bytes = _make_zip_bytes({
+            "a/b/SKILL.md": "# Too Deep",
+        })
+        skill = SkillDefinition(
+            name="deep-skill", version="1.0.0", url="https://example.com/deep.zip"
+        )
+        manager = SkillManager(storage_path=str(tmp_path))
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.content = zip_bytes
+        mock_response.headers = {"content-type": "application/zip"}
+        mock_response.raise_for_status = MagicMock()
+
+        with patch("dcaf.core.services.skill_manager.httpx.AsyncClient") as mock_client_cls:
+            mock_client = AsyncMock()
+            mock_client.get = AsyncMock(return_value=mock_response)
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=False)
+            mock_client_cls.return_value = mock_client
+
+            path = await manager.fetch_and_cache(skill)
+
+        assert path is None
+
+    @pytest.mark.asyncio
     async def test_fetch_unreachable_url(self, tmp_path):
         """Unreachable URL logs error and returns None."""
         skill = SkillDefinition(

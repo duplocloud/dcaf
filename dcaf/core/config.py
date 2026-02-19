@@ -50,7 +50,7 @@ DEFAULTS = {
 
 # Provider-specific model defaults
 PROVIDER_MODEL_DEFAULTS = {
-    "bedrock": "anthropic.claude-3-sonnet-20240229-v1:0",
+    "bedrock": "us.anthropic.claude-3-sonnet-20240229-v1:0",
     "anthropic": "claude-3-sonnet-20240229",
     "google": "gemini-3-flash",
     "openai": "gpt-4",

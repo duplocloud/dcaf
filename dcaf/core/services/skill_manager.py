@@ -136,6 +136,14 @@ class SkillManager:
             )
             return None
 
+        logger.info(
+            "Fetched skill '%s' v%s from %s (%d bytes)",
+            skill.name,
+            skill.version,
+            skill.url,
+            len(response.content),
+        )
+
         content_type = response.headers.get("content-type", "")
         fmt = self._detect_format(skill.url, content_type)
 
@@ -159,7 +167,7 @@ class SkillManager:
                     target_dir,
                 )
             except OSError:
-                logger.debug(
+                logger.info(
                     "Skill '%s' v%s already cached by another process, using existing",
                     skill.name,
                     skill.version,
@@ -181,6 +189,12 @@ class SkillManager:
     def _extract_zip(self, content: bytes, target: Path, skill: SkillDefinition) -> str | None:
         """
         Extract zip contents to target directory and validate SKILL.md exists.
+
+        If SKILL.md is not at the zip root but exists exactly one directory
+        level deep, the contents of that subdirectory are elevated to the
+        root.  This handles zips created by tools (e.g. macOS Finder) that
+        wrap files in a top-level folder.  ``__MACOSX`` metadata directories
+        are removed during elevation.
 
         Args:
             content: The raw zip bytes.
@@ -214,16 +228,71 @@ class SkillManager:
             shutil.rmtree(target, ignore_errors=True)
             return None
 
-        if not (target / SKILL_FILENAME).is_file():
-            logger.error(
-                "Skill '%s' v%s: expected SKILL.md file missing at folder root",
-                skill.name,
-                skill.version,
-            )
-            shutil.rmtree(target, ignore_errors=True)
-            return None
+        if (target / SKILL_FILENAME).is_file():
+            return str(target)
 
-        return str(target)
+        # SKILL.md not at root — look one level deep and elevate if found.
+        elevated = self._elevate_skill_root(target, skill)
+        if elevated:
+            return str(target)
+
+        logger.error(
+            "Skill '%s' v%s: SKILL.md not found at root or one level deep",
+            skill.name,
+            skill.version,
+        )
+        shutil.rmtree(target, ignore_errors=True)
+        return None
+
+    def _elevate_skill_root(self, target: Path, skill: SkillDefinition) -> bool:
+        """
+        Find SKILL.md one directory level deep and elevate that folder to root.
+
+        Searches immediate subdirectories of *target* for a ``SKILL.md`` file.
+        If exactly one is found, its parent directory's contents are moved to
+        *target* and any ``__MACOSX`` metadata directories are removed.
+
+        Args:
+            target: The extraction root directory.
+            skill: The skill definition (for logging).
+
+        Returns:
+            True if elevation succeeded, False otherwise.
+        """
+        candidates = [
+            d
+            for d in target.iterdir()
+            if d.is_dir() and d.name != "__MACOSX" and (d / SKILL_FILENAME).is_file()
+        ]
+
+        if len(candidates) != 1:
+            return False
+
+        skill_subdir = candidates[0]
+        logger.info(
+            "Skill '%s' v%s: SKILL.md found in subdirectory '%s', elevating to root",
+            skill.name,
+            skill.version,
+            skill_subdir.name,
+        )
+
+        # Move all files from the subdirectory to root
+        for item in list(skill_subdir.iterdir()):
+            dest = target / item.name
+            if dest.exists():
+                if dest.is_dir():
+                    shutil.rmtree(dest)
+                else:
+                    dest.unlink()
+            item.rename(dest)
+
+        # Clean up the now-empty subdirectory and __MACOSX junk
+        skill_subdir.rmdir()
+        macosx_dir = target / "__MACOSX"
+        if macosx_dir.exists():
+            shutil.rmtree(macosx_dir)
+
+        return True
 
     async def resolve_skills(self, definitions: list[SkillDefinition]) -> Skills | None:
         """
@@ -244,12 +313,33 @@ class SkillManager:
         if not definitions:
             return None
 
+        logger.info(
+            "Resolving %d skill(s): %s",
+            len(definitions),
+            ", ".join(f"'{s.name}' v{s.version}" for s in definitions),
+        )
+
         loaders: list[SkillLoader] = []
 
         for skill in definitions:
+            logger.info("Resolving skill '%s' v%s ...", skill.name, skill.version)
+
             path = self.get_local_skill_path(skill)
 
-            if path is None:
+            if path is not None:
+                logger.info(
+                    "Skill '%s' v%s resolved from local cache at %s",
+                    skill.name,
+                    skill.version,
+                    path,
+                )
+            else:
+                logger.info(
+                    "Skill '%s' v%s not in local cache, fetching from %s",
+                    skill.name,
+                    skill.version,
+                    skill.url,
+                )
                 path = await self.fetch_and_cache(skill)
 
             if path is None:
