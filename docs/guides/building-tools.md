@@ -438,6 +438,9 @@ def get_tenant_services(platform_context: dict) -> str:
 
 ## Approval Workflows
 
+!!! note "Unified Approvals"
+    DCAF now supports a unified `data.approvals[]` field that handles both tool calls and commands through a single approval path with a `type` discriminator. The `@tool(requires_approval=True)` decorator works the same way — the difference is in how the server processes and returns approvals. See the [Schemas Reference](../api-reference/schemas.md#approval) and [Message Protocol](./message-protocol.md#unified-approval-flow) for details.
+
 ### When to Require Approval
 
 Require approval for operations that:
@@ -487,12 +490,12 @@ def terminate_instance(
 
 ### User Approval Flow
 
-1. **Agent calls tool** → DCAF creates `ToolCall` object
-2. **Agent returns** → Client receives pending tool call
-3. **User reviews** → Sees tool, inputs, and description
+1. **Agent calls tool** → DCAF creates an `Approval` (or legacy `ToolCall`) object
+2. **Agent returns** → Client receives pending approval
+3. **User reviews** → Sees tool name, inputs, description, and intent
 4. **User approves/rejects** → Sets `execute=True` or `rejection_reason`
 5. **Client sends back** → Agent receives decision
-6. **Tool executes** → If approved, runs and returns result
+6. **Tool executes** → If approved, runs and returns result as `ExecutedApproval`
 
 ### Client-Side Display
 
