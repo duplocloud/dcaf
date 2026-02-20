@@ -21,10 +21,11 @@ from typing import Any, cast
 from ....schemas.events import (
     DoneEvent,
     ErrorEvent,
+    ExecutedApprovalsEvent,
     ExecutedToolCallsEvent,
     StreamEvent,
 )
-from ....schemas.messages import AgentMessage, ExecutedToolCall
+from ....schemas.messages import AgentMessage, ExecutedApproval, ExecutedToolCall
 from ...agent import Agent
 
 logger = logging.getLogger(__name__)
@@ -97,6 +98,9 @@ class ServerAdapter:
         # Check for approved tool calls that need to be processed
         executed_tool_calls = self._process_approved_tool_calls(messages_list, context)
 
+        # Process unified approvals
+        executed_approvals = self._process_approvals(messages_list, context)
+
         # Convert to Core format (simple list of dicts with role/content)
         core_messages = self._convert_messages(messages_list)
 
@@ -130,6 +134,9 @@ class ServerAdapter:
             # Add any executed tool calls from this request
             if executed_tool_calls:
                 agent_msg.data.executed_tool_calls.extend(executed_tool_calls)  # type: ignore[arg-type]
+
+            if executed_approvals:
+                agent_msg.data.executed_approvals.extend(executed_approvals)
 
             # If there are pending approvals, ensure helpful content
             if response.needs_approval and not agent_msg.content:
@@ -171,6 +178,11 @@ class ServerAdapter:
         if executed_tool_calls:
             yield ExecutedToolCallsEvent(executed_tool_calls=executed_tool_calls)
 
+        # Process unified approvals
+        executed_approvals = self._process_approvals(messages_list, context)
+        if executed_approvals:
+            yield ExecutedApprovalsEvent(executed_approvals=executed_approvals)
+
         # Convert to Core format
         core_messages = self._convert_messages(messages_list)
 
@@ -185,6 +197,17 @@ class ServerAdapter:
             result_content = "\n\n".join(result_parts)
             if core_messages and core_messages[-1]["role"] == "user":
                 core_messages[-1]["content"] = result_content
+            else:
+                core_messages.append({"role": "user", "content": result_content})
+
+        if executed_approvals:
+            result_parts = [
+                f"Tool result for {ea.name} with inputs {ea.input}: {ea.output}"
+                for ea in executed_approvals
+            ]
+            result_content = "\n\n".join(result_parts)
+            if core_messages and core_messages[-1]["role"] == "user":
+                core_messages[-1]["content"] += "\n\n" + result_content
             else:
                 core_messages.append({"role": "user", "content": result_content})
 
@@ -321,3 +344,54 @@ class ServerAdapter:
                     return f"Error executing {tool_name}: {str(e)}"
 
         return f"Tool '{tool_name}' not found"
+
+    def _process_approvals(
+        self,
+        messages_list: list[dict[str, Any]],
+        platform_context: dict[str, Any],
+    ) -> list[ExecutedApproval]:
+        """
+        Process approved/rejected items from the unified approvals field.
+
+        Reads data.approvals[] from the latest message. For each:
+        - If execute=True: runs the tool via _execute_tool() and captures output
+        - If rejection_reason is set: captures the rejection as output
+        """
+        executed: list[ExecutedApproval] = []
+
+        if not messages_list:
+            return executed
+
+        latest_message = messages_list[-1]
+        data = latest_message.get("data", {})
+        approvals = data.get("approvals", [])
+
+        for approval in approvals:
+            approval_id = approval.get("id", "")
+            approval_type = approval.get("type", "")
+            name = approval.get("name", "")
+            tool_input = approval.get("input", {})
+
+            if approval.get("execute", False):
+                result = self._execute_tool(name, tool_input, platform_context)
+                executed.append(
+                    ExecutedApproval(
+                        id=approval_id,
+                        type=approval_type,
+                        name=name,
+                        input=tool_input,
+                        output=result,
+                    )
+                )
+            elif approval.get("rejection_reason"):
+                executed.append(
+                    ExecutedApproval(
+                        id=approval_id,
+                        type=approval_type,
+                        name=name,
+                        input=tool_input,
+                        output=f"Rejected: {approval['rejection_reason']}",
+                    )
+                )
+
+        return executed
