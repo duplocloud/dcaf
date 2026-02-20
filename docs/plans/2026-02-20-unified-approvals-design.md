@@ -105,3 +105,14 @@ Request with data.approvals[] (user decisions)
 - All existing agents (no changes required)
 - The domain-level approval state machine (ToolCall entity, ApprovalService, domain events)
 - The frontend's existing handling of `data.cmds` and `data.tool_calls`
+
+## Phase 1 Status
+
+Phase 1 complete. The following were added:
+- `Approval` and `ExecutedApproval` models (both public and core schemas)
+- `ApprovalsEvent` and `ExecutedApprovalsEvent` stream events (both public and core)
+- `ServerAdapter._process_approvals()` wired into both `invoke()` and `invoke_stream()`
+- Context injection for LLM to see approval results
+- Full test coverage in `tests/core/test_unified_approvals.py` (24 tests)
+
+Legacy `data.cmds` and `data.tool_calls` remain fully functional. Full test suite: 478 passed, 0 regressions.
