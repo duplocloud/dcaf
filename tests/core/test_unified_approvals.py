@@ -131,3 +131,94 @@ class TestCoreApprovalModel:
         """Core Data has session field that public Data doesn't."""
         data = CoreData(session={"wizard_step": 2})
         assert data.session == {"wizard_step": 2}
+
+
+from dcaf.schemas.events import ApprovalsEvent, ExecutedApprovalsEvent
+from dcaf.schemas.messages import Approval, ExecutedApproval
+
+
+class TestApprovalEvents:
+    def test_approvals_event(self):
+        event = ApprovalsEvent(
+            approvals=[
+                Approval(
+                    id="ap-1",
+                    type="command",
+                    name="execute_terminal_cmd",
+                    input={"command": "kubectl get pods"},
+                )
+            ]
+        )
+        assert event.type == "approvals"
+        assert len(event.approvals) == 1
+
+    def test_executed_approvals_event(self):
+        event = ExecutedApprovalsEvent(
+            executed_approvals=[
+                ExecutedApproval(
+                    id="ap-1",
+                    type="command",
+                    name="execute_terminal_cmd",
+                    input={"command": "kubectl get pods"},
+                    output="pod1\npod2",
+                )
+            ]
+        )
+        assert event.type == "executed_approvals"
+        assert len(event.executed_approvals) == 1
+
+    def test_approvals_event_serialization(self):
+        event = ApprovalsEvent(
+            approvals=[
+                Approval(
+                    id="ap-1",
+                    type="tool_call",
+                    name="delete_pod",
+                    input={"pod": "nginx"},
+                    description="Delete the nginx pod",
+                )
+            ]
+        )
+        data = event.model_dump()
+        assert data["type"] == "approvals"
+        assert data["approvals"][0]["type"] == "tool_call"
+        assert data["approvals"][0]["name"] == "delete_pod"
+
+
+from dcaf.core.schemas.events import (
+    ApprovalsEvent as CoreApprovalsEvent,
+    ExecutedApprovalsEvent as CoreExecutedApprovalsEvent,
+)
+from dcaf.core.schemas.messages import (
+    Approval as CoreApproval,
+    ExecutedApproval as CoreExecutedApproval,
+)
+
+
+class TestCoreApprovalEvents:
+    def test_core_approvals_event(self):
+        event = CoreApprovalsEvent(
+            approvals=[
+                CoreApproval(
+                    id="ap-1",
+                    type="command",
+                    name="execute_terminal_cmd",
+                    input={"command": "ls"},
+                )
+            ]
+        )
+        assert event.type == "approvals"
+
+    def test_core_executed_approvals_event(self):
+        event = CoreExecutedApprovalsEvent(
+            executed_approvals=[
+                CoreExecutedApproval(
+                    id="ap-1",
+                    type="tool_call",
+                    name="list_pods",
+                    input={},
+                    output="pod1",
+                )
+            ]
+        )
+        assert event.type == "executed_approvals"
