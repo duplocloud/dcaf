@@ -9,6 +9,7 @@ import pytest
 
 from dcaf.core.domain.value_objects.skill_definition import SkillDefinition
 from dcaf.core.services.skill_manager import SkillManager
+from dcaf.core.services.skill_translator import translate_skills
 
 
 def test_agno_skills_imports():
@@ -610,4 +611,239 @@ class TestSkillsEndToEnd:
         assert result is not None
         # Verify it was cached
         cached = tmp_path / "skills" / "fetched" / "1.0.0" / "SKILL.md"
+        assert cached.is_file()
+
+
+class TestSkillTranslator:
+    def test_translate_skillmd_format(self):
+        """SkillMd format creates SkillDefinition with inline content."""
+        raw = [
+            {
+                "Name": "ecs-troubleshooting",
+                "Version": 0,
+                "Format": "SkillMd",
+                "SkillMd": "---\nname: ecs-troubleshooting\n---\n# ECS Skill",
+                "IsActive": True,
+                "Id": "abc123",
+                "Type": "Custom",
+            }
+        ]
+        result = translate_skills(raw)
+        assert len(result) == 1
+        assert result[0].name == "ecs-troubleshooting"
+        assert result[0].version == "0"
+        assert result[0].url == ""
+        assert result[0].content == "---\nname: ecs-troubleshooting\n---\n# ECS Skill"
+
+    def test_translate_package_format(self):
+        """Package format creates SkillDefinition with signed URL."""
+        raw = [
+            {
+                "Name": "magic-iac",
+                "Version": 0,
+                "Format": "Package",
+                "FileStoreSignedUrl": "https://s3.example.com/skill.zip?token=abc",
+                "IsActive": True,
+                "Id": "def456",
+                "Type": "Custom",
+            }
+        ]
+        result = translate_skills(raw)
+        assert len(result) == 1
+        assert result[0].name == "magic-iac"
+        assert result[0].version == "0"
+        assert result[0].url == "https://s3.example.com/skill.zip?token=abc"
+        assert result[0].content is None
+
+    def test_filter_inactive_skills(self):
+        """Inactive skills are excluded."""
+        raw = [
+            {
+                "Name": "inactive-skill",
+                "Version": 1,
+                "Format": "SkillMd",
+                "SkillMd": "# content",
+                "IsActive": False,
+            },
+            {
+                "Name": "active-skill",
+                "Version": 2,
+                "Format": "SkillMd",
+                "SkillMd": "# active content",
+                "IsActive": True,
+            },
+        ]
+        result = translate_skills(raw)
+        assert len(result) == 1
+        assert result[0].name == "active-skill"
+
+    def test_version_int_to_str(self):
+        """Integer version is converted to string."""
+        raw = [
+            {
+                "Name": "versioned",
+                "Version": 42,
+                "Format": "SkillMd",
+                "SkillMd": "# content",
+                "IsActive": True,
+            }
+        ]
+        result = translate_skills(raw)
+        assert result[0].version == "42"
+
+    def test_internal_format_passthrough(self):
+        """Existing internal format (lowercase keys) passes through unchanged."""
+        raw = [
+            {"name": "hello-python", "version": "1.0.2", "url": "http://localhost:8001/hello.zip"}
+        ]
+        result = translate_skills(raw)
+        assert len(result) == 1
+        assert result[0].name == "hello-python"
+        assert result[0].version == "1.0.2"
+        assert result[0].url == "http://localhost:8001/hello.zip"
+        assert result[0].content is None
+
+    def test_mixed_formats(self):
+        """Internal and external formats can coexist in the same list."""
+        raw = [
+            {"name": "internal-skill", "version": "1.0.0", "url": "http://example.com/skill.md"},
+            {
+                "Name": "external-skill",
+                "Version": 0,
+                "Format": "SkillMd",
+                "SkillMd": "# External",
+                "IsActive": True,
+            },
+        ]
+        result = translate_skills(raw)
+        assert len(result) == 2
+        assert result[0].name == "internal-skill"
+        assert result[1].name == "external-skill"
+
+    def test_unknown_format_skipped(self):
+        """Unknown Format value is skipped with warning."""
+        raw = [
+            {
+                "Name": "weird",
+                "Version": 0,
+                "Format": "SomethingNew",
+                "IsActive": True,
+            }
+        ]
+        result = translate_skills(raw)
+        assert len(result) == 0
+
+    def test_skillmd_without_content_skipped(self):
+        """SkillMd format with empty SkillMd field is skipped."""
+        raw = [
+            {
+                "Name": "empty-md",
+                "Version": 0,
+                "Format": "SkillMd",
+                "SkillMd": "",
+                "IsActive": True,
+            }
+        ]
+        result = translate_skills(raw)
+        assert len(result) == 0
+
+    def test_package_without_url_skipped(self):
+        """Package format without FileStoreSignedUrl is skipped."""
+        raw = [
+            {
+                "Name": "no-url",
+                "Version": 0,
+                "Format": "Package",
+                "FileStoreSignedUrl": "",
+                "IsActive": True,
+            }
+        ]
+        result = translate_skills(raw)
+        assert len(result) == 0
+
+    def test_is_active_defaults_true(self):
+        """Skills without IsActive field default to active."""
+        raw = [
+            {
+                "Name": "no-active-field",
+                "Version": 0,
+                "Format": "SkillMd",
+                "SkillMd": "# content",
+            }
+        ]
+        result = translate_skills(raw)
+        assert len(result) == 1
+
+
+class TestSkillDefinitionContent:
+    def test_content_field_default_none(self):
+        """Content field defaults to None for backward compatibility."""
+        skill = SkillDefinition(name="test", version="1.0.0", url="http://example.com/skill")
+        assert skill.content is None
+
+    def test_content_field_set(self):
+        """Content field can hold inline markdown."""
+        skill = SkillDefinition(
+            name="test", version="1.0.0", url="", content="# Inline Skill"
+        )
+        assert skill.content == "# Inline Skill"
+
+
+class TestSkillManagerCacheInline:
+    def test_cache_inline_writes_skill_md(self, tmp_path):
+        """cache_inline writes content to the correct path."""
+        manager = SkillManager(storage_path=str(tmp_path))
+        skill = SkillDefinition(
+            name="inline-skill",
+            version="3",
+            url="",
+            content="---\nname: inline-skill\n---\n# Inline Skill Content",
+        )
+
+        path = manager.cache_inline(skill)
+
+        assert path is not None
+        skill_file = Path(path) / "SKILL.md"
+        assert skill_file.is_file()
+        assert skill_file.read_text() == "---\nname: inline-skill\n---\n# Inline Skill Content"
+
+    def test_cache_inline_overwrites_existing(self, tmp_path):
+        """cache_inline always overwrites to avoid stale cache."""
+        manager = SkillManager(storage_path=str(tmp_path))
+
+        # Write first version
+        skill_v1 = SkillDefinition(
+            name="overwrite-test", version="0", url="", content="# Version 1"
+        )
+        manager.cache_inline(skill_v1)
+
+        # Write second version (same name/version, different content)
+        skill_v2 = SkillDefinition(
+            name="overwrite-test", version="0", url="", content="# Version 2 (updated)"
+        )
+        path = manager.cache_inline(skill_v2)
+
+        assert path is not None
+        assert (Path(path) / "SKILL.md").read_text() == "# Version 2 (updated)"
+
+    @pytest.mark.asyncio
+    async def test_resolve_skills_uses_inline_content(self, tmp_path):
+        """resolve_skills writes inline content directly without fetching."""
+        from agno.skills import Skills
+
+        manager = SkillManager(storage_path=str(tmp_path))
+        definitions = [
+            SkillDefinition(
+                name="inline-resolved",
+                version="0",
+                url="",
+                content="---\nname: inline-resolved\ndescription: Test\n---\n# Inline",
+            ),
+        ]
+
+        result = await manager.resolve_skills(definitions)
+
+        assert isinstance(result, Skills)
+        # Verify the file was written
+        cached = tmp_path / "skills" / "inline-resolved" / "0" / "SKILL.md"
         assert cached.is_file()

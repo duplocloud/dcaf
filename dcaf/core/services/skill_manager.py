@@ -294,6 +294,39 @@ class SkillManager:
 
         return True
 
+    def cache_inline(self, skill: SkillDefinition) -> str | None:
+        """Write inline skill content directly to the local cache.
+
+        Always overwrites existing content to avoid serving stale
+        inline markdown when the platform sends updated content.
+
+        Args:
+            skill: Skill definition with ``content`` set.
+
+        Returns:
+            The local path to the cached skill directory, or None on failure.
+        """
+        target_dir = Path(self.storage_path) / SKILLS_DIR / skill.name / skill.version
+
+        try:
+            target_dir.mkdir(parents=True, exist_ok=True)
+            (target_dir / SKILL_FILENAME).write_text(skill.content or "")
+            logger.info(
+                "Cached inline skill '%s' v%s at %s",
+                skill.name,
+                skill.version,
+                target_dir,
+            )
+            return str(target_dir)
+        except Exception:
+            logger.error(
+                "Failed to cache inline skill '%s' v%s",
+                skill.name,
+                skill.version,
+                exc_info=True,
+            )
+            return None
+
     async def resolve_skills(self, definitions: list[SkillDefinition]) -> Skills | None:
         """
         Resolve a list of skill definitions into an Agno Skills object.
@@ -324,30 +357,33 @@ class SkillManager:
         for skill in definitions:
             logger.info("Resolving skill '%s' v%s ...", skill.name, skill.version)
 
-            path = self.get_local_skill_path(skill)
-
-            if path is not None:
-                logger.info(
-                    "Skill '%s' v%s resolved from local cache at %s",
-                    skill.name,
-                    skill.version,
-                    path,
-                )
+            # Inline content: write directly (always overwrite for freshness)
+            if skill.content is not None:
+                path = self.cache_inline(skill)
             else:
-                logger.info(
-                    "Skill '%s' v%s not in local cache, fetching from %s",
-                    skill.name,
-                    skill.version,
-                    skill.url,
-                )
-                path = await self.fetch_and_cache(skill)
+                path = self.get_local_skill_path(skill)
+
+                if path is not None:
+                    logger.info(
+                        "Skill '%s' v%s resolved from local cache at %s",
+                        skill.name,
+                        skill.version,
+                        path,
+                    )
+                else:
+                    logger.info(
+                        "Skill '%s' v%s not in local cache, fetching from %s",
+                        skill.name,
+                        skill.version,
+                        skill.url,
+                    )
+                    path = await self.fetch_and_cache(skill)
 
             if path is None:
                 logger.error(
-                    "Skipping skill '%s' v%s: could not resolve locally or from %s",
+                    "Skipping skill '%s' v%s: could not resolve",
                     skill.name,
                     skill.version,
-                    skill.url,
                 )
                 continue
 

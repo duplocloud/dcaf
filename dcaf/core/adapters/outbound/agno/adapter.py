@@ -31,9 +31,9 @@ from ....application.dto.responses import (
     StreamEventType,
 )
 from ....application.ports.mcp_protocol import MCPToolLike
-from ....domain.value_objects.skill_definition import SkillDefinition
 from ....events import Event, EventRegistry
 from ....services.skill_manager import SkillManager
+from ....services.skill_translator import translate_skills
 from .gcp_metadata import GCPMetadataManager, get_default_gcp_metadata_manager
 from .message_converter import AgnoMessageConverter
 from .model_factory import AgnoModelFactory, ModelConfig
@@ -674,6 +674,9 @@ class AgnoAdapter:
         """
         Extract and resolve skills from platform context.
 
+        Supports both the internal format (lowercase keys) and the
+        external platform format (PascalCase keys with Format field).
+
         Args:
             platform_context: The platform context dict, may contain a "skills" key.
 
@@ -687,10 +690,9 @@ class AgnoAdapter:
         if not raw_skills:
             return None
 
-        definitions = [
-            SkillDefinition(name=s["name"], version=s["version"], url=s["url"])
-            for s in raw_skills
-        ]
+        definitions = translate_skills(raw_skills)
+        if not definitions:
+            return None
 
         manager = SkillManager()
         return await manager.resolve_skills(definitions)
