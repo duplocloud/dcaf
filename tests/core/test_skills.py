@@ -614,6 +614,144 @@ class TestSkillsEndToEnd:
         assert cached.is_file()
 
 
+class TestSkillTranslatorS3:
+    FEDERATION_URL = (
+        "https://signin.aws.amazon.com/federation"
+        "?Action=login&Issuer=duplo-ai-studio&SigninToken=abc123"
+        "&Destination=https%3A%2F%2Fs3.console.aws.amazon.com%2Fs3%2Fbuckets"
+        "%2Fduplo-ai-userdata-805863115079%3Fregion%3Dus-west-2%26prefix%3Dskills%2Fmagic-iac"
+    )
+
+    def test_package_s3_produces_s3_uri(self):
+        """Package with PackagePath=s3 produces an s3:// URI."""
+        raw = [
+            {
+                "Name": "magic-iac",
+                "Version": 0,
+                "Format": "Package",
+                "PackagePath": "s3",
+                "FileStoreSignedUrl": self.FEDERATION_URL,
+                "IsActive": True,
+            }
+        ]
+        result = translate_skills(raw)
+        assert len(result) == 1
+        assert result[0].url.startswith("s3://duplo-ai-userdata-805863115079/skills/magic-iac")
+        assert "region=us-west-2" in result[0].url
+
+    def test_package_http_produces_http_url(self):
+        """Package without PackagePath=s3 keeps original HTTP URL."""
+        raw = [
+            {
+                "Name": "my-skill",
+                "Version": 1,
+                "Format": "Package",
+                "PackagePath": "http",
+                "FileStoreSignedUrl": "https://cdn.example.com/my-skill.zip",
+                "IsActive": True,
+            }
+        ]
+        result = translate_skills(raw)
+        assert len(result) == 1
+        assert result[0].url == "https://cdn.example.com/my-skill.zip"
+
+    def test_package_s3_invalid_federation_url_skipped(self):
+        """Package with PackagePath=s3 but unparseable URL is skipped."""
+        raw = [
+            {
+                "Name": "bad-skill",
+                "Version": 0,
+                "Format": "Package",
+                "PackagePath": "s3",
+                "FileStoreSignedUrl": "https://not-a-federation-url.com/something",
+                "IsActive": True,
+            }
+        ]
+        result = translate_skills(raw)
+        assert len(result) == 0
+
+
+class TestSkillManagerS3:
+    @pytest.mark.asyncio
+    async def test_fetch_from_s3(self, tmp_path):
+        """_fetch_from_s3 uses boto3 to list and download zip from S3."""
+        zip_bytes = _make_zip_bytes({"SKILL.md": "# S3 Skill", "scripts/run.sh": "echo s3"})
+
+        skill = SkillDefinition(
+            name="magic-iac",
+            version="0",
+            url="s3://my-bucket/skills/magic-iac?region=us-west-2",
+        )
+        manager = SkillManager(storage_path=str(tmp_path))
+
+        mock_s3 = MagicMock()
+        mock_s3.list_objects_v2.return_value = {
+            "Contents": [{"Key": "skills/magic-iac/skill.zip", "Size": len(zip_bytes)}]
+        }
+        mock_s3.get_object.return_value = {"Body": MagicMock(read=MagicMock(return_value=zip_bytes))}
+
+        with patch("dcaf.core.services.skill_manager.boto3.client", return_value=mock_s3):
+            path = await manager.fetch_and_cache(skill)
+
+        assert path is not None
+        assert (Path(path) / "SKILL.md").read_text() == "# S3 Skill"
+        mock_s3.list_objects_v2.assert_called_once_with(
+            Bucket="my-bucket", Prefix="skills/magic-iac"
+        )
+        mock_s3.get_object.assert_called_once_with(
+            Bucket="my-bucket", Key="skills/magic-iac/skill.zip"
+        )
+
+    @pytest.mark.asyncio
+    async def test_fetch_from_s3_no_zip_found(self, tmp_path):
+        """Returns None when no zip exists at the S3 prefix."""
+        skill = SkillDefinition(
+            name="missing",
+            version="0",
+            url="s3://my-bucket/skills/missing?region=us-east-1",
+        )
+        manager = SkillManager(storage_path=str(tmp_path))
+
+        mock_s3 = MagicMock()
+        mock_s3.list_objects_v2.return_value = {"Contents": []}
+
+        with patch("dcaf.core.services.skill_manager.boto3.client", return_value=mock_s3):
+            path = await manager.fetch_and_cache(skill)
+
+        assert path is None
+
+    @pytest.mark.asyncio
+    async def test_http_skill_still_uses_httpx(self, tmp_path):
+        """HTTP URLs still go through httpx, not boto3."""
+        skill = SkillDefinition(
+            name="http-skill",
+            version="1.0.0",
+            url="https://example.com/skill.md",
+        )
+        manager = SkillManager(storage_path=str(tmp_path))
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.content = b"# HTTP Skill"
+        mock_response.headers = {"content-type": "text/markdown"}
+        mock_response.raise_for_status = MagicMock()
+
+        with (
+            patch("dcaf.core.services.skill_manager.boto3.client") as mock_boto3,
+            patch("dcaf.core.services.skill_manager.httpx.AsyncClient") as mock_client_cls,
+        ):
+            mock_client = AsyncMock()
+            mock_client.get = AsyncMock(return_value=mock_response)
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=False)
+            mock_client_cls.return_value = mock_client
+
+            path = await manager.fetch_and_cache(skill)
+
+        assert path is not None
+        mock_boto3.assert_not_called()
+
+
 class TestSkillTranslator:
     def test_translate_skillmd_format(self):
         """SkillMd format creates SkillDefinition with inline content."""

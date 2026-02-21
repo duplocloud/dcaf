@@ -8,6 +8,7 @@ from io import BytesIO
 from pathlib import Path
 from urllib.parse import urlparse
 
+import boto3
 import httpx
 from agno.skills import LocalSkills, Skills
 from agno.skills.loaders.base import SkillLoader
@@ -98,12 +99,90 @@ class SkillManager:
 
         return "text"
 
+    def _fetch_from_s3(self, skill: SkillDefinition) -> bytes | None:
+        """Download skill zip bytes directly from S3.
+
+        The skill URL is expected to be an ``s3://bucket/prefix`` URI
+        (optionally with ``?region=...``).  We list objects under the
+        prefix to find a ``.zip`` file and download it.
+
+        Args:
+            skill: The skill definition with an ``s3://`` URL.
+
+        Returns:
+            Raw zip bytes, or None on failure.
+        """
+        from urllib.parse import parse_qs, urlparse
+
+        parsed = urlparse(skill.url)
+        bucket = parsed.netloc
+        prefix = parsed.path.lstrip("/")
+        region = parse_qs(parsed.query).get("region", ["us-east-1"])[0]
+
+        try:
+            s3 = boto3.client("s3", region_name=region)
+
+            # List objects under the prefix to find the zip file
+            response = s3.list_objects_v2(Bucket=bucket, Prefix=prefix)
+            contents = response.get("Contents", [])
+
+            zip_keys = [obj["Key"] for obj in contents if obj["Key"].endswith(".zip")]
+            if not zip_keys:
+                logger.error(
+                    "Skill '%s' v%s: no .zip file found at s3://%s/%s",
+                    skill.name,
+                    skill.version,
+                    bucket,
+                    prefix,
+                )
+                return None
+
+            key = zip_keys[0]
+            logger.info(
+                "Skill '%s' v%s: downloading s3://%s/%s",
+                skill.name,
+                skill.version,
+                bucket,
+                key,
+            )
+
+            obj = s3.get_object(Bucket=bucket, Key=key)
+            content = obj["Body"].read()
+
+            if len(content) > MAX_SKILL_SIZE:
+                logger.error(
+                    "Skill '%s' v%s: S3 download too large (%d bytes, max %d)",
+                    skill.name,
+                    skill.version,
+                    len(content),
+                    MAX_SKILL_SIZE,
+                )
+                return None
+
+            logger.info(
+                "Skill '%s' v%s: fetched %d bytes from S3",
+                skill.name,
+                skill.version,
+                len(content),
+            )
+            return content
+
+        except Exception:
+            logger.error(
+                "Failed to fetch skill '%s' v%s from S3 (%s)",
+                skill.name,
+                skill.version,
+                skill.url,
+                exc_info=True,
+            )
+            return None
+
     async def fetch_and_cache(self, skill: SkillDefinition) -> str | None:
         """
         Fetch a skill from its URL and cache it locally.
 
-        Uses atomic rename for concurrent safety. If the target directory
-        already exists when we try to rename, the existing version is trusted.
+        Routes to the S3 SDK when the URL scheme is ``s3://``, otherwise
+        uses HTTP. Uses atomic rename for concurrent safety.
 
         Args:
             skill: The skill definition with name, version, and URL.
@@ -113,49 +192,58 @@ class SkillManager:
         """
         target_dir = Path(self.storage_path) / SKILLS_DIR / skill.name / skill.version
 
-        try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.get(skill.url)
-                response.raise_for_status()
-                if len(response.content) > MAX_SKILL_SIZE:
-                    logger.error(
-                        "Skill '%s' v%s: download too large (%d bytes, max %d)",
-                        skill.name,
-                        skill.version,
-                        len(response.content),
-                        MAX_SKILL_SIZE,
-                    )
-                    return None
-        except Exception:
-            logger.error(
-                "Failed to fetch skill '%s' v%s from %s",
+        parsed_scheme = skill.url.split("://")[0] if "://" in skill.url else "http"
+
+        if parsed_scheme == "s3":
+            raw_bytes = self._fetch_from_s3(skill)
+            if raw_bytes is None:
+                return None
+            content_bytes = raw_bytes
+            fmt = "zip"
+        else:
+            try:
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    response = await client.get(skill.url)
+                    response.raise_for_status()
+                    if len(response.content) > MAX_SKILL_SIZE:
+                        logger.error(
+                            "Skill '%s' v%s: download too large (%d bytes, max %d)",
+                            skill.name,
+                            skill.version,
+                            len(response.content),
+                            MAX_SKILL_SIZE,
+                        )
+                        return None
+            except Exception:
+                logger.error(
+                    "Failed to fetch skill '%s' v%s from %s",
+                    skill.name,
+                    skill.version,
+                    skill.url,
+                    exc_info=True,
+                )
+                return None
+
+            logger.info(
+                "Fetched skill '%s' v%s from %s (%d bytes)",
                 skill.name,
                 skill.version,
                 skill.url,
-                exc_info=True,
+                len(response.content),
             )
-            return None
-
-        logger.info(
-            "Fetched skill '%s' v%s from %s (%d bytes)",
-            skill.name,
-            skill.version,
-            skill.url,
-            len(response.content),
-        )
-
-        content_type = response.headers.get("content-type", "")
-        fmt = self._detect_format(skill.url, content_type)
+            content_bytes = response.content
+            content_type = response.headers.get("content-type", "")
+            fmt = self._detect_format(skill.url, content_type)
 
         temp_dir = Path(tempfile.mkdtemp(prefix=f"skill_{skill.name}_"))
 
         try:
             if fmt == "zip":
-                result = self._extract_zip(response.content, temp_dir, skill)
+                result = self._extract_zip(content_bytes, temp_dir, skill)
                 if result is None:
                     return None
             else:
-                (temp_dir / SKILL_FILENAME).write_text(response.text)
+                (temp_dir / SKILL_FILENAME).write_bytes(content_bytes)
 
             target_dir.parent.mkdir(parents=True, exist_ok=True)
             try:
