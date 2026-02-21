@@ -64,6 +64,25 @@ def _parse_s3_uri_from_federation_url(federation_url: str) -> str | None:
         return None
 
 
+def _translate_package(raw: dict[str, Any], name: str, version: str) -> SkillDefinition | None:
+    """Translate a Package-format skill dict into a SkillDefinition."""
+    raw_url = raw.get("FileStoreSignedUrl", "")
+    if not raw_url:
+        logger.warning("Skill '%s': Package format but no FileStoreSignedUrl", name)
+        return None
+
+    package_path = raw.get("PackagePath", "")
+    if package_path == "s3":
+        s3_uri = _parse_s3_uri_from_federation_url(raw_url)
+        if not s3_uri:
+            logger.warning("Skill '%s': PackagePath=s3 but could not parse S3 URI from URL", name)
+            return None
+        logger.debug("Skill '%s': resolved S3 URI: %s", name, s3_uri)
+        return SkillDefinition(name=name, version=version, url=s3_uri)
+
+    return SkillDefinition(name=name, version=version, url=raw_url)
+
+
 def _translate_one(raw: dict[str, Any]) -> SkillDefinition | None:
     """Translate a single external skill dict into a SkillDefinition.
 
@@ -85,23 +104,7 @@ def _translate_one(raw: dict[str, Any]) -> SkillDefinition | None:
         return SkillDefinition(name=name, version=version, url="", content=content)
 
     if fmt == "Package":
-        raw_url = raw.get("FileStoreSignedUrl", "")
-        if not raw_url:
-            logger.warning("Skill '%s': Package format but no FileStoreSignedUrl", name)
-            return None
-
-        package_path = raw.get("PackagePath", "")
-        if package_path == "s3":
-            s3_uri = _parse_s3_uri_from_federation_url(raw_url)
-            if not s3_uri:
-                logger.warning(
-                    "Skill '%s': PackagePath=s3 but could not parse S3 URI from URL", name
-                )
-                return None
-            logger.debug("Skill '%s': resolved S3 URI: %s", name, s3_uri)
-            return SkillDefinition(name=name, version=version, url=s3_uri)
-
-        return SkillDefinition(name=name, version=version, url=raw_url)
+        return _translate_package(raw, name, version)
 
     logger.warning("Skill '%s': unknown format '%s', skipping", name, fmt)
     return None

@@ -33,11 +33,8 @@ class TestSkillDefinition:
         skill = SkillDefinition(
             name="k8s-debug", version="1.0.0", url="https://example.com/skill.zip"
         )
-        try:
-            skill.name = "changed"
-            raise AssertionError("Should be immutable")
-        except (AttributeError, TypeError, Exception):
-            pass  # Expected for frozen dataclass
+        with pytest.raises((AttributeError, TypeError)):
+            skill.name = "changed"  # type: ignore[misc]
 
 
 class TestPlatformContextSkills:
@@ -206,10 +203,12 @@ class TestSkillManagerFetch:
     @pytest.mark.asyncio
     async def test_fetch_zip_nested_skill_md_elevated(self, tmp_path):
         """Zip with SKILL.md in a subdirectory gets elevated to root."""
-        zip_bytes = _make_zip_bytes({
-            "my-skill/SKILL.md": "# Nested Skill",
-            "my-skill/scripts/run.sh": "echo hello",
-        })
+        zip_bytes = _make_zip_bytes(
+            {
+                "my-skill/SKILL.md": "# Nested Skill",
+                "my-skill/scripts/run.sh": "echo hello",
+            }
+        )
         skill = SkillDefinition(
             name="nested-skill", version="1.0.0", url="https://example.com/nested.zip"
         )
@@ -237,12 +236,14 @@ class TestSkillManagerFetch:
     @pytest.mark.asyncio
     async def test_fetch_zip_nested_with_macos_metadata_elevated(self, tmp_path):
         """Zip with __MACOSX metadata and nested SKILL.md still works."""
-        zip_bytes = _make_zip_bytes({
-            "hello-python/SKILL.md": "# Hello Skill",
-            "hello-python/scripts/hello.py": "print('hi')",
-            "__MACOSX/._hello-python": "",
-            "__MACOSX/hello-python/._SKILL.md": "",
-        })
+        zip_bytes = _make_zip_bytes(
+            {
+                "hello-python/SKILL.md": "# Hello Skill",
+                "hello-python/scripts/hello.py": "print('hi')",
+                "__MACOSX/._hello-python": "",
+                "__MACOSX/hello-python/._SKILL.md": "",
+            }
+        )
         skill = SkillDefinition(
             name="macos-skill", version="1.0.0", url="https://example.com/macos.zip"
         )
@@ -272,9 +273,11 @@ class TestSkillManagerFetch:
     @pytest.mark.asyncio
     async def test_fetch_zip_deeply_nested_skill_md_rejected(self, tmp_path):
         """Zip with SKILL.md nested more than one level deep is rejected."""
-        zip_bytes = _make_zip_bytes({
-            "a/b/SKILL.md": "# Too Deep",
-        })
+        zip_bytes = _make_zip_bytes(
+            {
+                "a/b/SKILL.md": "# Too Deep",
+            }
+        )
         skill = SkillDefinition(
             name="deep-skill", version="1.0.0", url="https://example.com/deep.zip"
         )
@@ -489,7 +492,9 @@ class TestAgnoAdapterSkillsIntegration:
         # Create a cached skill
         skill_dir = tmp_path / "skills" / "test-skill" / "1.0.0"
         skill_dir.mkdir(parents=True)
-        (skill_dir / "SKILL.md").write_text("---\nname: test-skill\ndescription: A test\n---\n# Test")
+        (skill_dir / "SKILL.md").write_text(
+            "---\nname: test-skill\ndescription: A test\n---\n# Test"
+        )
 
         platform_context = {
             "skills": [
@@ -506,7 +511,11 @@ class TestAgnoAdapterSkillsIntegration:
         adapter._get_or_create_model_async = AsyncMock(return_value=mock_model)
 
         with (
-            patch.object(SkillManager, "__init__", lambda self, **_kw: setattr(self, "storage_path", str(tmp_path)) or None),
+            patch.object(
+                SkillManager,
+                "__init__",
+                lambda self, **_kw: setattr(self, "storage_path", str(tmp_path)) or None,
+            ),
             patch.object(SkillManager, "get_local_skill_path", return_value=str(skill_dir)),
             patch("dcaf.core.adapters.outbound.agno.adapter.AgnoAgent") as mock_agno_agent,
         ):
@@ -583,9 +592,11 @@ class TestSkillsEndToEnd:
         """End-to-end: skill not cached -> fetched -> cached -> loaded."""
         monkeypatch.setenv("PERSISTENT_VOLUME_STORAGE", str(tmp_path))
 
-        zip_bytes = _make_zip_bytes({
-            "SKILL.md": "---\nname: fetched\ndescription: Fetched skill\n---\n# Fetched",
-        })
+        zip_bytes = _make_zip_bytes(
+            {
+                "SKILL.md": "---\nname: fetched\ndescription: Fetched skill\n---\n# Fetched",
+            }
+        )
 
         mock_response = MagicMock()
         mock_response.status_code = 200
@@ -688,7 +699,9 @@ class TestSkillManagerS3:
         mock_s3.list_objects_v2.return_value = {
             "Contents": [{"Key": "skills/magic-iac/skill.zip", "Size": len(zip_bytes)}]
         }
-        mock_s3.get_object.return_value = {"Body": MagicMock(read=MagicMock(return_value=zip_bytes))}
+        mock_s3.get_object.return_value = {
+            "Body": MagicMock(read=MagicMock(return_value=zip_bytes))
+        }
 
         with patch("dcaf.core.services.skill_manager.boto3.client", return_value=mock_s3):
             path = await manager.fetch_and_cache(skill)
@@ -921,9 +934,7 @@ class TestSkillDefinitionContent:
 
     def test_content_field_set(self):
         """Content field can hold inline markdown."""
-        skill = SkillDefinition(
-            name="test", version="1.0.0", url="", content="# Inline Skill"
-        )
+        skill = SkillDefinition(name="test", version="1.0.0", url="", content="# Inline Skill")
         assert skill.content == "# Inline Skill"
 
 

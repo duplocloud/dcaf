@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "dcaf"
-version = "2.0.28"
+version = "2.0.29"
 description = "DuploCloud Agent Builder (DAB) - A framework for building LLM powered AI agents and workflows that integrate with the DuploCloud Help Desk."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -63,6 +63,12 @@ dev = [
     "ruff==0.15.0",
     "mypy>=1.8.0",
     "types-requests>=2.31.0",
+    # Code health (CI)
+    "radon>=6.0.0",
+    "import-linter>=2.0",
+    # Security & dead code (CI, non-blocking)
+    "pip-audit",
+    "vulture",
 ]
 
 # MCP (Model Context Protocol)
@@ -114,20 +120,58 @@ select = [
     "I",      # isort
     "B",      # flake8-bugbear
     "C4",     # flake8-comprehensions
+    "C901",   # McCabe complexity
     "UP",     # pyupgrade
+    "S",      # flake8-bandit (security)
     "ARG",    # flake8-unused-arguments
     "SIM",    # flake8-simplify
+    "PLR0911", # too many return statements
+    "PLR0912", # too many branches
+    "PLR0913", # too many arguments
+    "PLR0915", # too many statements
 ]
 ignore = [
     "E501",   # line too long (handled by formatter)
     "B008",   # do not perform function calls in argument defaults
+    "B904",   # raise without from inside except (often intentional)
     "B905",   # zip without strict= (flexibility)
+    "S101",   # allow assert (used for type narrowing)
     "ARG001", # unused function argument (common in protocols)
 ]
 
+[tool.ruff.lint.pylint]
+max-args = 8
+max-statements = 50
+max-branches = 12
+max-returns = 6
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
+
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]  # Allow unused imports in __init__.py
-"tests/*" = ["ARG001"]    # Allow unused arguments in tests
+"tests/*" = ["ARG001", "S101", "S105", "S106", "PLR0913"]  # test-specific relaxations
+
+# Legacy files with known complexity/style issues — suppress until refactored
+"dcaf/agent_server.py" = ["C901", "PLR0912", "PLR0915"]
+"dcaf/agents/*.py" = ["C901", "PLR0912", "PLR0915", "S602", "S603"]
+"dcaf/cli.py" = ["C901", "PLR0911", "PLR0912", "S602", "S603", "S607"]
+"dcaf/llm/*.py" = ["PLR0913"]
+"dcaf/mcp/__init__.py" = ["C901", "S104"]
+"dcaf/mcp/tools.py" = ["C901", "PLR0912", "PLR0913", "PLR0915"]
+"examples/*.py" = ["S311", "S602", "S603"]
+"main.py" = ["S104"]
+"scripts/*.py" = ["C901", "F841", "S603"]
+
+# Core files with pre-existing issues in functions not introduced by feature/skills
+"dcaf/core/adapters/outbound/agno/adapter.py" = ["C901", "PLR0912", "PLR0913"]
+"dcaf/core/adapters/outbound/agno/message_converter.py" = ["PLR0911"]
+"dcaf/core/adapters/outbound/agno/model_factory.py" = ["S110"]
+"dcaf/core/adapters/outbound/agno/response_converter.py" = ["C901", "PLR0911", "PLR0912"]
+"dcaf/core/agent.py" = ["C901", "PLR0911", "PLR0913"]
+"dcaf/core/config.py" = ["C901", "PLR0911", "PLR0912", "S105"]
+"dcaf/core/domain/value_objects/platform_context.py" = ["C901"]
+"dcaf/core/server.py" = ["C901", "PLR0912", "PLR0913", "PLR0915", "S104"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["dcaf"]
@@ -152,6 +196,7 @@ ignore_missing_imports = true
 no_implicit_optional = true
 warn_redundant_casts = true
 warn_unused_ignores = true
+strict_optional = true
 show_error_codes = true
 exclude = [
     "build/",
@@ -187,3 +232,54 @@ dev = [
     "ruff==0.15.0",
     "types-requests>=2.32.4.20260107",
 ]
+
+# =============================================================================
+# Prek — pre-commit hook runner
+# Install: uv tool install prek
+# =============================================================================
+[tool.prek]
+
+[[tool.prek.hooks]]
+name = "Ruff Format"
+priority = 10
+command = "ruff format"
+include = ["*.py"]
+exclude = [".venv", "build", "dist", "__pycache__"]
+
+[[tool.prek.hooks]]
+name = "Ruff Check"
+priority = 20
+command = "ruff check --fix"
+include = ["*.py"]
+exclude = [".venv", "build", "dist", "__pycache__"]
+
+[[tool.prek.hooks]]
+name = "MyPy"
+priority = 30
+command = "mypy dcaf/"
+include = ["*.py"]
+exclude = [".venv", "build", "dist", "tests"]
+
+# =============================================================================
+# import-linter — architectural layer enforcement
+# =============================================================================
+[tool.importlinter]
+root_packages = ["dcaf"]
+
+[[tool.importlinter.contracts]]
+name = "Schemas are dependency-free"
+type = "forbidden"
+source_modules = ["dcaf.schemas"]
+forbidden_modules = ["dcaf.core", "dcaf.agents", "dcaf.llm"]
+
+[[tool.importlinter.contracts]]
+name = "Core does not import agents"
+type = "forbidden"
+source_modules = ["dcaf.core"]
+forbidden_modules = ["dcaf.agents"]
+
+[[tool.importlinter.contracts]]
+name = "Legacy LLM does not import core or agents"
+type = "forbidden"
+source_modules = ["dcaf.llm"]
+forbidden_modules = ["dcaf.core", "dcaf.agents"]

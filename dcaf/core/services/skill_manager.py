@@ -38,7 +38,9 @@ class SkillManager:
 
     def __init__(self, storage_path: str | None = None) -> None:
         self.storage_path = (
-            storage_path or os.environ.get(EnvVars.PERSISTENT_VOLUME_STORAGE) or DEFAULT_STORAGE_PATH
+            storage_path
+            or os.environ.get(EnvVars.PERSISTENT_VOLUME_STORAGE)
+            or DEFAULT_STORAGE_PATH
         )
 
     def get_local_skill_path(self, skill: SkillDefinition) -> str | None:
@@ -147,7 +149,7 @@ class SkillManager:
             )
 
             obj = s3.get_object(Bucket=bucket, Key=key)
-            content = obj["Body"].read()
+            content: bytes = obj["Body"].read()
 
             if len(content) > MAX_SKILL_SIZE:
                 logger.error(
