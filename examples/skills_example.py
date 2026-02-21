@@ -65,9 +65,7 @@ dotenv.load_dotenv(override=True)
 temp_folder = os.path.join(tempfile.gettempdir(), "dcaf")
 
 os.environ.setdefault("AWS_PROFILE", "test10")
-os.environ.setdefault(
-    "PERSISTENT_VOLUME_STORAGE", temp_folder
-)
+os.environ.setdefault("PERSISTENT_VOLUME_STORAGE", temp_folder)
 
 print(temp_folder)
 
@@ -92,9 +90,7 @@ def run_command(command: str) -> str:
     if not command.strip().startswith("git"):
         return "Error: Only git commands are allowed"
     try:
-        result = subprocess.run(
-            command, shell=True, capture_output=True, text=True, timeout=30
-        )
+        result = subprocess.run(command, shell=True, capture_output=True, text=True, timeout=30)
         output = result.stdout
         if result.stderr:
             output += result.stderr

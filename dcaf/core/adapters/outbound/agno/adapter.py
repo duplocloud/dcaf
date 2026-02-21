@@ -668,9 +668,7 @@ class AgnoAdapter:
 
         return agent
 
-    async def _resolve_skills(
-        self, platform_context: dict[str, Any] | None
-    ) -> Skills | None:
+    async def _resolve_skills(self, platform_context: dict[str, Any] | None) -> Skills | None:
         """
         Extract and resolve skills from platform context.
 
