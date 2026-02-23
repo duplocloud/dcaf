@@ -106,6 +106,8 @@ Additionally:
 
 The `PERSISTENT_VOLUME_STORAGE` environment variable defaults to `/data`. It uses no `DCAF_` prefix because it is a general-purpose storage path that may be shared with other services on the same infrastructure.
 
+The storage root is resolved in priority order: constructor argument → `PERSISTENT_VOLUME_STORAGE` env var → `/data` built-in default.
+
 ```
 /data/                              # PERSISTENT_VOLUME_STORAGE
   skills/
@@ -119,6 +121,27 @@ The `PERSISTENT_VOLUME_STORAGE` environment variable defaults to `/data`. It use
       2.1.0/
         SKILL.md
 ```
+
+### 8. External Platform Format Translation
+
+**Problem:** The DuploCloud platform delivers skills in a PascalCase format (`Format`, `Name`, `Version`, `IsActive`, `SkillMd`, `FileStoreSignedUrl`) that differs from the internal DCAF wire format (`name`, `version`, `url`).
+
+**Decision:** A thin translation layer (`skill_translator.py`) detects the format by checking for the presence of the `Format` key and converts PascalCase entries to internal `SkillDefinition` objects. Both formats can coexist in the same request.
+
+Two external formats are supported:
+
+- **`SkillMd`** — inline markdown content embedded directly in the request. Written to the local cache on every request to ensure freshness. No URL fetch needed.
+- **`Package`** — zip archive downloaded from a `FileStoreSignedUrl` (typically a pre-signed S3 URL). Follows the same fetch-and-cache pipeline as the URL-based internal format.
+
+Inactive skills (`"IsActive": false`) are silently skipped by the translation layer.
+
+### 9. Zip Root Auto-Elevation
+
+**Problem:** Tools like macOS Finder wrap zip contents in a top-level folder (e.g., `my-skill/SKILL.md`). Requiring `SKILL.md` strictly at the zip root would reject these common archives.
+
+**Decision:** If `SKILL.md` is not at the zip root, the extractor looks exactly one directory level deep. If a single subdirectory contains `SKILL.md`, its contents are promoted to the root (elevated). `__MACOSX` metadata directories are removed during elevation. If `SKILL.md` is not found at root or one level deep, the skill is rejected.
+
+This strictly limits the elevation depth to one level to avoid ambiguity when a zip contains multiple subdirectories.
 
 ## Consequences
 
