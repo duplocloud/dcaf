@@ -2276,6 +2276,28 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#8-external-platform-format-translation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. External Platform Format Translation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#9-zip-root-auto-elevation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Zip Root Auto-Elevation
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -2513,6 +2535,28 @@
     <span class="md-ellipsis">
       
         7. Storage Layout and Environment Variable
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#8-external-platform-format-translation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. External Platform Format Translation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#9-zip-root-auto-elevation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Zip Root Auto-Elevation
       
     </span>
   </a>
@@ -2763,6 +2807,7 @@
 <h3 id="7-storage-layout-and-environment-variable">7. Storage Layout and Environment Variable<a class="headerlink" href="#7-storage-layout-and-environment-variable" title="Permanent link">&para;</a></h3>
 <p><strong>Decision:</strong> Skills are cached at <code>{PERSISTENT_VOLUME_STORAGE}/skills/{name}/{version}/</code>.</p>
 <p>The <code>PERSISTENT_VOLUME_STORAGE</code> environment variable defaults to <code>/data</code>. It uses no <code>DCAF_</code> prefix because it is a general-purpose storage path that may be shared with other services on the same infrastructure.</p>
+<p>The storage root is resolved in priority order: constructor argument → <code>PERSISTENT_VOLUME_STORAGE</code> env var → <code>/data</code> built-in default.</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>/data/                              # PERSISTENT_VOLUME_STORAGE
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>  skills/
 </span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>    k8s-debug/
@@ -2775,6 +2820,19 @@
 </span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>      2.1.0/
 </span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>        SKILL.md
 </span></code></pre></div>
+<h3 id="8-external-platform-format-translation">8. External Platform Format Translation<a class="headerlink" href="#8-external-platform-format-translation" title="Permanent link">&para;</a></h3>
+<p><strong>Problem:</strong> The DuploCloud platform delivers skills in a PascalCase format (<code>Format</code>, <code>Name</code>, <code>Version</code>, <code>IsActive</code>, <code>SkillMd</code>, <code>FileStoreSignedUrl</code>) that differs from the internal DCAF wire format (<code>name</code>, <code>version</code>, <code>url</code>).</p>
+<p><strong>Decision:</strong> A thin translation layer (<code>skill_translator.py</code>) detects the format by checking for the presence of the <code>Format</code> key and converts PascalCase entries to internal <code>SkillDefinition</code> objects. Both formats can coexist in the same request.</p>
+<p>Two external formats are supported:</p>
+<ul>
+<li><strong><code>SkillMd</code></strong> — inline markdown content embedded directly in the request. Written to the local cache on every request to ensure freshness. No URL fetch needed.</li>
+<li><strong><code>Package</code></strong> — zip archive downloaded from a <code>FileStoreSignedUrl</code> (typically a pre-signed S3 URL). Follows the same fetch-and-cache pipeline as the URL-based internal format.</li>
+</ul>
+<p>Inactive skills (<code>"IsActive": false</code>) are silently skipped by the translation layer.</p>
+<h3 id="9-zip-root-auto-elevation">9. Zip Root Auto-Elevation<a class="headerlink" href="#9-zip-root-auto-elevation" title="Permanent link">&para;</a></h3>
+<p><strong>Problem:</strong> Tools like macOS Finder wrap zip contents in a top-level folder (e.g., <code>my-skill/SKILL.md</code>). Requiring <code>SKILL.md</code> strictly at the zip root would reject these common archives.</p>
+<p><strong>Decision:</strong> If <code>SKILL.md</code> is not at the zip root, the extractor looks exactly one directory level deep. If a single subdirectory contains <code>SKILL.md</code>, its contents are promoted to the root (elevated). <code>__MACOSX</code> metadata directories are removed during elevation. If <code>SKILL.md</code> is not found at root or one level deep, the skill is rejected.</p>
+<p>This strictly limits the elevation depth to one level to avoid ambiguity when a zip contains multiple subdirectories.</p>
 <h2 id="consequences">Consequences<a class="headerlink" href="#consequences" title="Permanent link">&para;</a></h2>
 <h3 id="positive">Positive<a class="headerlink" href="#positive" title="Permanent link">&para;</a></h3>
 <ul>

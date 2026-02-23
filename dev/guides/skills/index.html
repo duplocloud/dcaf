@@ -1442,6 +1442,56 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#duplocloud-platform-format" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DuploCloud Platform Format
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="DuploCloud Platform Format">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#skillmd-format-inline-content" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SkillMd Format (Inline Content)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#package-format-zip-download" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Package Format (Zip Download)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mixed-formats" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mixed Formats
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#storage-and-caching" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1558,6 +1608,17 @@
     <span class="md-ellipsis">
       
         Under the Hood
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#system-prompt-modification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        System Prompt Modification
       
     </span>
   </a>
@@ -2684,6 +2745,56 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#duplocloud-platform-format" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DuploCloud Platform Format
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="DuploCloud Platform Format">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#skillmd-format-inline-content" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SkillMd Format (Inline Content)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#package-format-zip-download" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Package Format (Zip Download)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mixed-formats" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mixed Formats
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#storage-and-caching" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2800,6 +2911,17 @@
     <span class="md-ellipsis">
       
         Under the Hood
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#system-prompt-modification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        System Prompt Modification
       
     </span>
   </a>
@@ -2960,6 +3082,7 @@
 <li><a href="#quick-start">Quick Start</a></li>
 <li><a href="#how-skills-work">How Skills Work</a></li>
 <li><a href="#platform-context-integration">Platform Context Integration</a></li>
+<li><a href="#duplocloud-platform-format">DuploCloud Platform Format</a></li>
 <li><a href="#storage-and-caching">Storage and Caching</a></li>
 <li><a href="#skill-formats">Skill Formats</a></li>
 <li><a href="#agent-integration">Agent Integration</a></li>
@@ -3095,12 +3218,13 @@
 </span><span id="__span-4-15"><a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a>    <span class="p">]</span>
 </span><span id="__span-4-16"><a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a><span class="p">}</span>
 </span></code></pre></div>
-<p>Each skill definition has three required fields:</p>
+<p>Each skill definition has three fields:</p>
 <table>
 <thead>
 <tr>
 <th>Field</th>
 <th>Type</th>
+<th>Required</th>
 <th>Description</th>
 </tr>
 </thead>
@@ -3108,39 +3232,136 @@
 <tr>
 <td><code>name</code></td>
 <td>string</td>
+<td>Yes</td>
 <td>Unique identifier for the skill</td>
 </tr>
 <tr>
 <td><code>version</code></td>
 <td>string</td>
+<td>Yes</td>
 <td>Exact version string for cache lookup</td>
 </tr>
 <tr>
 <td><code>url</code></td>
 <td>string</td>
+<td>Yes</td>
 <td>URL to fetch the skill from if not cached</td>
 </tr>
 </tbody>
 </table>
 <p>You can pass multiple skills — the agent will load all of them.</p>
 <hr />
+<h2 id="duplocloud-platform-format">DuploCloud Platform Format<a class="headerlink" href="#duplocloud-platform-format" title="Permanent link">&para;</a></h2>
+<p>When skills are delivered by the DuploCloud platform (rather than passed directly in the API request), they use a PascalCase format with a <code>Format</code> discriminator field. The agent server automatically translates this format into the internal representation.</p>
+<h3 id="skillmd-format-inline-content">SkillMd Format (Inline Content)<a class="headerlink" href="#skillmd-format-inline-content" title="Permanent link">&para;</a></h3>
+<p>The <code>SkillMd</code> format passes skill content directly in the request — no URL fetch is needed. The platform embeds the <code>SKILL.md</code> contents inline:</p>
+<div class="language-json highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="p">{</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span><span class="nt">&quot;role&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;user&quot;</span><span class="p">,</span>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">  </span><span class="nt">&quot;content&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Debug why my pods are crashing&quot;</span><span class="p">,</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">  </span><span class="nt">&quot;platform_context&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">    </span><span class="nt">&quot;skills&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="w">      </span><span class="p">{</span>
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="w">        </span><span class="nt">&quot;Format&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;SkillMd&quot;</span><span class="p">,</span>
+</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="w">        </span><span class="nt">&quot;Name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;k8s-debug&quot;</span><span class="p">,</span>
+</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="w">        </span><span class="nt">&quot;Version&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;3&quot;</span><span class="p">,</span>
+</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="w">        </span><span class="nt">&quot;IsActive&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+</span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a><span class="w">        </span><span class="nt">&quot;SkillMd&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;---\nname: k8s-debug\ndescription: Kubernetes debugging\n---\n\n# K8s Debugging\n...&quot;</span>
+</span><span id="__span-5-12"><a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a><span class="w">      </span><span class="p">}</span>
+</span><span id="__span-5-13"><a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a><span class="w">    </span><span class="p">]</span>
+</span><span id="__span-5-14"><a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a><span class="w">  </span><span class="p">}</span>
+</span><span id="__span-5-15"><a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a><span class="p">}</span>
+</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Format</code></td>
+<td><code>"SkillMd"</code> — inline markdown</td>
+</tr>
+<tr>
+<td><code>Name</code></td>
+<td>Skill name</td>
+</tr>
+<tr>
+<td><code>Version</code></td>
+<td>Version string (used for cache key)</td>
+</tr>
+<tr>
+<td><code>IsActive</code></td>
+<td>If <code>false</code>, the skill is skipped</td>
+</tr>
+<tr>
+<td><code>SkillMd</code></td>
+<td>Full <code>SKILL.md</code> content as a string</td>
+</tr>
+</tbody>
+</table>
+<p>Inline skills always overwrite their cached version on each request, ensuring the agent always uses the latest content sent by the platform.</p>
+<h3 id="package-format-zip-download">Package Format (Zip Download)<a class="headerlink" href="#package-format-zip-download" title="Permanent link">&para;</a></h3>
+<p>The <code>Package</code> format triggers a zip download from a signed URL:</p>
+<div class="language-json highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="p">{</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span><span class="nt">&quot;Format&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Package&quot;</span><span class="p">,</span>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">  </span><span class="nt">&quot;Name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;hello-python&quot;</span><span class="p">,</span>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">  </span><span class="nt">&quot;Version&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;5&quot;</span><span class="p">,</span>
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="w">  </span><span class="nt">&quot;IsActive&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="w">  </span><span class="nt">&quot;FileStoreSignedUrl&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;https://s3.amazonaws.com/bucket/skills/hello-python.zip?...&quot;</span>
+</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="p">}</span>
+</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Format</code></td>
+<td><code>"Package"</code> — zip archive download</td>
+</tr>
+<tr>
+<td><code>Name</code></td>
+<td>Skill name</td>
+</tr>
+<tr>
+<td><code>Version</code></td>
+<td>Version string (used for cache key)</td>
+</tr>
+<tr>
+<td><code>IsActive</code></td>
+<td>If <code>false</code>, the skill is skipped</td>
+</tr>
+<tr>
+<td><code>FileStoreSignedUrl</code></td>
+<td>Pre-signed URL to download the zip archive</td>
+</tr>
+</tbody>
+</table>
+<h3 id="mixed-formats">Mixed Formats<a class="headerlink" href="#mixed-formats" title="Permanent link">&para;</a></h3>
+<p>A single request can mix both the internal lowercase format and the external PascalCase format in the same <code>skills</code> array. The translation layer detects the format of each entry by the presence of the <code>Format</code> key.</p>
+<hr />
 <h2 id="storage-and-caching">Storage and Caching<a class="headerlink" href="#storage-and-caching" title="Permanent link">&para;</a></h2>
 <h3 id="cache-layout">Cache Layout<a class="headerlink" href="#cache-layout" title="Permanent link">&para;</a></h3>
 <p>Skills are cached on the local filesystem at:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>{PERSISTENT_VOLUME_STORAGE}/skills/{name}/{version}/
+<div class="language-text highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>{PERSISTENT_VOLUME_STORAGE}/skills/{name}/{version}/
 </span></code></pre></div>
 <p>For example:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>/data/skills/
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>  k8s-debug/
-</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>    1.0.0/
-</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>      SKILL.md
-</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>      scripts/
-</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>        check-pods.sh
-</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>    2.0.0/
-</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>      SKILL.md
-</span><span id="__span-6-9"><a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>  aws-helper/
-</span><span id="__span-6-10"><a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>    2.1.0/
-</span><span id="__span-6-11"><a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a>      SKILL.md
+<div class="language-text highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>/data/skills/
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>  k8s-debug/
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>    1.0.0/
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>      SKILL.md
+</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>      scripts/
+</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>        check-pods.sh
+</span><span id="__span-8-7"><a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a>    2.0.0/
+</span><span id="__span-8-8"><a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>      SKILL.md
+</span><span id="__span-8-9"><a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a>  aws-helper/
+</span><span id="__span-8-10"><a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a>    2.1.0/
+</span><span id="__span-8-11"><a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a>      SKILL.md
 </span></code></pre></div>
 <h3 id="cache-behavior">Cache Behavior<a class="headerlink" href="#cache-behavior" title="Permanent link">&para;</a></h3>
 <ul>
@@ -3149,35 +3370,47 @@
 <li><strong>Exact version matching</strong>: Version <code>"1.0.0"</code> only matches <code>"1.0.0"</code> — there is no semantic version comparison</li>
 </ul>
 <h3 id="storage-path">Storage Path<a class="headerlink" href="#storage-path" title="Permanent link">&para;</a></h3>
-<p>The storage root is configured via the <code>PERSISTENT_VOLUME_STORAGE</code> environment variable:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">PERSISTENT_VOLUME_STORAGE</span><span class="o">=</span>/mnt/shared-storage
+<p>The storage root is resolved in this order:</p>
+<ol>
+<li><strong>Constructor argument</strong> — <code>SkillManager(storage_path="/custom/path")</code></li>
+<li><strong>Environment variable</strong> — <code>PERSISTENT_VOLUME_STORAGE</code></li>
+<li><strong>Built-in default</strong> — <code>/data</code></li>
+</ol>
+<p>To override via environment variable:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">PERSISTENT_VOLUME_STORAGE</span><span class="o">=</span>/mnt/shared-storage
 </span></code></pre></div>
-<p>If not set, it defaults to <code>/data</code>.</p>
 <hr />
 <h2 id="skill-formats">Skill Formats<a class="headerlink" href="#skill-formats" title="Permanent link">&para;</a></h2>
 <h3 id="zip-files">Zip Files<a class="headerlink" href="#zip-files" title="Permanent link">&para;</a></h3>
 <p>Zip archives can contain <code>SKILL.md</code> plus any supporting files:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>skill.zip
-</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>  ├── SKILL.md           # Required at zip root
-</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>  ├── references/
-</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>  │   └── api-spec.md
-</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>  └── scripts/
-</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>      └── deploy.sh
+<div class="language-text highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>skill.zip
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>  ├── SKILL.md           # Required at zip root (or one level deep — see below)
+</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>  ├── references/
+</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>  │   └── api-spec.md
+</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>  └── scripts/
+</span><span id="__span-10-6"><a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>      └── deploy.sh
 </span></code></pre></div>
-<div class="admonition warning">
-<p class="admonition-title">SKILL.md must be at the zip root</p>
-<p>If <code>SKILL.md</code> is not found at the root of the zip archive, the skill will be rejected with an error log: <code>Expected SKILL.md file missing at folder root</code>.</p>
+<div class="admonition note">
+<p class="admonition-title">SKILL.md auto-elevation</p>
+<p>If <code>SKILL.md</code> is not at the zip root but is found exactly one directory level deep, its parent directory contents are automatically promoted to the root. This handles zips created by tools like macOS Finder that wrap files in a top-level folder:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>skill.zip
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>  └── my-skill/         # top-level folder (auto-elevated)
+</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>      ├── SKILL.md      # found here → contents promoted to root
+</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>      └── scripts/
+</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>          └── deploy.sh
+</span></code></pre></div>
+<p>If <code>SKILL.md</code> cannot be found at the root or one level deep, the skill is rejected with an error log.</p>
 </div>
 <h3 id="markdown-files">Markdown Files<a class="headerlink" href="#markdown-files" title="Permanent link">&para;</a></h3>
 <p>A single markdown file served directly from a URL. It will be saved as <code>SKILL.md</code> in the cache directory:</p>
-<div class="language-markdown highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>---
-</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>name: my-skill
-</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="gu">description: A simple single-file skill</span>
-</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="gu">---</span>
-</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>
-</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="gh"># My Skill Instructions</span>
-</span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>
-</span><span id="__span-9-8"><a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>Do the thing.
+<div class="language-markdown highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>---
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>name: my-skill
+</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="gu">description: A simple single-file skill</span>
+</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="gu">---</span>
+</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a>
+</span><span id="__span-12-6"><a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a><span class="gh"># My Skill Instructions</span>
+</span><span id="__span-12-7"><a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a>
+</span><span id="__span-12-8"><a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a>Do the thing.
 </span></code></pre></div>
 <h3 id="format-detection">Format Detection<a class="headerlink" href="#format-detection" title="Permanent link">&para;</a></h3>
 <p>The format is detected automatically using this order of precedence:</p>
@@ -3192,18 +3425,24 @@
 <p>The <code>AgnoAdapter._create_agent_async()</code> method:</p>
 <ol>
 <li>Extracts the <code>skills</code> array from <code>platform_context</code></li>
-<li>Creates <code>SkillDefinition</code> value objects</li>
+<li>Translates both internal and external (PascalCase) formats via <code>translate_skills()</code></li>
 <li>Calls <code>SkillManager().resolve_skills()</code> to fetch/cache/load</li>
 <li>Passes the resulting <code>Skills</code> object to <code>AgnoAgent(skills=...)</code></li>
 </ol>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="c1"># This happens automatically — you don&#39;t need to write this code</span>
-</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="n">agent</span> <span class="o">=</span> <span class="n">AgnoAgent</span><span class="p">(</span>
-</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>    <span class="n">model</span><span class="o">=</span><span class="n">model</span><span class="p">,</span>
-</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>    <span class="n">instructions</span><span class="o">=</span><span class="n">system_prompt</span><span class="p">,</span>
-</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>    <span class="n">tools</span><span class="o">=</span><span class="n">tools</span><span class="p">,</span>
-</span><span id="__span-10-6"><a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>    <span class="n">skills</span><span class="o">=</span><span class="n">resolved_skills</span><span class="p">,</span>  <span class="c1"># ← automatically populated from platform context</span>
-</span><span id="__span-10-7"><a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="c1"># This happens automatically — you don&#39;t need to write this code</span>
+</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="n">agent</span> <span class="o">=</span> <span class="n">AgnoAgent</span><span class="p">(</span>
+</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>    <span class="n">model</span><span class="o">=</span><span class="n">model</span><span class="p">,</span>
+</span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a>    <span class="n">instructions</span><span class="o">=</span><span class="n">system_prompt</span><span class="p">,</span>
+</span><span id="__span-13-5"><a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a>    <span class="n">tools</span><span class="o">=</span><span class="n">tools</span><span class="p">,</span>
+</span><span id="__span-13-6"><a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a>    <span class="n">skills</span><span class="o">=</span><span class="n">resolved_skills</span><span class="p">,</span>  <span class="c1"># ← automatically populated from platform context</span>
+</span><span id="__span-13-7"><a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a><span class="p">)</span>
 </span></code></pre></div>
+<h3 id="system-prompt-modification">System Prompt Modification<a class="headerlink" href="#system-prompt-modification" title="Permanent link">&para;</a></h3>
+<p>The adapter automatically prepends a single-tool instruction to every system prompt:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>IMPORTANT: You must call tools ONE AT A TIME. Never request multiple tool calls
+</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>in a single response. Wait for each tool result before calling the next tool.
+</span></code></pre></div>
+<p>This is a workaround for a Bedrock constraint that rejects responses containing multiple parallel tool calls. It applies to all agents regardless of whether skills are loaded.</p>
 <hr />
 <h2 id="error-handling">Error Handling<a class="headerlink" href="#error-handling" title="Permanent link">&para;</a></h2>
 <p>The skills system is designed to be resilient. Skill failures never prevent the agent from starting.</p>
