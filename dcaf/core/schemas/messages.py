@@ -83,6 +83,9 @@ class PlatformContext(BaseModel):
     # Skills to load into the agent
     skills: list[SkillDefinitionSchema] = Field(default_factory=list)
 
+    # Scopes (evolving — kept generic intentionally)
+    scopes: list[dict[str, Any]] = Field(default_factory=list)
+
     model_config = ConfigDict(extra="allow")  # Allow additional fields to pass through
 
 

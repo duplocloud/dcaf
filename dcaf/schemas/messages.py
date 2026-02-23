@@ -52,6 +52,7 @@ class PlatformContext(BaseModel):
     tenant_name: str | None = None
     aws_credentials: dict[str, Any] | None = None
     kubeconfig: str | None = None
+    scopes: list[dict[str, Any]] = Field(default_factory=list)
 
 
 # unused - covered by executed_cmds
