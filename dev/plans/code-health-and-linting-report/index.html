@@ -12,7 +12,7 @@
         <meta name="author" content="DuploCloud">
       
       
-        <link rel="canonical" href="https://duplocloud.github.io/dcaf/dev/review/review-1/">
+        <link rel="canonical" href="https://duplocloud.github.io/dcaf/dev/plans/code-health-and-linting-report/">
       
       
       
@@ -25,7 +25,7 @@
     
     
       
-        <title>DECAF Framework Review Meeting Summary - DCAF Documentation</title>
+        <title>Code Health Metrics & Python Linting Report - DCAF Documentation</title>
       
     
     
@@ -76,7 +76,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#decaf-framework-review-meeting-summary" class="md-skip">
+        <a href="#code-health-metrics-python-linting-report" class="md-skip">
           Skip to content
         </a>
       
@@ -111,7 +111,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              DECAF Framework Review Meeting Summary
+              Code Health Metrics &amp; Python Linting Report
             
           </span>
         </div>
@@ -2184,33 +2184,22 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#overview" class="md-nav__link">
+  <a href="#1-ruff-linter-formatter" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Overview
+        1. Ruff — Linter &amp; Formatter
       
     </span>
   </a>
   
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#key-points-takeaways" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Key Points &amp; Takeaways
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Key Points &amp; Takeaways">
+    <nav class="md-nav" aria-label="1. Ruff — Linter &amp; Formatter">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#philosophy-design-principles" class="md-nav__link">
+  <a href="#enabled-rule-sets" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Philosophy &amp; Design Principles
+        Enabled Rule Sets
       
     </span>
   </a>
@@ -2218,10 +2207,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#new-features-added" class="md-nav__link">
+  <a href="#ignored-rules-global" class="md-nav__link">
     <span class="md-ellipsis">
       
-        New Features Added
+        Ignored Rules (Global)
       
     </span>
   </a>
@@ -2229,10 +2218,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#tool-definition-methods" class="md-nav__link">
+  <a href="#pylint-thresholds" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Tool Definition Methods
+        Pylint Thresholds
       
     </span>
   </a>
@@ -2240,10 +2229,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#modules-duplocloud-should-fully-own" class="md-nav__link">
+  <a href="#mccabe-complexity" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Modules DuploCloud Should Fully Own
+        McCabe Complexity
       
     </span>
   </a>
@@ -2251,10 +2240,32 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#key-agreements-reached" class="md-nav__link">
+  <a href="#per-file-ignores" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Key Agreements Reached
+        Per-File Ignores
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#formatter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Formatter
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-it-runs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How It Runs
       
     </span>
   </a>
@@ -2267,55 +2278,99 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#questions-asked" class="md-nav__link">
+  <a href="#2-mypy-static-type-checking" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Questions Asked
+        2. mypy — Static Type Checking
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Questions Asked">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-radon-code-health-metrics-via-ci-script" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Radon — Code Health Metrics (via CI Script)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-import-linter-architectural-dependency-enforcement" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. import-linter — Architectural Dependency Enforcement
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-additional-security-quality-tools-ci" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Additional Security &amp; Quality Tools (CI)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-test-coverage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Test Coverage
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-pre-commit-hook-execution-order" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Pre-commit Hook Execution Order
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-ci-pipeline-integration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. CI Pipeline Integration
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#summary-for-adoption" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Summary for Adoption
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Summary for Adoption">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#pranav-chakilam" class="md-nav__link">
+  <a href="#minimal-pyprojecttoml-snippet" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Pranav Chakilam
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#prem-lakshmanan" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Prem Lakshmanan
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#andy-boutte" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Andy Boutte
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#adam-smith" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Adam Smith
+        Minimal pyproject.toml Snippet
       
     </span>
   </a>
@@ -2324,178 +2379,6 @@
         
       </ul>
     </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#actionable-items" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Actionable Items
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Actionable Items">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#must-address" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Must Address
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#design-considerations" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Design Considerations
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#future-work" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Future Work
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#technical-deep-dives" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Technical Deep Dives
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Technical Deep Dives">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#session-state-management" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Session State Management
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#prompt-caching" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Prompt Caching
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#platform-context-tool-security" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Platform Context &amp; Tool Security
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#notable-quotes" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Notable Quotes
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#appendix-framework-architecture" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Appendix: Framework Architecture
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Appendix: Framework Architecture">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#agent-parameters" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Agent Parameters
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#serve-method" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Serve Method
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#tool-definition-with-approval" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Tool Definition with Approval
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#next-steps" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Next Steps
-      
-    </span>
-  </a>
   
 </li>
       
@@ -2527,324 +2410,463 @@
   
 
 
-<h1 id="decaf-framework-review-meeting-summary">DECAF Framework Review Meeting Summary<a class="headerlink" href="#decaf-framework-review-meeting-summary" title="Permanent link">&para;</a></h1>
-<p><strong>Date:</strong> Meeting transcript review<br />
-<strong>Presenter:</strong> Chuck Conway<br />
-<strong>Attendees:</strong> Pranav Chakilam, Andy Boutte, Prem Lakshmanan, Mal Marconi, Sum Yip, Adam Smith</p>
-<hr />
-<h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
-<p>Chuck presented an expanded version of <strong>DECAF (DuploCloud Agent Framework)</strong>, building on Pranav's original work. The goal is to create a framework that abstracts complexity while allowing agents to focus on solving domain problems. The framework currently uses Agno under the covers but is designed to be swappable.</p>
-<hr />
-<h2 id="key-points-takeaways">Key Points &amp; Takeaways<a class="headerlink" href="#key-points-takeaways" title="Permanent link">&para;</a></h2>
-<h3 id="philosophy-design-principles">Philosophy &amp; Design Principles<a class="headerlink" href="#philosophy-design-principles" title="Permanent link">&para;</a></h3>
+<h1 id="code-health-metrics-python-linting-report">Code Health Metrics &amp; Python Linting Report<a class="headerlink" href="#code-health-metrics-python-linting-report" title="Permanent link">&para;</a></h1>
+<p>A detailed reference of the tooling, rule sets, and thresholds used in this project for code quality enforcement. Intended for adoption by other projects.</p>
+<h2 id="1-ruff-linter-formatter">1. Ruff — Linter &amp; Formatter<a class="headerlink" href="#1-ruff-linter-formatter" title="Permanent link">&para;</a></h2>
+<p><strong>Version:</strong> <code>&gt;=0.15.0</code> (CI pins <code>0.15.0</code>)
+<strong>Target Python:</strong> <code>3.14</code>
+<strong>Line length:</strong> <code>88</code></p>
+<h3 id="enabled-rule-sets">Enabled Rule Sets<a class="headerlink" href="#enabled-rule-sets" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>Rule Set</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>E</code></td>
+<td>pycodestyle errors</td>
+<td>PEP 8 style errors</td>
+</tr>
+<tr>
+<td><code>W</code></td>
+<td>pycodestyle warnings</td>
+<td>PEP 8 style warnings</td>
+</tr>
+<tr>
+<td><code>F</code></td>
+<td>pyflakes</td>
+<td>Unused imports, undefined names, etc.</td>
+</tr>
+<tr>
+<td><code>I</code></td>
+<td>isort</td>
+<td>Import sorting/ordering</td>
+</tr>
+<tr>
+<td><code>B</code></td>
+<td>flake8-bugbear</td>
+<td>Common Python pitfalls and design issues</td>
+</tr>
+<tr>
+<td><code>C4</code></td>
+<td>flake8-comprehensions</td>
+<td>Unnecessary list/dict/set comprehensions</td>
+</tr>
+<tr>
+<td><code>C901</code></td>
+<td>McCabe complexity</td>
+<td>Cyclomatic complexity per function</td>
+</tr>
+<tr>
+<td><code>UP</code></td>
+<td>pyupgrade</td>
+<td>Modernize syntax to target Python version</td>
+</tr>
+<tr>
+<td><code>S</code></td>
+<td>flake8-bandit</td>
+<td>Security checks (hardcoded passwords, unsafe calls, etc.)</td>
+</tr>
+<tr>
+<td><code>PLR0911</code></td>
+<td>Pylint</td>
+<td>Too many return statements</td>
+</tr>
+<tr>
+<td><code>PLR0912</code></td>
+<td>Pylint</td>
+<td>Too many branches</td>
+</tr>
+<tr>
+<td><code>PLR0913</code></td>
+<td>Pylint</td>
+<td>Too many arguments</td>
+</tr>
+<tr>
+<td><code>PLR0915</code></td>
+<td>Pylint</td>
+<td>Too many statements</td>
+</tr>
+</tbody>
+</table>
+<h3 id="ignored-rules-global">Ignored Rules (Global)<a class="headerlink" href="#ignored-rules-global" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>Reason</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>E501</code></td>
+<td>Line length handled by the formatter, not the linter</td>
+</tr>
+<tr>
+<td><code>B008</code></td>
+<td>Allows function calls in argument defaults (FastAPI <code>Depends()</code> pattern)</td>
+</tr>
+<tr>
+<td><code>B904</code></td>
+<td><code>raise</code> without <code>from</code> inside <code>except</code> — often intentional</td>
+</tr>
+<tr>
+<td><code>B905</code></td>
+<td><code>zip()</code> without <code>strict=</code> parameter</td>
+</tr>
+<tr>
+<td><code>S101</code></td>
+<td>Allows <code>assert</code> usage (used idiomatically for type narrowing)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="pylint-thresholds">Pylint Thresholds<a class="headerlink" href="#pylint-thresholds" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>max-args</code></td>
+<td><strong>8</strong></td>
+</tr>
+<tr>
+<td><code>max-statements</code></td>
+<td><strong>50</strong></td>
+</tr>
+<tr>
+<td><code>max-branches</code></td>
+<td><strong>12</strong></td>
+</tr>
+<tr>
+<td><code>max-returns</code></td>
+<td><strong>6</strong></td>
+</tr>
+</tbody>
+</table>
+<h3 id="mccabe-complexity">McCabe Complexity<a class="headerlink" href="#mccabe-complexity" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>max-complexity</code></td>
+<td><strong>10</strong></td>
+</tr>
+</tbody>
+</table>
+<h3 id="per-file-ignores">Per-File Ignores<a class="headerlink" href="#per-file-ignores" title="Permanent link">&para;</a></h3>
 <ul>
-<li><strong>"Hide complexity, expose simplicity"</strong> — but still allow access to advanced controls when needed</li>
-<li><strong>No vendor lock-in</strong> — abstract implementation details (Agno, LangChain, Strands) so they can be swapped</li>
-<li><strong>Pranav's strong emphasis on "no magic"</strong> — keep code lean, transparent, and minimal abstractions</li>
-<li>An agent is fundamentally: one LLM API call + tools. Everything else is noise.</li>
-<li>As few lines of code and as few abstractions as possible</li>
-<li>Complete transparency — no one should wonder "what is this? how does it work?"</li>
-<li><strong>Target audience:</strong> internal engineers now, but eventually <strong>customers</strong> building their own agents</li>
+<li><strong><code>tests/*</code></strong> — <code>B018</code>, <code>B017</code>, <code>PLR0913</code>, <code>S101</code>, <code>S105</code>, <code>S106</code> (allows asserts, "useless" expressions, many-arg fixtures, test credentials)</li>
+<li><strong><code>migrations/*</code></strong> — <code>C901</code> (migrations are inherently complex)</li>
+<li><strong><code>scripts/*</code></strong> — <code>C901</code> (utility scripts)</li>
+<li>~30 specific source files have <code>PLR0913</code> or <code>PLR0911</code> suppressions (tracked as TODOs for refactoring)</li>
 </ul>
-<h3 id="new-features-added">New Features Added<a class="headerlink" href="#new-features-added" title="Permanent link">&para;</a></h3>
+<h3 id="formatter">Formatter<a class="headerlink" href="#formatter" title="Permanent link">&para;</a></h3>
+<p>Ruff is also the formatter (replaces Black). Settings:</p>
+<ul>
+<li><strong>Line length:</strong> 88</li>
+<li><strong>Excluded:</strong> <code>src/pa/_version.py</code> (auto-generated)</li>
+</ul>
+<h3 id="how-it-runs">How It Runs<a class="headerlink" href="#how-it-runs" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Pre-commit:</strong> <code>ruff format</code> (priority 10), then <code>ruff check --fix</code> (priority 20)</li>
+<li><strong>CI:</strong> <code>ruff check src/ tests/</code> + <code>ruff format --check src/ tests/</code> (no auto-fix in CI — must be clean)</li>
+</ul>
+<hr />
+<h2 id="2-mypy-static-type-checking">2. mypy — Static Type Checking<a class="headerlink" href="#2-mypy-static-type-checking" title="Permanent link">&para;</a></h2>
+<p><strong>Version:</strong> <code>&gt;=1.14.0</code>
+<strong>Target Python:</strong> <code>3.14</code></p>
 <table>
 <thead>
 <tr>
-<th>Feature</th>
-<th>Description</th>
+<th>Setting</th>
+<th>Value</th>
+<th>Notes</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><strong>Tool calling</strong></td>
-<td>With approval workflows</td>
+<td><code>warn_return_any</code></td>
+<td><code>true</code></td>
+<td>Warns when a function returns <code>Any</code></td>
 </tr>
 <tr>
-<td><strong>Human-in-the-loop</strong></td>
-<td>Approval process for high-risk operations</td>
+<td><code>warn_unused_ignores</code></td>
+<td><code>true</code></td>
+<td>Flags unnecessary <code># type: ignore</code> comments</td>
 </tr>
 <tr>
-<td><strong>Session state management</strong></td>
-<td>Persist data between conversation turns</td>
+<td><code>disallow_untyped_defs</code></td>
+<td><code>false</code></td>
+<td>Gradual typing — untyped function defs are allowed</td>
 </tr>
 <tr>
-<td><strong>Streaming support</strong></td>
-<td>Real-time response streaming</td>
+<td><code>check_untyped_defs</code></td>
+<td><code>true</code></td>
+<td>Still checks bodies of untyped functions</td>
 </tr>
 <tr>
-<td><strong>REST API changes</strong></td>
-<td>Renamed endpoints, snake_case convention</td>
+<td><code>ignore_missing_imports</code></td>
+<td><code>false</code></td>
+<td>Globally strict; overridden per-module for third-party libs</td>
 </tr>
 <tr>
-<td><strong>Request/Response interceptors</strong></td>
-<td>Modify payloads before/after LLM calls</td>
-</tr>
-<tr>
-<td><strong>Event system</strong></td>
-<td>Pub/sub pattern for logging, notifications</td>
-</tr>
-<tr>
-<td><strong>Prompt caching</strong></td>
-<td>Cache static portions of prompts for cost/speed savings (experimental)</td>
+<td><code>strict_optional</code></td>
+<td><code>true</code></td>
+<td><code>None</code> must be explicitly handled in Optional types</td>
 </tr>
 </tbody>
 </table>
-<h3 id="tool-definition-methods">Tool Definition Methods<a class="headerlink" href="#tool-definition-methods" title="Permanent link">&para;</a></h3>
-<p>Three ways to define tool schemas:</p>
-<ol>
-<li><strong>Auto-generated</strong> — from function signature (simplest)</li>
-<li><strong>Dictionary schema</strong> — most flexible, least safe</li>
-<li><strong>Pydantic models</strong> — most structured, validates at definition time</li>
-</ol>
-<h3 id="modules-duplocloud-should-fully-own">Modules DuploCloud Should Fully Own<a class="headerlink" href="#modules-duplocloud-should-fully-own" title="Permanent link">&para;</a></h3>
-<p>Per team agreement, these should NOT be delegated to Agno:</p>
-<ol>
-<li><strong>Schemas module</strong> — Pydantic data classes for API inputs/outputs</li>
-<li><strong>Agent server module</strong> — FastAPI app creation and endpoints</li>
-</ol>
-<h3 id="key-agreements-reached">Key Agreements Reached<a class="headerlink" href="#key-agreements-reached" title="Permanent link">&para;</a></h3>
+<p><strong>Excluded directories:</strong> <code>vendor/</code>, <code>scripts/</code>, <code>migrations/</code></p>
+<p><strong>Per-module overrides:</strong></p>
+<ul>
+<li>~30 third-party modules have <code>ignore_missing_imports = true</code> (no type stubs available)</li>
+<li>A handful of legacy test modules have <code>ignore_errors = true</code> (tracked for rewrite)</li>
+</ul>
+<p><strong>How it runs:</strong></p>
+<ul>
+<li><strong>Pre-commit:</strong> <code>mypy</code> on staged <code>.py</code> files (excluding vendor/scripts/migrations)</li>
+<li><strong>CI:</strong> <code>uv run mypy --config-file pyproject.toml src/</code></li>
+</ul>
+<hr />
+<h2 id="3-radon-code-health-metrics-via-ci-script">3. Radon — Code Health Metrics (via CI Script)<a class="headerlink" href="#3-radon-code-health-metrics-via-ci-script" title="Permanent link">&para;</a></h2>
+<p>Powered by <code>scripts/check_code_health.py</code> and the <code>radon</code> library (<code>&gt;=6.0.0</code>).</p>
+<p>Runs as a <strong>blocking CI gate</strong> on every push to <code>dev</code>.</p>
 <table>
 <thead>
 <tr>
-<th>Decision</th>
-<th>Details</th>
+<th>Metric</th>
+<th>Threshold</th>
+<th>Meaning</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>High-risk tools flag location</td>
-<td>Should live on the tool itself via decorator (<code>requires_approval=True</code>), not passed separately to agent</td>
+<td><strong>Maintainability Index (MI)</strong></td>
+<td>Minimum grade <strong>B</strong></td>
+<td>Fails if any file scores grade C or worse. Radon MI grades: A (20–100), B (10–19), C (0–9).</td>
 </tr>
 <tr>
-<td>Schema ownership</td>
-<td>Schemas and agent server modules fully owned by DuploCloud</td>
+<td><strong>Cyclomatic Complexity (CC)</strong></td>
+<td>Max grade <strong>C</strong></td>
+<td>Fails on any individual function/method graded D or worse (complexity &gt; 20).</td>
 </tr>
 <tr>
-<td>REST endpoint naming</td>
-<td>Lowercase snake_case (<code>/chat</code> instead of <code>/sendMessage</code>)</td>
+<td><strong>File SLOC</strong></td>
+<td>Max <strong>500</strong> lines</td>
+<td>Fails if any source file exceeds 500 source lines of code.</td>
 </tr>
 <tr>
-<td>Type safety</td>
-<td>Use Pydantic models wherever possible</td>
+<td><strong>Aggregate File CC</strong></td>
+<td>Max <strong>160</strong></td>
+<td>Fails if the sum of all function complexities in a single file exceeds 160.</td>
+</tr>
+<tr>
+<td><strong>Code Duplication</strong></td>
+<td>Max <strong>2.75%</strong></td>
+<td>Per-area duplication threshold (uses <code>jscpd</code>). Each layer scanned independently.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Scan path:</strong> <code>src/pa/</code>
+<strong>Excluded:</strong> <code>vendor/</code>, <code>migrations/</code>, <code>scripts/</code>, <code>tests/</code>, <code>__pycache__/</code></p>
+<p>The script supports CLI overrides:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>python<span class="w"> </span>scripts/check_code_health.py<span class="w">                       </span><span class="c1"># all checks</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>python<span class="w"> </span>scripts/check_code_health.py<span class="w"> </span>--check<span class="w"> </span>mi<span class="w"> </span>cc<span class="w"> </span>sloc<span class="w">    </span><span class="c1"># specific checks only</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>python<span class="w"> </span>scripts/check_code_health.py<span class="w"> </span>--sloc-max<span class="w"> </span><span class="m">400</span><span class="w">        </span><span class="c1"># override SLOC threshold</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>python<span class="w"> </span>scripts/check_code_health.py<span class="w"> </span>--agg-cc-max<span class="w"> </span><span class="m">120</span><span class="w">      </span><span class="c1"># override aggregate CC</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>python<span class="w"> </span>scripts/check_code_health.py<span class="w"> </span>--dup-max<span class="w"> </span><span class="m">2</span>.0<span class="w">         </span><span class="c1"># override duplication %</span>
+</span></code></pre></div>
+<hr />
+<h2 id="4-import-linter-architectural-dependency-enforcement">4. import-linter — Architectural Dependency Enforcement<a class="headerlink" href="#4-import-linter-architectural-dependency-enforcement" title="Permanent link">&para;</a></h2>
+<p><strong>Version:</strong> <code>&gt;=2.0</code></p>
+<p>Enforces a layered architecture through import contracts:</p>
+<table>
+<thead>
+<tr>
+<th>Contract</th>
+<th>Type</th>
+<th>Rule</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Core cannot import Butler API</td>
+<td><code>forbidden</code></td>
+<td><code>pa.core</code> cannot import from <code>pa.butler_api</code></td>
+</tr>
+<tr>
+<td>Core cannot import SAQ</td>
+<td><code>forbidden</code></td>
+<td><code>pa.core</code> cannot import from <code>pa.saq</code></td>
+</tr>
+<tr>
+<td>Layered architecture</td>
+<td><code>layers</code></td>
+<td><code>pa.butler_api</code> → <code>pa.saq</code> → <code>pa.core</code> (higher can import lower, not vice versa)</td>
 </tr>
 </tbody>
 </table>
 <hr />
-<h2 id="questions-asked">Questions Asked<a class="headerlink" href="#questions-asked" title="Permanent link">&para;</a></h2>
-<h3 id="pranav-chakilam">Pranav Chakilam<a class="headerlink" href="#pranav-chakilam" title="Permanent link">&para;</a></h3>
-<ol>
-<li>Can we go to the slide with all the agent inputs (high-risk tools, system prompt, etc.)?</li>
-<li>Why is <code>high_risk_tools</code> a separate agent parameter instead of an attribute on the tool itself?</li>
-<li>What is the input/output of request interceptors? Is it the raw JSON body sent to the LLM API?</li>
-<li>Can we reuse existing schema classes (e.g., <code>AgentMessage</code>) instead of creating new ones like <code>AgentResult</code>?</li>
-<li>Does the <code>serve()</code> function contain custom logic or reuse existing code?</li>
-<li>Are we moving to a stateful session pattern where the agent maintains internal state (like LangChain)?</li>
-<li>How do we invoke the agent? Can we pass in the entire messages array?</li>
-<li>How is platform context (kubeconfig, Duplo token) passed to tools without exposing it to the LLM?</li>
-<li>Does Agno let us log the time taken by an LLM API call and the request body sent?</li>
-</ol>
-<h3 id="prem-lakshmanan">Prem Lakshmanan<a class="headerlink" href="#prem-lakshmanan" title="Permanent link">&para;</a></h3>
-<ol>
-<li>Are the request interceptors and response interceptors from Agno, or custom additions?</li>
-<li>There are places using Pydantic models and places using dictionaries — is this intentional?</li>
-<li>The session object goes to AI Help Desk and back — how does this workflow function?</li>
-<li>What happens with dynamic prompts for caching (values injected at runtime)?</li>
-<li>Is platform context sent to the LLM? (Concern about sensitive data like kubeconfig)</li>
-<li>Can we generate PyDocs/documentation from the code?</li>
-</ol>
-<h3 id="andy-boutte">Andy Boutte<a class="headerlink" href="#andy-boutte" title="Permanent link">&para;</a></h3>
-<ol>
-<li>Did you claim "decaf" on PyPI? (To Pranav)</li>
-<li>Regarding high-risk tools — shouldn't this be more granular than true/false? (e.g., regex patterns, approval checker functions)</li>
-<li>The interceptors are a decaf engineering responsibility to place hooks — am I thinking about that correctly?</li>
-<li>The interceptor feature is great — should we commit it upstream to Agno?</li>
-<li>So system context is just prompt organization to maximize cache hits?</li>
-<li>Prompt caching increased performance but also cost? Or decreased cost?</li>
-</ol>
-<h3 id="adam-smith">Adam Smith<a class="headerlink" href="#adam-smith" title="Permanent link">&para;</a></h3>
-<ol>
-<li>When is the test? When can I feed it into the robot?</li>
-</ol>
-<hr />
-<h2 id="actionable-items">Actionable Items<a class="headerlink" href="#actionable-items" title="Permanent link">&para;</a></h2>
-<h3 id="must-address">Must Address<a class="headerlink" href="#must-address" title="Permanent link">&para;</a></h3>
+<h2 id="5-additional-security-quality-tools-ci">5. Additional Security &amp; Quality Tools (CI)<a class="headerlink" href="#5-additional-security-quality-tools-ci" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
-<th>Item</th>
-<th>Owner</th>
+<th>Tool</th>
+<th>Purpose</th>
 <th>Status</th>
-<th>Notes</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>Move <code>high_risk_tools</code> to tool decorator (<code>requires_approval=True</code>)</td>
-<td>Chuck</td>
-<td>Open</td>
-<td>Pranav's suggestion — team agreed</td>
+<td><strong>pip-audit</strong></td>
+<td>Dependency vulnerability scanning</td>
+<td><code>continue-on-error: true</code> (non-blocking, triaging findings)</td>
 </tr>
 <tr>
-<td>Review <code>AgentResult</code> vs existing <code>AgentMessage</code> schema</td>
-<td>Chuck</td>
-<td>Open</td>
-<td>Determine if they can be unified</td>
-</tr>
-<tr>
-<td>Clarify how messages/thread history is passed to agent</td>
-<td>Chuck</td>
-<td>Open</td>
-<td>Pranav asked — Chuck to investigate</td>
-</tr>
-<tr>
-<td>Verify platform context is NOT sent to LLM</td>
-<td>Chuck</td>
-<td>Open</td>
-<td>Prem's security concern</td>
-</tr>
-<tr>
-<td>Confirm how platform context is injected into tools</td>
-<td>Chuck</td>
-<td>Open</td>
-<td>Explain the wrapper/currying mechanism</td>
-</tr>
-<tr>
-<td>Test prompt caching implementation</td>
-<td>Chuck</td>
-<td>Open</td>
-<td>Currently experimental</td>
-</tr>
-<tr>
-<td>Claim "decaf" on PyPI</td>
-<td>Pranav</td>
-<td>Open</td>
-<td>Andy's suggestion to avoid naming conflicts</td>
+<td><strong>vulture</strong> (<code>--min-confidence 80</code>)</td>
+<td>Dead code detection</td>
+<td><code>continue-on-error: true</code> (non-blocking, whitelist pending)</td>
 </tr>
 </tbody>
 </table>
-<h3 id="design-considerations">Design Considerations<a class="headerlink" href="#design-considerations" title="Permanent link">&para;</a></h3>
+<hr />
+<h2 id="6-test-coverage">6. Test Coverage<a class="headerlink" href="#6-test-coverage" title="Permanent link">&para;</a></h2>
+<p><strong>Tool:</strong> <code>pytest-cov</code> / <code>coverage</code></p>
 <table>
 <thead>
 <tr>
-<th>Item</th>
-<th>Notes</th>
+<th>Setting</th>
+<th>Value</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>Interceptor granularity</td>
-<td>Add more hooks over time: before/after tool call, before response flows back, etc.</td>
+<td><strong>Source paths</strong></td>
+<td><code>pa/saq</code>, <code>pa/core</code>, <code>pa/butler_api</code></td>
 </tr>
 <tr>
-<td>High-risk tool approval</td>
-<td>Make it more granular — support regex patterns, approval checker functions (Andy's suggestion)</td>
+<td><strong>Omitted</strong></td>
+<td><code>tests/*</code>, <code>migrations/*</code>, <code>scripts/*</code></td>
 </tr>
 <tr>
-<td><code>serve()</code> abstraction debate</td>
-<td>Pranav prefers explicit UVicorn code (transparency); Chuck prefers abstraction (simplicity for customers). <strong>Decision:</strong> see how it evolves</td>
-</tr>
-<tr>
-<td>Session naming</td>
-<td>Pranav suggests "session" may be confusing — consider "turn_data" or similar</td>
-</tr>
-<tr>
-<td>Logging from Agno</td>
-<td>Verify what Agno logs (timing, request bodies)</td>
+<td><strong>CI test command</strong></td>
+<td><code>pytest tests/ -v --tb=short -x -m "not integration"</code></td>
 </tr>
 </tbody>
 </table>
-<h3 id="future-work">Future Work<a class="headerlink" href="#future-work" title="Permanent link">&para;</a></h3>
-<ul class="task-list">
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Add more interceptor hooks as use cases emerge</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Consider upstream contribution of interceptor feature to Agno</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Generate public documentation (MKDocs/PyDocs) for customer consumption</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Test streaming functionality end-to-end</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Evaluate prompt caching cost/benefit on real agents</li>
-</ul>
-<hr />
-<h2 id="technical-deep-dives">Technical Deep Dives<a class="headerlink" href="#technical-deep-dives" title="Permanent link">&para;</a></h2>
-<h3 id="session-state-management">Session State Management<a class="headerlink" href="#session-state-management" title="Permanent link">&para;</a></h3>
-<p><strong>Problem:</strong> Data retrieved during a conversation (e.g., tenant info from Neo4j) must be re-fetched on every turn.</p>
-<p><strong>Solution:</strong> Session storage that persists data across conversation turns.</p>
-<p><strong>Example use case (Architecture Diagram Agent):</strong>
-1. User asks to diagram all pods
-2. Agent queries database, generates diagram
-3. User asks to add Docker image versions
-4. <strong>Without sessions:</strong> Re-query database
-5. <strong>With sessions:</strong> Use cached data, regenerate immediately</p>
-<p><strong>Current implementation:</strong> Uses the <code>data</code> attribute in Help Desk responses (server-side storage, transmitted back and forth).</p>
-<p><strong>Future options:</strong> Redis, file storage, database — swappable via interface.</p>
-<h3 id="prompt-caching">Prompt Caching<a class="headerlink" href="#prompt-caching" title="Permanent link">&para;</a></h3>
-<p><strong>How it works:</strong>
-- Cache static portions of prompts (instructions, examples)
-- Only dynamic content (user input, context) is reprocessed</p>
-<p><strong>Bedrock specifics:</strong>
-- 4 checkpoints available
-- Cache expires after 5 minutes of inactivity
-- Minimum 1,000 tokens required</p>
-<p><strong>Cost implications:</strong>
-| Operation | Cost |
-|-----------|------|
-| First write (cache creation) | ~25% MORE expensive |
-| Subsequent reads (cache hits) | ~90% CHEAPER, up to 50% faster |</p>
-<p><strong>Best candidates:</strong> Agents with large static prompts and multi-turn conversations (e.g., Architecture Diagram Agent where ~90-95% of prompt is static).</p>
-<h3 id="platform-context-tool-security">Platform Context &amp; Tool Security<a class="headerlink" href="#platform-context-tool-security" title="Permanent link">&para;</a></h3>
-<p><strong>Concern:</strong> Sensitive data (kubeconfig, Duplo tokens) should NOT be sent to the LLM.</p>
-<p><strong>Solution:</strong> Platform context is injected into tools via function wrapping (currying/<code>functools.partial</code> pattern).</p>
+<p><strong>Excluded from coverage reporting:</strong></p>
 <ul>
-<li>LLM only sees the tool schema with required parameters (e.g., <code>cipher</code>, <code>params</code>)</li>
-<li>Platform context is pre-bound to the function before LLM invocation</li>
-<li>Tool receives context at execution time without LLM involvement</li>
+<li><code>pragma: no cover</code></li>
+<li><code>__repr__</code> methods</li>
+<li>Debug/settings guard blocks</li>
+<li><code>Protocol</code> classes</li>
+<li><code>@abstractmethod</code> methods</li>
 </ul>
 <hr />
-<h2 id="notable-quotes">Notable Quotes<a class="headerlink" href="#notable-quotes" title="Permanent link">&para;</a></h2>
-<blockquote>
-<p><strong>Pranav:</strong> "An agent, at the end of the day, is one LLM API call and two functions. Everything else is noise."</p>
-<p><strong>Chuck:</strong> "We want to do the most with the least — most work done, least amount of abstraction."</p>
-<p><strong>Andy:</strong> "We have very low expectations that a customer is gonna build agents end-to-end by themselves [in the short term], but that's absolutely the direction we want things to go."</p>
-<p><strong>Pranav:</strong> "We should try to not have as few lines as possible in the framework, because it can easily become bloated, and then it'll become spaghetti."</p>
-</blockquote>
+<h2 id="7-pre-commit-hook-execution-order">7. Pre-commit Hook Execution Order<a class="headerlink" href="#7-pre-commit-hook-execution-order" title="Permanent link">&para;</a></h2>
+<p>Managed by <strong>prek</strong> (installed via <code>uv tool install prek</code>). Hooks run on every commit in priority order:</p>
+<table>
+<thead>
+<tr>
+<th>Priority</th>
+<th>Hook</th>
+<th>Command</th>
+<th>Files</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>10</td>
+<td>Ruff Format</td>
+<td><code>uv run ruff format</code></td>
+<td><code>*.py</code> (excl. vendor, migrations)</td>
+</tr>
+<tr>
+<td>20</td>
+<td>Ruff Check</td>
+<td><code>uv run ruff check --fix</code></td>
+<td><code>*.py</code> (excl. vendor, migrations)</td>
+</tr>
+<tr>
+<td>30</td>
+<td>MyPy</td>
+<td><code>uv run mypy</code></td>
+<td><code>*.py</code> (excl. vendor, scripts, migrations)</td>
+</tr>
+<tr>
+<td>40</td>
+<td>ESLint</td>
+<td><code>npm run lint:fix</code></td>
+<td>UI <code>*.{js,jsx,ts,tsx}</code></td>
+</tr>
+<tr>
+<td>40</td>
+<td>Prettier</td>
+<td><code>npx prettier --write</code></td>
+<td>UI <code>*.{js,jsx,ts,tsx,css}</code></td>
+</tr>
+</tbody>
+</table>
 <hr />
-<h2 id="appendix-framework-architecture">Appendix: Framework Architecture<a class="headerlink" href="#appendix-framework-architecture" title="Permanent link">&para;</a></h2>
-<h3 id="agent-parameters">Agent Parameters<a class="headerlink" href="#agent-parameters" title="Permanent link">&para;</a></h3>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">Agent</span><span class="p">(</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">tools</span><span class="o">=</span><span class="p">[</span><span class="o">...</span><span class="p">],</span>                    <span class="c1"># List of tool functions</span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">system_prompt</span><span class="o">=</span><span class="s2">&quot;...&quot;</span><span class="p">,</span>            <span class="c1"># Static instructions</span>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">model</span><span class="o">=</span><span class="s2">&quot;...&quot;</span><span class="p">,</span>                    <span class="c1"># Model identifier</span>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">provider</span><span class="o">=</span><span class="s2">&quot;...&quot;</span><span class="p">,</span>                 <span class="c1"># LLM provider (Anthropic, OpenAI, etc.)</span>
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">high_risk_tools</span><span class="o">=</span><span class="p">[</span><span class="o">...</span><span class="p">],</span>          <span class="c1"># DEPRECATED: Move to tool decorator</span>
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">on_event</span><span class="o">=</span><span class="n">callback</span><span class="p">,</span>              <span class="c1"># Event handler for logging, etc.</span>
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="n">request_interceptors</span><span class="o">=</span><span class="p">[</span><span class="o">...</span><span class="p">],</span>     <span class="c1"># Modify requests before LLM</span>
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="n">response_interceptors</span><span class="o">=</span><span class="p">[</span><span class="o">...</span><span class="p">]</span>     <span class="c1"># Modify responses after LLM</span>
-</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="p">)</span>
+<h2 id="8-ci-pipeline-integration">8. CI Pipeline Integration<a class="headerlink" href="#8-ci-pipeline-integration" title="Permanent link">&para;</a></h2>
+<p>All checks run as separate jobs in the GitHub Actions CI pipeline (<code>.github/workflows/ci.yml</code>):</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>migration-check → lint → type-check → code-health → security → test → build-and-push
 </span></code></pre></div>
-<h3 id="serve-method">Serve Method<a class="headerlink" href="#serve-method" title="Permanent link">&para;</a></h3>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">serve</span><span class="p">(</span>
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>    <span class="n">agent</span><span class="o">=</span><span class="n">agent</span><span class="p">,</span>      <span class="c1"># Agent instance or callable returning AgentResult</span>
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>    <span class="n">port</span><span class="o">=</span><span class="mi">8000</span><span class="p">,</span>        <span class="c1"># Server port</span>
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>    <span class="n">host</span><span class="o">=</span><span class="s2">&quot;0.0.0.0&quot;</span><span class="p">,</span>   <span class="c1"># Server host</span>
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="n">workers</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>        <span class="c1"># UVicorn worker count</span>
-</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>    <span class="n">timeout</span><span class="o">=</span><span class="mi">30</span><span class="p">,</span>       <span class="c1"># Request timeout</span>
-</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>    <span class="n">log_level</span><span class="o">=</span><span class="s2">&quot;info&quot;</span>  <span class="c1"># Logging verbosity</span>
-</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="p">)</span>
-</span></code></pre></div>
-<h3 id="tool-definition-with-approval">Tool Definition with Approval<a class="headerlink" href="#tool-definition-with-approval" title="Permanent link">&para;</a></h3>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nd">@tool</span><span class="p">(</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Execute kubectl command&quot;</span><span class="p">,</span>
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    <span class="n">requires_approval</span><span class="o">=</span><span class="kc">True</span>  <span class="c1"># Triggers human-in-the-loop</span>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="p">)</span>
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="k">def</span><span class="w"> </span><span class="nf">execute_kubectl</span><span class="p">(</span><span class="n">command</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">platform_context</span><span class="p">:</span> <span class="n">PlatformContext</span><span class="p">):</span>
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="c1"># Platform context injected via wrapper, not by LLM</span>
-</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>    <span class="o">...</span>
-</span></code></pre></div>
+<ul>
+<li><strong>Lint, type-check, code-health, security, and test</strong> run on <code>dev</code> pushes only</li>
+<li><strong>Main branch</strong> skips validation (already passed on <code>dev</code>) and promotes the tested image directly</li>
+</ul>
 <hr />
-<h2 id="next-steps">Next Steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
+<h2 id="summary-for-adoption">Summary for Adoption<a class="headerlink" href="#summary-for-adoption" title="Permanent link">&para;</a></h2>
+<p>To replicate this setup in another project, you need:</p>
 <ol>
-<li>Chuck to address outstanding questions and update design</li>
-<li>Team code review once implementation hardens</li>
-<li>Test with existing agents (Architecture Diagram, Kubernetes)</li>
-<li>Documentation for internal and eventual customer use</li>
+<li><strong><code>ruff</code></strong> — single tool for both formatting and linting, configured in <code>pyproject.toml</code> under <code>[tool.ruff]</code></li>
+<li><strong><code>mypy</code></strong> — type checking with gradual adoption (<code>disallow_untyped_defs = false</code>, <code>check_untyped_defs = true</code>)</li>
+<li><strong><code>radon</code></strong> — maintainability index, cyclomatic complexity, SLOC metrics via a CI health script</li>
+<li><strong><code>jscpd</code></strong> (Node.js) — copy-paste / code duplication detection</li>
+<li><strong><code>import-linter</code></strong> — architectural layer enforcement</li>
+<li><strong><code>prek</code></strong> — pre-commit hook runner (<code>uv tool install prek</code>)</li>
+<li><strong>(Optional)</strong> <code>pip-audit</code> + <code>vulture</code> — dependency vulnerability scanning and dead code detection</li>
 </ol>
+<h3 id="minimal-pyprojecttoml-snippet">Minimal <code>pyproject.toml</code> Snippet<a class="headerlink" href="#minimal-pyprojecttoml-snippet" title="Permanent link">&para;</a></h3>
+<div class="language-toml highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="k">[tool.ruff]</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="n">target-version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;py314&quot;</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">line-length</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">88</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="k">[tool.ruff.lint]</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="n">select</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;E&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;W&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;F&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;I&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;B&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;C4&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;C901&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;UP&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;S&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;PLR0911&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;PLR0912&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;PLR0913&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;PLR0915&quot;</span><span class="p">]</span>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="n">ignore</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;E501&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;B008&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;B904&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;B905&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;S101&quot;</span><span class="p">]</span>
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>
+</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="k">[tool.ruff.lint.pylint]</span>
+</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="n">max-args</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">8</span>
+</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="n">max-statements</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">50</span>
+</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="n">max-branches</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">12</span>
+</span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="n">max-returns</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">6</span>
+</span><span id="__span-2-14"><a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>
+</span><span id="__span-2-15"><a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a><span class="k">[tool.ruff.lint.mccabe]</span>
+</span><span id="__span-2-16"><a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a><span class="n">max-complexity</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">10</span>
+</span><span id="__span-2-17"><a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a>
+</span><span id="__span-2-18"><a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a><span class="k">[tool.mypy]</span>
+</span><span id="__span-2-19"><a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a><span class="n">warn_return_any</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
+</span><span id="__span-2-20"><a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a><span class="n">warn_unused_ignores</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
+</span><span id="__span-2-21"><a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a><span class="n">disallow_untyped_defs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">false</span>
+</span><span id="__span-2-22"><a id="__codelineno-2-22" name="__codelineno-2-22" href="#__codelineno-2-22"></a><span class="n">check_untyped_defs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
+</span><span id="__span-2-23"><a id="__codelineno-2-23" name="__codelineno-2-23" href="#__codelineno-2-23"></a><span class="n">ignore_missing_imports</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">false</span>
+</span><span id="__span-2-24"><a id="__codelineno-2-24" name="__codelineno-2-24" href="#__codelineno-2-24"></a><span class="n">strict_optional</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
+</span></code></pre></div>
 
 
 
