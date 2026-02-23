@@ -50,7 +50,7 @@ DEFAULTS = {
 
 # Provider-specific model defaults
 PROVIDER_MODEL_DEFAULTS = {
-    "bedrock": "anthropic.claude-3-sonnet-20240229-v1:0",
+    "bedrock": "us.anthropic.claude-3-sonnet-20240229-v1:0",
     "anthropic": "claude-3-sonnet-20240229",
     "google": "gemini-3-flash",
     "openai": "gpt-4",
@@ -99,6 +99,9 @@ class EnvVars:
     TOOL_CALL_LIMIT = "DCAF_TOOL_CALL_LIMIT"
     DISABLE_HISTORY = "DCAF_DISABLE_HISTORY"
     DISABLE_TOOL_FILTERING = "DCAF_DISABLE_TOOL_FILTERING"
+
+    # Storage
+    PERSISTENT_VOLUME_STORAGE = "PERSISTENT_VOLUME_STORAGE"
 
 
 # ============================================================================

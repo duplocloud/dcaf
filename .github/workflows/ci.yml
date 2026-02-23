@@ -133,11 +133,76 @@ jobs:
           retention-days: 7
 
   # ==========================================================================
+  # Code Health — radon (blocking)
+  # ==========================================================================
+  code-health:
+    name: Code Health
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install radon
+        run: pip install radon>=6.0.0
+
+      - name: Run code health checks
+        run: python scripts/check_code_health.py
+
+  # ==========================================================================
+  # Architectural Layer Check — import-linter (blocking)
+  # ==========================================================================
+  import-linter:
+    name: Import Linter
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -e ".[dev]"
+
+      - name: Run import-linter
+        run: lint-imports
+
+  # ==========================================================================
+  # Security & Dead Code — pip-audit + vulture (non-blocking)
+  # ==========================================================================
+  security:
+    name: Security & Dead Code
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -e ".[dev]"
+
+      - name: Audit dependencies for vulnerabilities
+        run: pip-audit
+        continue-on-error: true
+
+      - name: Detect dead code
+        run: vulture dcaf/ --min-confidence 80
+        continue-on-error: true
+
+  # ==========================================================================
   # All Checks Passed
   # ==========================================================================
   ci-success:
     name: CI Success
-    needs: [lint, type-check, test, docs-build]
+    needs: [lint, type-check, test, docs-build, code-health, import-linter]
     runs-on: ubuntu-latest
     if: always()
     steps:
@@ -146,7 +211,9 @@ jobs:
           if [[ "${{ needs.lint.result }}" != "success" ]] || \
              [[ "${{ needs.type-check.result }}" != "success" ]] || \
              [[ "${{ needs.test.result }}" != "success" ]] || \
-             [[ "${{ needs.docs-build.result }}" != "success" ]]; then
+             [[ "${{ needs.docs-build.result }}" != "success" ]] || \
+             [[ "${{ needs.code-health.result }}" != "success" ]] || \
+             [[ "${{ needs.import-linter.result }}" != "success" ]]; then
             echo "One or more jobs failed"
             exit 1
           fi

@@ -21,6 +21,7 @@ from typing import Any
 
 # Agno SDK imports
 from agno.agent import Agent as AgnoAgent
+from agno.skills import Skills
 from agno.tools import tool as agno_tool_decorator
 from agno.utils.log import set_log_level_to_debug, set_log_level_to_info
 
@@ -31,6 +32,8 @@ from ....application.dto.responses import (
 )
 from ....application.ports.mcp_protocol import MCPToolLike
 from ....events import Event, EventRegistry
+from ....services.skill_manager import SkillManager
+from ....services.skill_translator import translate_skills
 from .gcp_metadata import GCPMetadataManager, get_default_gcp_metadata_manager
 from .message_converter import AgnoMessageConverter
 from .model_factory import AgnoModelFactory, ModelConfig
@@ -644,9 +647,13 @@ class AgnoAdapter:
         # This is necessary because Agno has a bug handling multiple toolUse blocks
         modified_prompt = self._get_modified_system_prompt(system_prompt)
 
+        # Resolve skills from platform context
+        agno_skills = await self._resolve_skills(platform_context)
+
         logger.info(
             f"Agno: Creating agent with {len(agno_tools)} tools "
-            f"(stream={stream}, tool_limit={self._tool_call_limit})"
+            f"(stream={stream}, tool_limit={self._tool_call_limit}, "
+            f"skills={'yes' if agno_skills else 'no'})"
         )
 
         # Create the agent
@@ -656,9 +663,37 @@ class AgnoAdapter:
             tools=agno_tools if agno_tools else None,
             stream=stream,
             tool_call_limit=self._tool_call_limit,
+            skills=agno_skills,
         )
 
         return agent
+
+    async def _resolve_skills(self, platform_context: dict[str, Any] | None) -> Skills | None:
+        """
+        Extract and resolve skills from platform context.
+
+        Supports both the internal format (lowercase keys) and the
+        external platform format (PascalCase keys with Format field).
+
+        Args:
+            platform_context: The platform context dict, may contain a "skills" key.
+
+        Returns:
+            An Agno Skills object, or None if no skills are defined.
+        """
+        if not platform_context:
+            return None
+
+        raw_skills = platform_context.get("skills")
+        if not raw_skills:
+            return None
+
+        definitions = translate_skills(raw_skills)
+        if not definitions:
+            return None
+
+        manager = SkillManager()
+        return await manager.resolve_skills(definitions)
 
     def _get_modified_system_prompt(self, system_prompt: str | None) -> str:
         """

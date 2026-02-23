@@ -45,6 +45,14 @@ class URLConfig(BaseModel):
     description: str
 
 
+class SkillDefinitionSchema(BaseModel):
+    """Wire-format schema for a skill definition in platform context."""
+
+    name: str
+    version: str
+    url: str
+
+
 class PlatformContext(BaseModel):
     """
     Platform context for agent execution.
@@ -71,6 +79,9 @@ class PlatformContext(BaseModel):
     # AWS context
     aws_credentials: dict[str, Any] | None = None
     aws_region: str | None = None
+
+    # Skills to load into the agent
+    skills: list[SkillDefinitionSchema] = Field(default_factory=list)
 
     # Scopes (evolving — kept generic intentionally)
     scopes: list[dict[str, Any]] = Field(default_factory=list)

@@ -37,7 +37,9 @@ With Interceptors:
 For advanced usage, see the domain, application, and adapters submodules.
 """
 
-from dcaf import __version__
+from importlib.metadata import version as _pkg_version
+
+__version__ = _pkg_version("dcaf")
 
 from ..channel_routing import ChannelResponseRouter, SlackResponseRouter
 from .agent import Agent, AgentResponse, PendingToolCall
