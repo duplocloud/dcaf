@@ -196,6 +196,131 @@ class SkillManager:
             shutil.rmtree(temp_dir, ignore_errors=True)
             return None
 
+    async def fetch_and_cache_from_s3(self, skill: SkillDefinition) -> str | None:
+        """
+        Recursively download a skill from S3 and cache it locally.
+
+        Uses the default AWS credential chain (IAM role) to authenticate.
+        Downloads all objects under the S3 prefix, preserving the directory
+        structure relative to the prefix root.
+
+        Uses atomic rename for concurrent safety. The temp directory is
+        created on the same filesystem as the target to avoid EXDEV errors
+        in Kubernetes environments.
+
+        Args:
+            skill: Skill definition with ``s3_path`` set (e.g. ``s3://bucket/prefix``).
+
+        Returns:
+            The local path to the cached skill directory, or None on failure.
+        """
+        import aioboto3
+
+        s3_uri = skill.s3_path or ""
+        parsed = urlparse(s3_uri)
+        if parsed.scheme != "s3" or not parsed.netloc:
+            logger.error(
+                "Skill '%s' v%s: invalid S3 URI '%s'",
+                skill.name,
+                skill.version,
+                s3_uri,
+            )
+            return None
+
+        bucket = parsed.netloc
+        prefix = parsed.path.lstrip("/")
+
+        target_dir = Path(self.storage_path) / SKILLS_DIR / skill.name / skill.version
+        target_dir.parent.mkdir(parents=True, exist_ok=True)
+        temp_dir = Path(tempfile.mkdtemp(dir=target_dir.parent, prefix=f"skill_{skill.name}_"))
+
+        try:
+            session = aioboto3.Session()
+            async with session.client("s3") as s3:
+                paginator = s3.get_paginator("list_objects_v2")
+                total = 0
+                async for page in paginator.paginate(Bucket=bucket, Prefix=prefix):
+                    for obj in page.get("Contents", []):
+                        key = obj["Key"]
+                        rel_path = key[len(prefix) :].lstrip("/")
+                        if not rel_path:
+                            # Key is the prefix itself (directory marker) — skip
+                            continue
+
+                        # Path traversal guard
+                        dest_path = (temp_dir / rel_path).resolve()
+                        if not str(dest_path).startswith(str(temp_dir.resolve())):
+                            logger.error(
+                                "Skill '%s' v%s: S3 key contains unsafe path: %s",
+                                skill.name,
+                                skill.version,
+                                key,
+                            )
+                            shutil.rmtree(temp_dir, ignore_errors=True)
+                            return None
+
+                        dest_path.parent.mkdir(parents=True, exist_ok=True)
+                        response = await s3.get_object(Bucket=bucket, Key=key)
+                        body = await response["Body"].read()
+                        dest_path.write_bytes(body)
+                        total += 1
+
+            if total == 0:
+                logger.error(
+                    "Skill '%s' v%s: no objects found at %s",
+                    skill.name,
+                    skill.version,
+                    s3_uri,
+                )
+                shutil.rmtree(temp_dir, ignore_errors=True)
+                return None
+
+            if not (temp_dir / SKILL_FILENAME).is_file():
+                logger.error(
+                    "Skill '%s' v%s: SKILL.md not found at S3 prefix root",
+                    skill.name,
+                    skill.version,
+                )
+                shutil.rmtree(temp_dir, ignore_errors=True)
+                return None
+
+            logger.info(
+                "Downloaded %d object(s) for skill '%s' v%s from %s",
+                total,
+                skill.name,
+                skill.version,
+                s3_uri,
+            )
+
+            try:
+                temp_dir.rename(target_dir)
+                logger.info(
+                    "Cached skill '%s' v%s at %s",
+                    skill.name,
+                    skill.version,
+                    target_dir,
+                )
+            except OSError:
+                logger.info(
+                    "Skill '%s' v%s already cached by another process, using existing",
+                    skill.name,
+                    skill.version,
+                )
+                shutil.rmtree(temp_dir, ignore_errors=True)
+
+            return str(target_dir)
+
+        except Exception:
+            logger.error(
+                "Failed to fetch skill '%s' v%s from %s",
+                skill.name,
+                skill.version,
+                s3_uri,
+                exc_info=True,
+            )
+            shutil.rmtree(temp_dir, ignore_errors=True)
+            return None
+
     def _extract_zip(self, content: bytes, target: Path, skill: SkillDefinition) -> str | None:
         """
         Extract zip contents to target directory and validate SKILL.md exists.
@@ -380,6 +505,14 @@ class SkillManager:
                         skill.version,
                         path,
                     )
+                elif skill.s3_path:
+                    logger.info(
+                        "Skill '%s' v%s not in local cache, fetching from S3 path %s",
+                        skill.name,
+                        skill.version,
+                        skill.s3_path,
+                    )
+                    path = await self.fetch_and_cache_from_s3(skill)
                 else:
                     logger.info(
                         "Skill '%s' v%s not in local cache, fetching from %s",
