@@ -107,6 +107,12 @@ class SkillManager:
         Uses atomic rename for concurrent safety. If the target directory
         already exists when we try to rename, the existing version is trusted.
 
+        The temp directory is created under ``target_dir.parent`` (not in
+        ``/tmp``) so that the rename stays within a single filesystem.
+        Cross-device renames (``EXDEV``) are a common failure mode in
+        Kubernetes where ``/tmp`` and the persistent volume are on separate
+        filesystems.
+
         Args:
             skill: The skill definition with name, version, and URL.
 
@@ -116,7 +122,7 @@ class SkillManager:
         target_dir = Path(self.storage_path) / SKILLS_DIR / skill.name / skill.version
 
         try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
+            async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
                 response = await client.get(skill.url)
                 response.raise_for_status()
                 if len(response.content) > MAX_SKILL_SIZE:
@@ -149,7 +155,10 @@ class SkillManager:
         content_type = response.headers.get("content-type", "")
         fmt = self._detect_format(skill.url, content_type)
 
-        temp_dir = Path(tempfile.mkdtemp(prefix=f"skill_{skill.name}_"))
+        # Create the parent directory first so the temp dir lives on the
+        # same filesystem as the target — required for atomic rename.
+        target_dir.parent.mkdir(parents=True, exist_ok=True)
+        temp_dir = Path(tempfile.mkdtemp(dir=target_dir.parent, prefix=f"skill_{skill.name}_"))
 
         try:
             if fmt == "zip":
@@ -159,7 +168,6 @@ class SkillManager:
             else:
                 (temp_dir / SKILL_FILENAME).write_bytes(content_bytes)
 
-            target_dir.parent.mkdir(parents=True, exist_ok=True)
             try:
                 temp_dir.rename(target_dir)
                 logger.info(
