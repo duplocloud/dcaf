@@ -10,12 +10,13 @@ This guide covers how to use skills with DCAF agents. Skills are reusable instru
 2. [Quick Start](#quick-start)
 3. [How Skills Work](#how-skills-work)
 4. [Platform Context Integration](#platform-context-integration)
-5. [Storage and Caching](#storage-and-caching)
-6. [Skill Formats](#skill-formats)
-7. [Agent Integration](#agent-integration)
-8. [Error Handling](#error-handling)
-9. [Environment Configuration](#environment-configuration)
-10. [Best Practices](#best-practices)
+5. [DuploCloud Platform Format](#duplocloud-platform-format)
+6. [Storage and Caching](#storage-and-caching)
+7. [Skill Formats](#skill-formats)
+8. [Agent Integration](#agent-integration)
+9. [Error Handling](#error-handling)
+10. [Environment Configuration](#environment-configuration)
+11. [Best Practices](#best-practices)
 
 ---
 
@@ -162,15 +163,79 @@ platform_context = {
 }
 ```
 
-Each skill definition has three required fields:
+Each skill definition has three fields:
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `name` | string | Unique identifier for the skill |
-| `version` | string | Exact version string for cache lookup |
-| `url` | string | URL to fetch the skill from if not cached |
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | string | Yes | Unique identifier for the skill |
+| `version` | string | Yes | Exact version string for cache lookup |
+| `url` | string | Yes | URL to fetch the skill from if not cached |
 
 You can pass multiple skills — the agent will load all of them.
+
+---
+
+## DuploCloud Platform Format
+
+When skills are delivered by the DuploCloud platform (rather than passed directly in the API request), they use a PascalCase format with a `Format` discriminator field. The agent server automatically translates this format into the internal representation.
+
+### SkillMd Format (Inline Content)
+
+The `SkillMd` format passes skill content directly in the request — no URL fetch is needed. The platform embeds the `SKILL.md` contents inline:
+
+```json
+{
+  "role": "user",
+  "content": "Debug why my pods are crashing",
+  "platform_context": {
+    "skills": [
+      {
+        "Format": "SkillMd",
+        "Name": "k8s-debug",
+        "Version": "3",
+        "IsActive": true,
+        "SkillMd": "---\nname: k8s-debug\ndescription: Kubernetes debugging\n---\n\n# K8s Debugging\n..."
+      }
+    ]
+  }
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `Format` | `"SkillMd"` — inline markdown |
+| `Name` | Skill name |
+| `Version` | Version string (used for cache key) |
+| `IsActive` | If `false`, the skill is skipped |
+| `SkillMd` | Full `SKILL.md` content as a string |
+
+Inline skills always overwrite their cached version on each request, ensuring the agent always uses the latest content sent by the platform.
+
+### Package Format (Zip Download)
+
+The `Package` format triggers a zip download from a signed URL:
+
+```json
+{
+  "Format": "Package",
+  "Name": "hello-python",
+  "Version": "5",
+  "IsActive": true,
+  "FileStoreSignedUrl": "https://s3.amazonaws.com/bucket/skills/hello-python.zip?..."
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `Format` | `"Package"` — zip archive download |
+| `Name` | Skill name |
+| `Version` | Version string (used for cache key) |
+| `IsActive` | If `false`, the skill is skipped |
+| `FileStoreSignedUrl` | Pre-signed URL to download the zip archive |
+
+### Mixed Formats
+
+A single request can mix both the internal lowercase format and the external PascalCase format in the same `skills` array. The translation layer detects the format of each entry by the presence of the `Format` key.
 
 ---
 
@@ -208,13 +273,17 @@ For example:
 
 ### Storage Path
 
-The storage root is configured via the `PERSISTENT_VOLUME_STORAGE` environment variable:
+The storage root is resolved in this order:
+
+1. **Constructor argument** — `SkillManager(storage_path="/custom/path")`
+2. **Environment variable** — `PERSISTENT_VOLUME_STORAGE`
+3. **Built-in default** — `/data`
+
+To override via environment variable:
 
 ```bash
 export PERSISTENT_VOLUME_STORAGE=/mnt/shared-storage
 ```
-
-If not set, it defaults to `/data`.
 
 ---
 
@@ -226,15 +295,25 @@ Zip archives can contain `SKILL.md` plus any supporting files:
 
 ```
 skill.zip
-  ├── SKILL.md           # Required at zip root
+  ├── SKILL.md           # Required at zip root (or one level deep — see below)
   ├── references/
   │   └── api-spec.md
   └── scripts/
       └── deploy.sh
 ```
 
-!!! warning "SKILL.md must be at the zip root"
-    If `SKILL.md` is not found at the root of the zip archive, the skill will be rejected with an error log: `Expected SKILL.md file missing at folder root`.
+!!! note "SKILL.md auto-elevation"
+    If `SKILL.md` is not at the zip root but is found exactly one directory level deep, its parent directory contents are automatically promoted to the root. This handles zips created by tools like macOS Finder that wrap files in a top-level folder:
+
+    ```
+    skill.zip
+      └── my-skill/         # top-level folder (auto-elevated)
+          ├── SKILL.md      # found here → contents promoted to root
+          └── scripts/
+              └── deploy.sh
+    ```
+
+    If `SKILL.md` cannot be found at the root or one level deep, the skill is rejected with an error log.
 
 ### Markdown Files
 
@@ -269,7 +348,7 @@ Skills are resolved and loaded automatically by the `AgnoAdapter` when creating 
 The `AgnoAdapter._create_agent_async()` method:
 
 1. Extracts the `skills` array from `platform_context`
-2. Creates `SkillDefinition` value objects
+2. Translates both internal and external (PascalCase) formats via `translate_skills()`
 3. Calls `SkillManager().resolve_skills()` to fetch/cache/load
 4. Passes the resulting `Skills` object to `AgnoAgent(skills=...)`
 
@@ -282,6 +361,17 @@ agent = AgnoAgent(
     skills=resolved_skills,  # ← automatically populated from platform context
 )
 ```
+
+### System Prompt Modification
+
+The adapter automatically prepends a single-tool instruction to every system prompt:
+
+```
+IMPORTANT: You must call tools ONE AT A TIME. Never request multiple tool calls
+in a single response. Wait for each tool result before calling the next tool.
+```
+
+This is a workaround for a Bedrock constraint that rejects responses containing multiple parallel tool calls. It applies to all agents regardless of whether skills are loaded.
 
 ---
 
