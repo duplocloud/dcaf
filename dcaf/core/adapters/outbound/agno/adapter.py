@@ -35,8 +35,8 @@ from ....application.dto.responses import (
     StreamEvent,
     StreamEventType,
 )
-from ....config import EnvVars
 from ....application.ports.mcp_protocol import MCPToolLike
+from ....config import EnvVars
 from ....events import Event, EventRegistry
 from ....services.skill_manager import SkillManager
 from ....services.skill_translator import translate_skills
@@ -743,9 +743,7 @@ class AgnoAdapter:
         if os.getenv(EnvVars.DEFAULT_TOOLKIT, "false").lower() == "true":
             default_toolkits = self._build_default_toolkits()
             agno_tools = default_toolkits + agno_tools
-            logger.info(
-                f"Default toolkit enabled: added {len(default_toolkits)} built-in toolkits"
-            )
+            logger.info(f"Default toolkit enabled: added {len(default_toolkits)} built-in toolkits")
 
         return agno_tools
 

@@ -596,7 +596,9 @@ class TestDefaultToolkit:
 
     def test_default_toolkit_disabled_by_default(self, monkeypatch):
         """Verify default toolkit is NOT included when env var is unset."""
-        monkeypatch.delenv("DCAF_DEFAULT_TOOLKIT", raising=False)
+        from dcaf.core.config import EnvVars
+
+        monkeypatch.delenv(EnvVars.DEFAULT_TOOLKIT, raising=False)
 
         from dcaf.core.adapters.outbound.agno.adapter import AgnoAdapter
 
@@ -614,7 +616,9 @@ class TestDefaultToolkit:
 
     def test_default_toolkit_enabled_merges_with_user_tools(self, monkeypatch):
         """Verify default toolkits are merged when env var is true."""
-        monkeypatch.setenv("DCAF_DEFAULT_TOOLKIT", "true")
+        from dcaf.core.config import EnvVars
+
+        monkeypatch.setenv(EnvVars.DEFAULT_TOOLKIT, "true")
 
         from dcaf.core.adapters.outbound.agno.adapter import AgnoAdapter
 
@@ -632,7 +636,9 @@ class TestDefaultToolkit:
 
     def test_default_toolkit_enabled_no_user_tools(self, monkeypatch):
         """Verify default toolkits work even with no user tools."""
-        monkeypatch.setenv("DCAF_DEFAULT_TOOLKIT", "true")
+        from dcaf.core.config import EnvVars
+
+        monkeypatch.setenv(EnvVars.DEFAULT_TOOLKIT, "true")
 
         from dcaf.core.adapters.outbound.agno.adapter import AgnoAdapter
 
@@ -641,6 +647,28 @@ class TestDefaultToolkit:
         agno_tools = adapter._prepare_tools_with_defaults([], platform_context=None)
         # Should have 5 default toolkits
         assert len(agno_tools) == 5
+
+    @pytest.mark.parametrize(
+        "value,expected_count",
+        [
+            ("true", 5),
+            ("True", 5),
+            ("TRUE", 5),
+            ("false", 0),
+            ("0", 0),
+        ],
+    )
+    def test_default_toolkit_case_insensitive(self, monkeypatch, value, expected_count):
+        """Verify env var check is case-insensitive for 'true' and rejects other values."""
+        from dcaf.core.config import EnvVars
+
+        monkeypatch.setenv(EnvVars.DEFAULT_TOOLKIT, value)
+
+        from dcaf.core.adapters.outbound.agno.adapter import AgnoAdapter
+
+        adapter = AgnoAdapter(model_id="test", provider="bedrock")
+        agno_tools = adapter._prepare_tools_with_defaults([], platform_context=None)
+        assert len(agno_tools) == expected_count
 
 
 if __name__ == "__main__":
