@@ -23,6 +23,11 @@ from typing import Any
 from agno.agent import Agent as AgnoAgent
 from agno.skills import Skills
 from agno.tools import tool as agno_tool_decorator
+from agno.tools.file import FileTools
+from agno.tools.file_generation import FileGenerationTools
+from agno.tools.local_file_system import LocalFileSystemTools
+from agno.tools.python import PythonTools
+from agno.tools.shell import ShellTools
 from agno.utils.log import set_log_level_to_debug, set_log_level_to_info
 
 from ....application.dto.responses import (
@@ -694,6 +699,24 @@ class AgnoAdapter:
 
         manager = SkillManager()
         return await manager.resolve_skills(definitions)
+
+    def _build_default_toolkits(self) -> list[Any]:
+        """
+        Build the default set of Agno toolkits.
+
+        Returns a list of Agno toolkit instances: FileTools, LocalFileSystemTools,
+        PythonTools, ShellTools, and FileGenerationTools.
+
+        These are native Agno toolkits and are passed directly to AgnoAgent
+        without conversion through _convert_tools_to_agno().
+        """
+        return [
+            FileTools(),
+            LocalFileSystemTools(),
+            PythonTools(),
+            ShellTools(),
+            FileGenerationTools(),
+        ]
 
     def _get_modified_system_prompt(self, system_prompt: str | None) -> str:
         """

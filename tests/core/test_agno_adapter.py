@@ -556,5 +556,38 @@ Here's the final response to the user.
         assert result == ""
 
 
+class TestDefaultToolkit:
+    """Tests for the default toolkit feature flag."""
+
+    def test_build_default_toolkits_returns_five_toolkits(self):
+        """Verify _build_default_toolkits returns all 5 Agno toolkit instances."""
+        from dcaf.core.adapters.outbound.agno.adapter import AgnoAdapter
+
+        adapter = AgnoAdapter(model_id="test", provider="bedrock")
+        toolkits = adapter._build_default_toolkits()
+
+        assert len(toolkits) == 5, f"Expected 5 toolkits, got {len(toolkits)}"
+
+    def test_build_default_toolkits_returns_correct_types(self):
+        """Verify each toolkit is the correct Agno type."""
+        from agno.tools.file import FileTools
+        from agno.tools.file_generation import FileGenerationTools
+        from agno.tools.local_file_system import LocalFileSystemTools
+        from agno.tools.python import PythonTools
+        from agno.tools.shell import ShellTools
+
+        from dcaf.core.adapters.outbound.agno.adapter import AgnoAdapter
+
+        adapter = AgnoAdapter(model_id="test", provider="bedrock")
+        toolkits = adapter._build_default_toolkits()
+
+        toolkit_types = {type(t) for t in toolkits}
+        expected_types = {FileTools, LocalFileSystemTools, PythonTools, ShellTools, FileGenerationTools}
+
+        assert toolkit_types == expected_types, (
+            f"Expected types {expected_types}, got {toolkit_types}"
+        )
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
