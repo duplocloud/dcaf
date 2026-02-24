@@ -158,6 +158,7 @@ class MCPTool:
         auto_approve_tools: list[str] | None = None,
         pre_hook: PreHookFunc | None = None,
         post_hook: PostHookFunc | None = None,
+        headers: dict[str, str] | None = None,
     ):
         """
         Initialize the MCP toolkit.
@@ -184,6 +185,9 @@ class MCPTool:
             post_hook: Async or sync function called after each tool execution.
                       Receives MCPToolCall with tool_name, arguments, result, and duration.
                       Return value replaces the tool result (return call.result to keep original).
+            headers: Dictionary of HTTP headers to send with every request to the
+                    MCP server. Only supported with sse or streamable-http transport.
+                    Example: {"Authorization": "Bearer <token>"}
 
         Raises:
             ValueError: If required parameters are missing for the transport type.
@@ -201,6 +205,9 @@ class MCPTool:
                 f"Example: MCPTool(url='http://localhost:8000/mcp', transport='{transport}')"
             )
 
+        if headers is not None and transport == "stdio":
+            raise ValueError("headers are only supported with sse or streamable-http transport")
+
         # Store configuration
         self._command = command
         self._url = url
@@ -214,6 +221,7 @@ class MCPTool:
         self._auto_approve_tools = auto_approve_tools
         self._pre_hook = pre_hook
         self._post_hook = post_hook
+        self._headers = headers
 
         # Internal state
         self._agno_mcp_tools: Any = None
@@ -271,6 +279,13 @@ class MCPTool:
                 name for name in self._exclude_tools if not any(c in name for c in "*?[]")
             ]
 
+        header_provider = None
+        if self._headers:
+            _headers = self._headers
+
+            def header_provider() -> dict[str, str]:
+                return _headers
+
         # Create the Agno MCPTools with our configuration
         self._agno_mcp_tools = AgnoMCPTools(
             command=self._command,
@@ -282,6 +297,7 @@ class MCPTool:
             exclude_tools=agno_exclude or None,
             tool_name_prefix=self._tool_name_prefix,
             refresh_connection=self._refresh_connection,
+            header_provider=header_provider,
         )
 
         target = self._url or self._command
