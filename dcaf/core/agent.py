@@ -70,6 +70,7 @@ from .models import ChatMessage, normalize_messages
 from .schemas.events import (
     DoneEvent,
     ErrorEvent,
+    IntermittentUpdateEvent,
     TextDeltaEvent,
     ToolCallsEvent,
 )
@@ -1079,6 +1080,8 @@ class Agent:
             if internal_event.event_type == StreamEventType.TEXT_DELTA:
                 text = internal_event.data.get("text", "")
                 return TextDeltaEvent(text=text)
+            elif internal_event.event_type == StreamEventType.REASONING_STARTED:
+                return IntermittentUpdateEvent(text="Thinking...")
             elif internal_event.event_type == StreamEventType.TOOL_USE_START:
                 # Accumulate tool calls for later
                 tool_call_id = internal_event.data.get("tool_call_id", "")
@@ -1092,7 +1095,7 @@ class Agent:
                         input_description={},
                     )
                 )
-                return None  # Don't yield yet, wait for complete tool call
+                return IntermittentUpdateEvent(text=f"Calling tool: {tool_name}")
             elif internal_event.event_type == StreamEventType.TOOL_CALLS:
                 # Tool calls requiring approval (from RunPausedEvent)
                 tool_calls_data = internal_event.data.get("tool_calls", [])

@@ -2,7 +2,7 @@
 
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from .messages import (
     Approval,
@@ -83,5 +83,13 @@ class ErrorEvent(StreamEvent):
     error: str
 
 
-# Total event types: 9
-# They are: executed_commands, executed_tool_calls, text_delta, tool_calls, commands, approvals, executed_approvals, done, error
+class IntermittentUpdateEvent(StreamEvent):
+    """Interim status update (e.g. 'Thinking...', 'Calling tool: foo')"""
+
+    type: Literal["intermittent_update"] = "intermittent_update"
+    text: str
+    content: dict = Field(default_factory=dict)
+
+
+# Total event types: 10
+# They are: executed_commands, executed_tool_calls, text_delta, tool_calls, commands, approvals, executed_approvals, done, error, intermittent_update

@@ -390,6 +390,7 @@ for event in events:
 | Event Type | Description | Data Fields |
 |------------|-------------|-------------|
 | `text_delta` | Streaming text chunk | `text` |
+| `intermittent_update` | Interim status update (e.g. "Thinking...", "Calling tool: foo") | `text`, `content` |
 | `commands` | Commands for approval | `commands` |
 | `tool_calls` | Tool calls for approval | `tool_calls` |
 | `executed_commands` | Executed command results | `executed_cmds` |

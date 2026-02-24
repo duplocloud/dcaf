@@ -40,7 +40,7 @@ Each line is a complete JSON object that can be parsed independently.
 
 ## Stream Event Types
 
-DCAF supports 9 event types:
+DCAF supports 10 event types:
 
 ### 1. text_delta
 
@@ -55,7 +55,41 @@ Streaming text tokens from the LLM.
 
 **Use:** Append `text` to the displayed response.
 
-### 2. tool_calls
+### 2. intermittent_update
+
+Interim status updates emitted while the agent is working — before any text is produced.
+
+```json
+{
+    "type": "intermittent_update",
+    "text": "Thinking...",
+    "content": {}
+}
+```
+
+```json
+{
+    "type": "intermittent_update",
+    "text": "Calling tool: get_pods",
+    "content": {}
+}
+```
+
+Emitted at two points:
+
+- When the LLM begins its reasoning phase → `"Thinking..."`
+- When a tool invocation starts → `"Calling tool: <name>"`
+
+Fields:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `text` | `string` | Human-readable status label |
+| `content` | `object` | Arbitrary metadata for the update (defaults to `{}`) |
+
+**Use:** Display a transient indicator (spinner, status bar) so users know the agent is active. Use `content` to carry structured data (e.g. tool inputs, step counts) for richer UI.
+
+### 3. tool_calls
 
 Tool calls requiring user approval.
 
@@ -77,7 +111,7 @@ Tool calls requiring user approval.
 
 **Use:** Display approval UI for tools.
 
-### 3. executed_tool_calls
+### 4. executed_tool_calls
 
 Tools that were executed automatically.
 
@@ -97,7 +131,7 @@ Tools that were executed automatically.
 
 **Use:** Display executed tool information.
 
-### 4. commands
+### 5. commands
 
 Terminal commands for approval.
 
@@ -116,7 +150,7 @@ Terminal commands for approval.
 
 **Use:** Display command approval UI.
 
-### 5. executed_commands
+### 6. executed_commands
 
 Commands that were executed.
 
@@ -134,7 +168,7 @@ Commands that were executed.
 
 **Use:** Display command output.
 
-### 6. approvals
+### 7. approvals
 
 Unified approval items for user review. Supports tool calls, commands, and custom approval types through a `type` discriminator.
 
@@ -157,7 +191,7 @@ Unified approval items for user review. Supports tool calls, commands, and custo
 
 **Use:** Display unified approval UI. The `type` field determines which UI variant to render.
 
-### 7. executed_approvals
+### 8. executed_approvals
 
 Approval items that were executed after user approval.
 
@@ -178,7 +212,7 @@ Approval items that were executed after user approval.
 
 **Use:** Display executed approval results.
 
-### 8. done
+### 9. done
 
 Stream completed successfully.
 
@@ -196,7 +230,7 @@ Stream completed successfully.
 
 **Use:** Finalize UI, enable user input.
 
-### 9. error
+### 10. error
 
 Error during streaming.
 
@@ -300,11 +334,14 @@ def stream_chat(messages: list):
             event = json.loads(line.decode('utf-8'))
             event_type = event.get("type")
             
-            if event_type == "text_delta":
+            if event_type == "intermittent_update":
+                print(f"\r[{event.get('text')}]", end="", flush=True)
+
+            elif event_type == "text_delta":
                 text = event.get("text", "")
                 accumulated_text += text
                 print(text, end="", flush=True)
-            
+
             elif event_type == "tool_calls":
                 print("\n[Tool calls pending approval]")
                 for tc in event.get("tool_calls", []):
@@ -385,11 +422,15 @@ async function streamChat(messages) {
                 const event = JSON.parse(line);
                 
                 switch (event.type) {
+                    case 'intermittent_update':
+                        showStatus(event.text);
+                        break;
+
                     case 'text_delta':
                         accumulatedText += event.text;
                         updateDisplay(event.text);
                         break;
-                    
+
                     case 'tool_calls':
                         showToolApproval(event.tool_calls);
                         break;
@@ -452,6 +493,7 @@ import { useState, useCallback } from 'react';
 function useStreamingChat() {
     const [text, setText] = useState('');
     const [isStreaming, setIsStreaming] = useState(false);
+    const [status, setStatus] = useState('');
     const [toolCalls, setToolCalls] = useState([]);
     const [error, setError] = useState(null);
     
@@ -488,7 +530,11 @@ function useStreamingChat() {
                     const event = JSON.parse(line);
                     
                     switch (event.type) {
+                        case 'intermittent_update':
+                            setStatus(event.text);
+                            break;
                         case 'text_delta':
+                            setStatus('');
                             setText(prev => prev + event.text);
                             break;
                         case 'tool_calls':
@@ -501,18 +547,18 @@ function useStreamingChat() {
                 }
             }
         } catch (e) {
-            setError(e.message);
+            setError(e.text);
         } finally {
             setIsStreaming(false);
         }
     }, []);
     
-    return { text, isStreaming, toolCalls, error, sendMessage };
+    return { text, isStreaming, status, toolCalls, error, sendMessage };
 }
 
 // Usage in component
 function ChatComponent() {
-    const { text, isStreaming, toolCalls, error, sendMessage } = useStreamingChat();
+    const { text, isStreaming, status, toolCalls, error, sendMessage } = useStreamingChat();
     const [input, setInput] = useState('');
     
     const handleSubmit = () => {
@@ -523,8 +569,9 @@ function ChatComponent() {
     return (
         <div>
             <div className="response">
+                {status && <div className="status-indicator">{status}</div>}
                 {text}
-                {isStreaming && <span className="cursor">▌</span>}
+                {isStreaming && !status && <span className="cursor">▌</span>}
             </div>
             
             {toolCalls.length > 0 && (
@@ -690,6 +737,7 @@ Don't assume events arrive in a specific order:
 ```javascript
 let state = {
     text: '',
+    status: '',
     toolCalls: [],
     executedTools: [],
     commands: [],
@@ -702,7 +750,11 @@ let state = {
 
 function processEvent(event) {
     switch (event.type) {
+        case 'intermittent_update':
+            state.status = event.text;
+            break;
         case 'text_delta':
+            state.status = '';  // clear status once text starts arriving
             state.text += event.text;
             break;
         case 'tool_calls':
@@ -752,17 +804,21 @@ def stream_with_timeout(messages, timeout=60):
 
 ### 4. Show Progress Indicators
 
+Use `status` events to display meaningful, real-time feedback rather than a generic spinner:
+
 ```jsx
-function StreamingResponse({ text, isStreaming }) {
+function StreamingResponse({ text, isStreaming, status }) {
     return (
         <div className="response">
-            {text}
-            {isStreaming && (
+            {status && (
                 <span className="streaming-indicator">
-                    <span className="cursor">▌</span>
-                    <span className="status">Generating...</span>
+                    <span className="spinner" />
+                    <span className="status">{status}</span>
+                    {/* e.g. "Thinking..." or "Calling tool: get_pods" */}
                 </span>
             )}
+            {text}
+            {isStreaming && !status && <span className="cursor">▌</span>}
         </div>
     );
 }
