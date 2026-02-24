@@ -254,11 +254,17 @@ class ServerAdapter:
 
             # Only include user and assistant messages
             if role in ["user", "assistant"]:
-                # Re-inject previously executed command history so the LLM has context
-                # across turns (mirrors base_command_agent behaviour).
+                # Re-inject prior execution history so the LLM has context across
+                # turns. Clients send back executed_cmds / executed_tool_calls /
+                # executed_approvals from previous turns in every request.
                 if role == "user":
-                    for ec in msg.get("data", {}).get("executed_cmds", []):
+                    data = msg.get("data", {})
+                    for ec in data.get("executed_cmds", []):
                         content += f"\n\nPreviously executed: {ec.get('command', '')}\nOutput: {ec.get('output', '')}"
+                    for tc in data.get("executed_tool_calls", []):
+                        content += f"\n\nPreviously executed tool: {tc.get('name', '')} with inputs {tc.get('input', {})}\nOutput: {tc.get('output', '')}"
+                    for ea in data.get("executed_approvals", []):
+                        content += f"\n\nPreviously executed: {ea.get('name', '')} with inputs {ea.get('input', {})}\nOutput: {ea.get('output', '')}"
                 core_messages.append({"role": role, "content": content})
 
         return core_messages
