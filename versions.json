@@ -1,10 +1,5 @@
 [
   {
-    "version": "vnext",
-    "title": "vnext",
-    "aliases": []
-  },
-  {
     "version": "dev",
     "title": "dev",
     "aliases": []
