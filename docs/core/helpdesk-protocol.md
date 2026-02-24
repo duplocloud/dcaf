@@ -8,8 +8,9 @@ DCAF Core provides **full compatibility** with the DuploCloud HelpDesk messaging
 
 The HelpDesk protocol defines a rich message format that includes:
 
-- **Commands**: Terminal commands for user approval and execution
-- **Tool Calls**: Structured tool invocations with approval workflow
+- **Unified Approvals**: Type-discriminated approval items for tool calls, commands, and custom types
+- **Commands**: Terminal commands for user approval and execution *(legacy)*
+- **Tool Calls**: Structured tool invocations with approval workflow *(legacy)*
 - **Platform Context**: Runtime context (tenant, namespace, credentials)
 - **Streaming Events**: Real-time updates during agent execution
 
@@ -120,6 +121,9 @@ msg = ChatMessage.user(
 
 ## Command DTOs
 
+!!! info "Legacy"
+    Command DTOs are maintained for backward compatibility. New agents should use the [Unified Approval DTOs](#unified-approval-dtos).
+
 Commands represent terminal commands for user approval.
 
 ### CommandDTO
@@ -181,6 +185,9 @@ cmd = CommandDTO(
 
 ## Tool Call DTOs
 
+!!! info "Legacy"
+    Tool Call DTOs are maintained for backward compatibility. New agents should use the [Unified Approval DTOs](#unified-approval-dtos).
+
 Tool calls follow the HelpDesk protocol format with all required fields.
 
 ### ToolCallDTO
@@ -217,14 +224,73 @@ executed = ExecutedToolCallDTO(
 
 ---
 
+## Unified Approval DTOs
+
+The unified approval system provides a single approval path for all action types. The `type` field discriminates between approval kinds (e.g., `"tool_call"`, `"command"`), allowing the frontend to render the appropriate UI.
+
+!!! note "New Agents"
+    New agents should use `data.approvals` instead of the separate `data.cmds` and `data.tool_calls` fields.
+
+### ApprovalDTO
+
+```python
+from dcaf.core.schemas.messages import Approval
+
+approval = Approval(
+    id="appr_001",
+    type="tool_call",
+    name="delete_pod",
+    input={"name": "nginx-1", "namespace": "default"},
+    execute=False,  # Awaiting approval
+    description="Delete Kubernetes pod nginx-1",
+    intent="Remove failing pod as requested",
+)
+
+# Command-type approval
+cmd_approval = Approval(
+    id="appr_002",
+    type="command",
+    name="execute_terminal_cmd",
+    input={"command": "kubectl rollout restart deployment/web-app"},
+    description="Restart web-app deployment",
+)
+```
+
+### ExecutedApprovalDTO
+
+```python
+from dcaf.core.schemas.messages import ExecutedApproval
+
+executed = ExecutedApproval(
+    id="appr_001",
+    type="tool_call",
+    name="delete_pod",
+    input={"name": "nginx-1", "namespace": "default"},
+    output="pod \"nginx-1\" deleted",
+)
+```
+
+---
+
 ## Data Container
 
 `DataDTO` is the container that holds all commands and tool calls:
 
 ```python
 from dcaf.core import DataDTO, CommandDTO, ToolCallDTO
+from dcaf.core.schemas.messages import Approval, ExecutedApproval
 
 data = DataDTO(
+    # Unified approvals (preferred for new agents)
+    approvals=[
+        Approval(id="1", type="tool_call", name="delete_pod",
+                 input={"name": "nginx-1"}, description="Delete pod"),
+    ],
+    executed_approvals=[
+        ExecutedApproval(id="0", type="tool_call", name="get_status",
+                         input={}, output="OK"),
+    ],
+    # Legacy fields (backward compatibility)
     cmds=[
         CommandDTO(command="kubectl get pods"),
     ],
@@ -328,6 +394,8 @@ for event in events:
 | `tool_calls` | Tool calls for approval | `tool_calls` |
 | `executed_commands` | Executed command results | `executed_cmds` |
 | `executed_tool_calls` | Executed tool results | `executed_tool_calls` |
+| `approvals` | Unified approvals for user review | `approvals` |
+| `executed_approvals` | Executed approval results | `executed_approvals` |
 | `done` | Stream complete | `stop_reason` (optional) |
 | `error` | Error occurred | `error`, `code` |
 
@@ -390,6 +458,10 @@ curl -X POST http://localhost:8000/api/chat \
 | `ExecutedCommand` | `ExecutedCommandDTO` | Same structure |
 | `ToolCall` | `ToolCallDTO` | Same structure |
 | `ExecutedToolCall` | `ExecutedToolCallDTO` | Same structure |
+| `Approval` | `Approval` | Unified approval item |
+| `ExecutedApproval` | `ExecutedApproval` | Unified executed approval |
+| `ApprovalsEvent` | `StreamEvent.approvals_event()` | Factory method |
+| `ExecutedApprovalsEvent` | `StreamEvent.executed_approvals_event()` | Factory method |
 | `Data` | `DataDTO` | Same structure |
 | `AgentMessage` | `AgentResponse` | Core uses dataclass |
 | `TextDeltaEvent` | `StreamEvent.text_delta()` | Factory method |

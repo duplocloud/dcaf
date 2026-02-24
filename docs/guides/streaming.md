@@ -40,7 +40,7 @@ Each line is a complete JSON object that can be parsed independently.
 
 ## Stream Event Types
 
-DCAF supports 7 event types:
+DCAF supports 9 event types:
 
 ### 1. text_delta
 
@@ -134,7 +134,51 @@ Commands that were executed.
 
 **Use:** Display command output.
 
-### 6. done
+### 6. approvals
+
+Unified approval items for user review. Supports tool calls, commands, and custom approval types through a `type` discriminator.
+
+```json
+{
+    "type": "approvals",
+    "approvals": [
+        {
+            "id": "appr_123",
+            "type": "tool_call",
+            "name": "delete_pod",
+            "input": {"name": "nginx-1", "namespace": "default"},
+            "execute": false,
+            "description": "Delete Kubernetes pod nginx-1",
+            "intent": "Remove failing pod as requested"
+        }
+    ]
+}
+```
+
+**Use:** Display unified approval UI. The `type` field determines which UI variant to render.
+
+### 7. executed_approvals
+
+Approval items that were executed after user approval.
+
+```json
+{
+    "type": "executed_approvals",
+    "executed_approvals": [
+        {
+            "id": "appr_123",
+            "type": "tool_call",
+            "name": "delete_pod",
+            "input": {"name": "nginx-1", "namespace": "default"},
+            "output": "pod \"nginx-1\" deleted"
+        }
+    ]
+}
+```
+
+**Use:** Display executed approval results.
+
+### 8. done
 
 Stream completed successfully.
 
@@ -152,7 +196,7 @@ Stream completed successfully.
 
 **Use:** Finalize UI, enable user input.
 
-### 7. error
+### 9. error
 
 Error during streaming.
 
@@ -175,10 +219,12 @@ Agents that support streaming implement `invoke_stream`:
 
 ```python
 from dcaf.schemas.events import (
-    TextDeltaEvent, 
+    TextDeltaEvent,
     ToolCallsEvent,
     ExecutedToolCallsEvent,
-    DoneEvent, 
+    ApprovalsEvent,
+    ExecutedApprovalsEvent,
+    DoneEvent,
     ErrorEvent
 )
 from typing import Generator
@@ -278,7 +324,17 @@ def stream_chat(messages: list):
                 for cmd in event.get("executed_cmds", []):
                     print(f"\n[Executed: {cmd['command']}]")
                     print(f"  Output: {cmd['output']}")
-            
+
+            elif event_type == "approvals":
+                print("\n[Approvals pending]")
+                for appr in event.get("approvals", []):
+                    print(f"  - [{appr['type']}] {appr['name']}: {appr['input']}")
+
+            elif event_type == "executed_approvals":
+                for appr in event.get("executed_approvals", []):
+                    print(f"\n[Executed {appr['type']}: {appr['name']}]")
+                    print(f"  Output: {appr['output']}")
+
             elif event_type == "done":
                 print(f"\n[Done: {event.get('stop_reason')}]")
                 return accumulated_text
@@ -349,7 +405,15 @@ async function streamChat(messages) {
                     case 'executed_commands':
                         showExecutedCommands(event.executed_cmds);
                         break;
-                    
+
+                    case 'approvals':
+                        showApprovalUI(event.approvals);
+                        break;
+
+                    case 'executed_approvals':
+                        showExecutedApprovals(event.executed_approvals);
+                        break;
+
                     case 'done':
                         finalize(event.stop_reason);
                         return accumulatedText;
@@ -630,6 +694,8 @@ let state = {
     executedTools: [],
     commands: [],
     executedCommands: [],
+    approvals: [],
+    executedApprovals: [],
     done: false,
     error: null
 };
@@ -650,6 +716,12 @@ function processEvent(event) {
             break;
         case 'executed_commands':
             state.executedCommands.push(...event.executed_cmds);
+            break;
+        case 'approvals':
+            state.approvals.push(...event.approvals);
+            break;
+        case 'executed_approvals':
+            state.executedApprovals.push(...event.executed_approvals);
             break;
         case 'done':
             state.done = true;

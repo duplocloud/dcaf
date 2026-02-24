@@ -35,6 +35,8 @@ from dcaf.schemas.messages import (
     ExecutedToolCall,
     Command,
     ExecutedCommand,
+    Approval,
+    ExecutedApproval,
     PlatformContext
 )
 
@@ -44,6 +46,8 @@ from dcaf.schemas.events import (
     ExecutedToolCallsEvent,
     CommandsEvent,
     ExecutedCommandsEvent,
+    ApprovalsEvent,
+    ExecutedApprovalsEvent,
     DoneEvent,
     ErrorEvent
 )
@@ -196,10 +200,16 @@ Container for all data associated with a message.
 
 ```python
 class Data(BaseModel):
+    # Legacy (backward compatibility)
     cmds: List[Command] = Field(default_factory=list)
     executed_cmds: List[ExecutedCommand] = Field(default_factory=list)
     tool_calls: List[ToolCall] = Field(default_factory=list)
     executed_tool_calls: List[ExecutedToolCall] = Field(default_factory=list)
+
+    # Unified approvals
+    approvals: List[Approval] = Field(default_factory=list)
+    executed_approvals: List[ExecutedApproval] = Field(default_factory=list)
+
     url_configs: List[URLConfig] = Field(default_factory=list)
 ```
 
@@ -207,10 +217,12 @@ class Data(BaseModel):
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `cmds` | `List[Command]` | Suggested terminal commands |
-| `executed_cmds` | `List[ExecutedCommand]` | Commands that were executed |
-| `tool_calls` | `List[ToolCall]` | Tools requiring approval |
-| `executed_tool_calls` | `List[ExecutedToolCall]` | Tools that were executed |
+| `cmds` | `List[Command]` | Suggested terminal commands *(legacy — use `approvals` for new agents)* |
+| `executed_cmds` | `List[ExecutedCommand]` | Commands that were executed *(legacy)* |
+| `tool_calls` | `List[ToolCall]` | Tools requiring approval *(legacy — use `approvals` for new agents)* |
+| `executed_tool_calls` | `List[ExecutedToolCall]` | Tools that were executed *(legacy)* |
+| `approvals` | `List[Approval]` | Unified approval items (commands, tool calls, or custom types) |
+| `executed_approvals` | `List[ExecutedApproval]` | Approval items that were executed |
 | `url_configs` | `List[URLConfig]` | URL configurations |
 
 ---
@@ -347,6 +359,101 @@ class ExecutedToolCall(BaseModel):
 
 ---
 
+### Approval
+
+A unified approval item supporting commands, tool calls, and custom types.
+
+```python
+class Approval(BaseModel):
+    id: str
+    type: str
+    name: str
+    input: Dict[str, Any]
+    execute: bool = False
+    rejection_reason: Optional[str] = None
+    description: str = ""
+    intent: Optional[str] = None
+```
+
+#### Fields
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `id` | `str` | Required | Unique identifier |
+| `type` | `str` | Required | Approval type (`"command"`, `"tool_call"`, or custom) |
+| `name` | `str` | Required | Tool name or `"execute_terminal_cmd"` |
+| `input` | `Dict` | Required | Tool args or `{"command": "...", "files": [...]}` |
+| `execute` | `bool` | `False` | Whether user approved |
+| `rejection_reason` | `str` | `None` | Why user rejected |
+| `description` | `str` | `""` | Human-readable summary |
+| `intent` | `str` | `None` | LLM's stated reason |
+
+#### Example
+
+```python
+from dcaf.schemas.messages import Approval
+
+# Tool call approval
+approval = Approval(
+    id="appr_abc123",
+    type="tool_call",
+    name="delete_pod",
+    input={"name": "nginx-1", "namespace": "default"},
+    description="Delete Kubernetes pod nginx-1",
+    intent="Remove failing pod as requested"
+)
+
+# Command approval
+cmd_approval = Approval(
+    id="appr_cmd456",
+    type="command",
+    name="execute_terminal_cmd",
+    input={"command": "kubectl rollout restart deployment/web-app"},
+    description="Restart web-app deployment"
+)
+```
+
+---
+
+### ExecutedApproval
+
+A unified approval item that was executed.
+
+```python
+class ExecutedApproval(BaseModel):
+    id: str
+    type: str
+    name: str
+    input: Dict[str, Any]
+    output: str
+```
+
+#### Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | `str` | Approval identifier |
+| `type` | `str` | Approval type |
+| `name` | `str` | Tool name or command identifier |
+| `input` | `Dict` | Input parameters used |
+| `output` | `str` | Execution result |
+
+#### Example
+
+```python
+from dcaf.schemas.messages import ExecutedApproval
+
+executed = ExecutedApproval(
+    id="appr_abc123",
+    type="tool_call",
+    name="delete_pod",
+    input={"name": "nginx-1", "namespace": "default"},
+    output="pod \"nginx-1\" deleted"
+)
+```
+
+---
+
 ### FileObject
 
 A file to be created for command execution.
@@ -465,6 +572,66 @@ Commands that were executed.
 class ExecutedCommandsEvent(StreamEvent):
     type: Literal["executed_commands"] = "executed_commands"
     executed_cmds: List[ExecutedCommand]
+```
+
+---
+
+### ApprovalsEvent
+
+Unified approvals for user approval.
+
+```python
+class ApprovalsEvent(StreamEvent):
+    type: Literal["approvals"] = "approvals"
+    approvals: List[Approval]
+```
+
+#### Example
+
+```json
+{
+    "type": "approvals",
+    "approvals": [
+        {
+            "id": "appr_123",
+            "type": "tool_call",
+            "name": "delete_pod",
+            "input": {"name": "nginx-1"},
+            "execute": false,
+            "description": "Delete pod nginx-1",
+            "intent": "Remove failing pod"
+        }
+    ]
+}
+```
+
+---
+
+### ExecutedApprovalsEvent
+
+Approval items that were executed.
+
+```python
+class ExecutedApprovalsEvent(StreamEvent):
+    type: Literal["executed_approvals"] = "executed_approvals"
+    executed_approvals: List[ExecutedApproval]
+```
+
+#### Example
+
+```json
+{
+    "type": "executed_approvals",
+    "executed_approvals": [
+        {
+            "id": "appr_123",
+            "type": "tool_call",
+            "name": "delete_pod",
+            "input": {"name": "nginx-1"},
+            "output": "pod \"nginx-1\" deleted"
+        }
+    ]
+}
 ```
 
 ---
@@ -732,6 +899,51 @@ except ValidationError as e:
     
 # Correct way
 response = AgentMessage(content="Response text")
+```
+
+### Example 6: Unified Approval Workflow
+
+```python
+from dcaf.schemas.messages import (
+    Messages, UserMessage, AgentMessage, Data, Approval, ExecutedApproval
+)
+
+# Agent response with unified approval
+response = AgentMessage(
+    content="I need your approval to delete the pod:",
+    data=Data(
+        approvals=[
+            Approval(
+                id="appr_001",
+                type="tool_call",
+                name="delete_pod",
+                input={"name": "nginx-1", "namespace": "default"},
+                description="Delete Kubernetes pod nginx-1",
+                intent="Remove failing pod as requested"
+            )
+        ]
+    )
+)
+
+# User approves
+request = Messages(
+    messages=[
+        UserMessage(
+            content="Delete the failing pod",
+            data=Data(
+                approvals=[
+                    Approval(
+                        id="appr_001",
+                        type="tool_call",
+                        name="delete_pod",
+                        input={"name": "nginx-1", "namespace": "default"},
+                        execute=True  # Approved
+                    )
+                ]
+            )
+        )
+    ]
+)
 ```
 
 ---

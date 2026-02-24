@@ -40,6 +40,25 @@ class ExecutedToolCall(BaseModel):
     output: str | dict
 
 
+class Approval(BaseModel):
+    id: str
+    type: str
+    name: str
+    input: dict[str, Any]
+    execute: bool = False
+    rejection_reason: str | None = None
+    description: str = ""
+    intent: str | None = None
+
+
+class ExecutedApproval(BaseModel):
+    id: str
+    type: str
+    name: str
+    input: dict[str, Any]
+    output: str
+
+
 class URLConfig(BaseModel):
     url: HttpUrl
     description: str
@@ -101,6 +120,8 @@ class Data(BaseModel):
     executed_cmds: list[ExecutedCommand] = Field(default_factory=list)
     tool_calls: list[ToolCall] = Field(default_factory=list)
     executed_tool_calls: list[ExecutedToolCall] = Field(default_factory=list)
+    approvals: list[Approval] = Field(default_factory=list)
+    executed_approvals: list[ExecutedApproval] = Field(default_factory=list)
     url_configs: list[URLConfig] = Field(default_factory=list)
     user_file_uploads: list[FileObject] = Field(
         default_factory=list

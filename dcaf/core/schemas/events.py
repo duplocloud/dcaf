@@ -4,7 +4,14 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
-from .messages import Command, ExecutedCommand, ExecutedToolCall, ToolCall
+from .messages import (
+    Approval,
+    Command,
+    ExecutedApproval,
+    ExecutedCommand,
+    ExecutedToolCall,
+    ToolCall,
+)
 
 
 class StreamEvent(BaseModel):
@@ -48,6 +55,20 @@ class CommandsEvent(StreamEvent):
     commands: list[Command]
 
 
+class ApprovalsEvent(StreamEvent):
+    """Unified approval requests for frontend UI (commands, tool calls, etc.)"""
+
+    type: Literal["approvals"] = "approvals"
+    approvals: list[Approval]
+
+
+class ExecutedApprovalsEvent(StreamEvent):
+    """Results of executed approvals (before LLM call)"""
+
+    type: Literal["executed_approvals"] = "executed_approvals"
+    executed_approvals: list[ExecutedApproval]
+
+
 class DoneEvent(StreamEvent):
     """Stream finished successfully"""
 
@@ -63,5 +84,5 @@ class ErrorEvent(StreamEvent):
     error: str
 
 
-# Total event types: 7
-# They are: executed_commands, executed_tool_calls, text_delta, tool_calls, commands, done, error
+# Total event types: 9
+# They are: executed_commands, executed_tool_calls, text_delta, tool_calls, commands, approvals, executed_approvals, done, error

@@ -12,8 +12,9 @@ This guide explains the message protocol used by DCAF for communication between 
 4. [Response Format](#response-format)
 5. [Tool Call Flow](#tool-call-flow)
 6. [Command Flow](#command-flow)
-7. [Platform Context](#platform-context)
-8. [Examples](#examples)
+7. [Unified Approval Flow](#unified-approval-flow)
+8. [Platform Context](#platform-context)
+9. [Examples](#examples)
 
 ---
 
@@ -22,8 +23,9 @@ This guide explains the message protocol used by DCAF for communication between 
 DCAF uses a structured message protocol for all agent interactions. This protocol supports:
 
 - **Multi-turn conversations** with message history
-- **Tool calling** with approval workflows
-- **Terminal commands** with file creation
+- **Unified approvals** for tool calls, commands, and custom types
+- **Tool calling** with approval workflows *(legacy)*
+- **Terminal commands** with file creation *(legacy)*
 - **Platform context** for runtime information
 - **Streaming** for real-time responses
 
@@ -55,6 +57,8 @@ DCAF uses a structured message protocol for all agent interactions. This protoco
     "role": "user" | "assistant",
     "content": "Message text",
     "data": {
+        "approvals": [...],
+        "executed_approvals": [...],
         "cmds": [...],
         "executed_cmds": [...],
         "tool_calls": [...],
@@ -77,8 +81,9 @@ User messages can include platform context:
     "role": "user",
     "content": "Deploy my application",
     "data": {
-        "cmds": [],         # Commands to approve/reject
-        "tool_calls": []    # Tools to approve/reject
+        "approvals": [],     # Unified approvals to approve/reject
+        "cmds": [],          # Legacy: commands to approve/reject
+        "tool_calls": []     # Legacy: tools to approve/reject
     },
     "platform_context": {
         "user_id": "alice123",
@@ -209,6 +214,8 @@ Valid sources:
     "role": "assistant",
     "content": "Here is the information you requested...",
     "data": {
+        "approvals": [],
+        "executed_approvals": [],
         "cmds": [],
         "executed_cmds": [],
         "tool_calls": [],
@@ -292,6 +299,9 @@ Valid sources:
 ---
 
 ## Tool Call Flow
+
+!!! warning "Legacy"
+    The `data.tool_calls` flow is maintained for backward compatibility. New agents should use the [Unified Approval Flow](#unified-approval-flow) instead.
 
 ### Flow Diagram
 
@@ -440,6 +450,9 @@ Agent returns with executed tool:
 
 ## Command Flow
 
+!!! warning "Legacy"
+    The `data.cmds` flow is maintained for backward compatibility. New agents should use the [Unified Approval Flow](#unified-approval-flow) instead.
+
 ### Step 1: Agent Suggests Command
 
 ```json
@@ -516,6 +529,158 @@ Some commands need files created first:
                         "file_content": "replicaCount: 3\n..."
                     }
                 ]
+            }
+        ]
+    }
+}
+```
+
+---
+
+## Unified Approval Flow
+
+The unified approval flow replaces the separate tool call and command flows with a single `data.approvals[]` field. The `type` discriminator tells the frontend which UI to render.
+
+!!! note "Backward Compatibility"
+    The legacy `data.tool_calls` and `data.cmds` flows continue to work unchanged. New agents should use `data.approvals` instead.
+
+### Flow Diagram
+
+```
+┌────────┐       ┌───────┐       ┌───────┐       ┌────────┐
+│ Client │       │Server │       │ Tool  │       │ Client │
+└────┬───┘       └───┬───┘       └───┬───┘       └────┬───┘
+     │               │               │                │
+     │ "Delete pod"  │               │                │
+     │ ─────────────>│               │                │
+     │               │               │                │
+     │  Approval     │               │                │
+     │  (execute:    │               │                │
+     │   false)      │               │                │
+     │ <─────────────│               │                │
+     │               │               │                │
+     │ [User reviews and approves]   │                │
+     │               │               │                │
+     │ Approval      │               │                │
+     │ (execute:true)│               │                │
+     │ ─────────────>│               │                │
+     │               │               │                │
+     │               │ Execute       │                │
+     │               │ ─────────────>│                │
+     │               │               │                │
+     │               │ Result        │                │
+     │               │ <─────────────│                │
+     │               │               │                │
+     │ ExecutedAppr  │               │                │
+     │ <─────────────│               │                │
+     │               │               │                │
+```
+
+### Step 1: Request
+
+```json
+{
+    "messages": [
+        {
+            "role": "user",
+            "content": "Delete the pod called nginx-1"
+        }
+    ]
+}
+```
+
+### Step 2: Approval Request
+
+Agent returns an approval item:
+
+```json
+{
+    "role": "assistant",
+    "content": "I need your approval to delete the pod:",
+    "data": {
+        "approvals": [
+            {
+                "id": "appr_001",
+                "type": "tool_call",
+                "name": "delete_pod",
+                "input": {"name": "nginx-1", "namespace": "default"},
+                "execute": false,
+                "description": "Delete Kubernetes pod nginx-1",
+                "intent": "Remove failing pod as requested"
+            }
+        ]
+    }
+}
+```
+
+### Step 3a: Approval
+
+Client sends back with `execute: true`:
+
+```json
+{
+    "messages": [
+        {
+            "role": "user",
+            "content": "Delete the pod called nginx-1",
+            "data": {
+                "approvals": [
+                    {
+                        "id": "appr_001",
+                        "type": "tool_call",
+                        "name": "delete_pod",
+                        "input": {"name": "nginx-1", "namespace": "default"},
+                        "execute": true
+                    }
+                ]
+            }
+        }
+    ]
+}
+```
+
+### Step 3b: Rejection
+
+Client sends back with `rejection_reason`:
+
+```json
+{
+    "messages": [
+        {
+            "role": "user",
+            "content": "Delete the pod called nginx-1",
+            "data": {
+                "approvals": [
+                    {
+                        "id": "appr_001",
+                        "type": "tool_call",
+                        "name": "delete_pod",
+                        "input": {"name": "nginx-1", "namespace": "default"},
+                        "rejection_reason": "Wrong pod - I meant nginx-2"
+                    }
+                ]
+            }
+        }
+    ]
+}
+```
+
+### Step 4: Result
+
+Agent returns with executed approval:
+
+```json
+{
+    "role": "assistant",
+    "content": "Done! The pod has been deleted.",
+    "data": {
+        "executed_approvals": [
+            {
+                "id": "appr_001",
+                "type": "tool_call",
+                "name": "delete_pod",
+                "input": {"name": "nginx-1", "namespace": "default"},
+                "output": "pod \"nginx-1\" deleted successfully"
             }
         ]
     }

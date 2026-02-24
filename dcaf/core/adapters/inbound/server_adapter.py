@@ -21,10 +21,11 @@ from typing import Any, cast
 from ....schemas.events import (
     DoneEvent,
     ErrorEvent,
+    ExecutedApprovalsEvent,
     ExecutedToolCallsEvent,
     StreamEvent,
 )
-from ....schemas.messages import AgentMessage, ExecutedToolCall
+from ....schemas.messages import AgentMessage, ExecutedApproval, ExecutedToolCall
 from ...agent import Agent
 
 logger = logging.getLogger(__name__)
@@ -97,22 +98,12 @@ class ServerAdapter:
         # Check for approved tool calls that need to be processed
         executed_tool_calls = self._process_approved_tool_calls(messages_list, context)
 
-        # Convert to Core format (simple list of dicts with role/content)
-        core_messages = self._convert_messages(messages_list)
+        # Process unified approvals
+        executed_approvals = self._process_approvals(messages_list, context)
 
-        # Inject executed tool results into conversation so the LLM can see them.
-        # Replace the last user message (the approval text) to maintain strict
-        # user/assistant alternation required by Bedrock.
-        if executed_tool_calls:
-            result_parts = [
-                f"Tool result for {tc.name} with inputs {tc.input}: {tc.output}"
-                for tc in executed_tool_calls
-            ]
-            result_content = "\n\n".join(result_parts)
-            if core_messages and core_messages[-1]["role"] == "user":
-                core_messages[-1]["content"] = result_content
-            else:
-                core_messages.append({"role": "user", "content": result_content})
+        # Convert to Core format and inject execution results
+        core_messages = self._convert_messages(messages_list)
+        self._inject_execution_results(core_messages, executed_tool_calls, executed_approvals)
 
         if not core_messages:
             return AgentMessage(content="No messages provided.")
@@ -130,6 +121,9 @@ class ServerAdapter:
             # Add any executed tool calls from this request
             if executed_tool_calls:
                 agent_msg.data.executed_tool_calls.extend(executed_tool_calls)  # type: ignore[arg-type]
+
+            if executed_approvals:
+                agent_msg.data.executed_approvals.extend(executed_approvals)  # type: ignore[arg-type]
 
             # If there are pending approvals, ensure helpful content
             if response.needs_approval and not agent_msg.content:
@@ -171,22 +165,14 @@ class ServerAdapter:
         if executed_tool_calls:
             yield ExecutedToolCallsEvent(executed_tool_calls=executed_tool_calls)
 
-        # Convert to Core format
-        core_messages = self._convert_messages(messages_list)
+        # Process unified approvals
+        executed_approvals = self._process_approvals(messages_list, context)
+        if executed_approvals:
+            yield ExecutedApprovalsEvent(executed_approvals=executed_approvals)
 
-        # Inject executed tool results into conversation so the LLM can see them.
-        # Replace the last user message (the approval text) to maintain strict
-        # user/assistant alternation required by Bedrock.
-        if executed_tool_calls:
-            result_parts = [
-                f"Tool result for {tc.name} with inputs {tc.input}: {tc.output}"
-                for tc in executed_tool_calls
-            ]
-            result_content = "\n\n".join(result_parts)
-            if core_messages and core_messages[-1]["role"] == "user":
-                core_messages[-1]["content"] = result_content
-            else:
-                core_messages.append({"role": "user", "content": result_content})
+        # Convert to Core format and inject execution results
+        core_messages = self._convert_messages(messages_list)
+        self._inject_execution_results(core_messages, executed_tool_calls, executed_approvals)
 
         if not core_messages:
             yield ErrorEvent(error="No messages provided")
@@ -206,6 +192,36 @@ class ServerAdapter:
         except Exception as e:
             logger.exception(f"Stream error: {e}")
             yield ErrorEvent(error=str(e))
+
+    def _inject_execution_results(
+        self,
+        core_messages: list[dict[str, Any]],
+        executed_tool_calls: list[ExecutedToolCall],
+        executed_approvals: list[ExecutedApproval],
+    ) -> None:
+        """Inject tool/approval results into the conversation as a user message."""
+        parts: list[str] = []
+        if executed_tool_calls:
+            parts.extend(
+                f"Tool result for {tc.name} with inputs {tc.input}: {tc.output}"
+                for tc in executed_tool_calls
+            )
+        if executed_approvals:
+            parts.extend(
+                f"Tool result for {ea.name} with inputs {ea.input}: {ea.output}"
+                for ea in executed_approvals
+            )
+        if not parts:
+            return
+        result_content = "\n\n".join(parts)
+        if core_messages and core_messages[-1]["role"] == "user":
+            core_messages[-1]["content"] = (
+                core_messages[-1]["content"] + "\n\n" + result_content
+                if executed_approvals and not executed_tool_calls
+                else result_content
+            )
+        else:
+            core_messages.append({"role": "user", "content": result_content})
 
     def _convert_messages(self, messages_list: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """
@@ -321,3 +337,54 @@ class ServerAdapter:
                     return f"Error executing {tool_name}: {str(e)}"
 
         return f"Tool '{tool_name}' not found"
+
+    def _process_approvals(
+        self,
+        messages_list: list[dict[str, Any]],
+        platform_context: dict[str, Any],
+    ) -> list[ExecutedApproval]:
+        """
+        Process approved/rejected items from the unified approvals field.
+
+        Reads data.approvals[] from the latest message. For each:
+        - If execute=True: runs the tool via _execute_tool() and captures output
+        - If rejection_reason is set: captures the rejection as output
+        """
+        executed: list[ExecutedApproval] = []
+
+        if not messages_list:
+            return executed
+
+        latest_message = messages_list[-1]
+        data = latest_message.get("data", {})
+        approvals = data.get("approvals", [])
+
+        for approval in approvals:
+            approval_id = approval.get("id", "")
+            approval_type = approval.get("type", "")
+            name = approval.get("name", "")
+            tool_input = approval.get("input", {})
+
+            if approval.get("execute", False):
+                result = self._execute_tool(name, tool_input, platform_context)
+                executed.append(
+                    ExecutedApproval(
+                        id=approval_id,
+                        type=approval_type,
+                        name=name,
+                        input=tool_input,
+                        output=result,
+                    )
+                )
+            elif approval.get("rejection_reason"):
+                executed.append(
+                    ExecutedApproval(
+                        id=approval_id,
+                        type=approval_type,
+                        name=name,
+                        input=tool_input,
+                        output=f"Rejected: {approval['rejection_reason']}",
+                    )
+                )
+
+        return executed
