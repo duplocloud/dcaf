@@ -37,7 +37,7 @@ class ExecutedToolCall(BaseModel):
     id: str
     name: str
     input: dict[str, Any]
-    output: str
+    output: str | dict
 
 
 class URLConfig(BaseModel):
