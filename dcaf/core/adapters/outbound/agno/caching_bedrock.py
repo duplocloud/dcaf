@@ -149,6 +149,10 @@ class CachingAwsBedrock(AwsBedrock):
                         "aws_secret_access_key": self.aws_secret_access_key,
                     }
                 )
+                # STS temporary credentials require the session token
+                session_token = os.environ.get("AWS_SESSION_TOKEN")
+                if session_token:
+                    client_kwargs["aws_session_token"] = session_token
 
         return self.async_session.client(**client_kwargs)
 

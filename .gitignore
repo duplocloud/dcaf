@@ -14,7 +14,8 @@ backup_tool_calling_cmd_agent.py
 # AWS credentials
 update_env_aws_creds.sh
 
-CLAUDE.md
+# Claude Code local settings
+.claude/settings.local.json
 
 # Distribution / packaging
 .Python

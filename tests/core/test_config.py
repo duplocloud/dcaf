@@ -186,3 +186,16 @@ class TestIsProviderConfigured:
 
     def test_unknown_provider(self):
         assert is_provider_configured("unknown_provider") is False
+
+
+# =============================================================================
+# EnvVars Constants
+# =============================================================================
+
+
+class TestEnvVarsConstants:
+    def test_default_toolkit_env_var_defined(self):
+        from dcaf.core.config import EnvVars
+
+        assert hasattr(EnvVars, "DEFAULT_TOOLKIT")
+        assert EnvVars.DEFAULT_TOOLKIT == "DCAF_DEFAULT_TOOLKIT"

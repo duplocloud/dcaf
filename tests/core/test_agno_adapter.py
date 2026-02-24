@@ -556,5 +556,120 @@ Here's the final response to the user.
         assert result == ""
 
 
+class TestDefaultToolkit:
+    """Tests for the default toolkit feature flag."""
+
+    def test_build_default_toolkits_returns_five_toolkits(self):
+        """Verify _build_default_toolkits returns all 5 Agno toolkit instances."""
+        from dcaf.core.adapters.outbound.agno.adapter import AgnoAdapter
+
+        adapter = AgnoAdapter(model_id="test", provider="bedrock")
+        toolkits = adapter._build_default_toolkits()
+
+        assert len(toolkits) == 5, f"Expected 5 toolkits, got {len(toolkits)}"
+
+    def test_build_default_toolkits_returns_correct_types(self):
+        """Verify each toolkit is the correct Agno type."""
+        from agno.tools.file import FileTools
+        from agno.tools.file_generation import FileGenerationTools
+        from agno.tools.local_file_system import LocalFileSystemTools
+        from agno.tools.python import PythonTools
+        from agno.tools.shell import ShellTools
+
+        from dcaf.core.adapters.outbound.agno.adapter import AgnoAdapter
+
+        adapter = AgnoAdapter(model_id="test", provider="bedrock")
+        toolkits = adapter._build_default_toolkits()
+
+        toolkit_types = {type(t) for t in toolkits}
+        expected_types = {
+            FileTools,
+            LocalFileSystemTools,
+            PythonTools,
+            ShellTools,
+            FileGenerationTools,
+        }
+
+        assert toolkit_types == expected_types, (
+            f"Expected types {expected_types}, got {toolkit_types}"
+        )
+
+    def test_default_toolkit_disabled_by_default(self, monkeypatch):
+        """Verify default toolkit is NOT included when env var is unset."""
+        from dcaf.core.config import EnvVars
+
+        monkeypatch.delenv(EnvVars.DEFAULT_TOOLKIT, raising=False)
+
+        from dcaf.core.adapters.outbound.agno.adapter import AgnoAdapter
+
+        adapter = AgnoAdapter(model_id="test", provider="bedrock")
+
+        from dcaf.core import tool
+
+        @tool(description="User tool")
+        def my_tool(x: str) -> str:
+            return x
+
+        agno_tools = adapter._prepare_tools_with_defaults([my_tool], platform_context=None)
+        # Should only have the user tool (converted), no default toolkits
+        assert len(agno_tools) == 1
+
+    def test_default_toolkit_enabled_merges_with_user_tools(self, monkeypatch):
+        """Verify default toolkits are merged when env var is true."""
+        from dcaf.core.config import EnvVars
+
+        monkeypatch.setenv(EnvVars.DEFAULT_TOOLKIT, "true")
+
+        from dcaf.core.adapters.outbound.agno.adapter import AgnoAdapter
+
+        adapter = AgnoAdapter(model_id="test", provider="bedrock")
+
+        from dcaf.core import tool
+
+        @tool(description="User tool")
+        def my_tool(x: str) -> str:
+            return x
+
+        agno_tools = adapter._prepare_tools_with_defaults([my_tool], platform_context=None)
+        # Should have 5 default toolkits + 1 user tool = 6
+        assert len(agno_tools) == 6
+
+    def test_default_toolkit_enabled_no_user_tools(self, monkeypatch):
+        """Verify default toolkits work even with no user tools."""
+        from dcaf.core.config import EnvVars
+
+        monkeypatch.setenv(EnvVars.DEFAULT_TOOLKIT, "true")
+
+        from dcaf.core.adapters.outbound.agno.adapter import AgnoAdapter
+
+        adapter = AgnoAdapter(model_id="test", provider="bedrock")
+
+        agno_tools = adapter._prepare_tools_with_defaults([], platform_context=None)
+        # Should have 5 default toolkits
+        assert len(agno_tools) == 5
+
+    @pytest.mark.parametrize(
+        "value,expected_count",
+        [
+            ("true", 5),
+            ("True", 5),
+            ("TRUE", 5),
+            ("false", 0),
+            ("0", 0),
+        ],
+    )
+    def test_default_toolkit_case_insensitive(self, monkeypatch, value, expected_count):
+        """Verify env var check is case-insensitive for 'true' and rejects other values."""
+        from dcaf.core.config import EnvVars
+
+        monkeypatch.setenv(EnvVars.DEFAULT_TOOLKIT, value)
+
+        from dcaf.core.adapters.outbound.agno.adapter import AgnoAdapter
+
+        adapter = AgnoAdapter(model_id="test", provider="bedrock")
+        agno_tools = adapter._prepare_tools_with_defaults([], platform_context=None)
+        assert len(agno_tools) == expected_count
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
