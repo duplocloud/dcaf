@@ -163,13 +163,15 @@ platform_context = {
 }
 ```
 
-Each skill definition has three fields:
+Each skill definition has the following fields:
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `name` | string | Yes | Unique identifier for the skill |
 | `version` | string | Yes | Exact version string for cache lookup |
-| `url` | string | Yes | URL to fetch the skill from if not cached |
+| `url` | string | Conditional | URL to fetch the skill from if not cached. Required unless `content` or `s3_path` is set. Use `""` when using inline content or S3. |
+| `content` | string | Conditional | Inline `SKILL.md` content as a string. Used instead of fetching from `url`. Always overwrites the local cache on each request. |
+| `s3_path` | string | Conditional | S3 URI (`s3://bucket/prefix`) for skills stored in S3. Used instead of `url`. Requires IAM credentials on the host. |
 
 You can pass multiple skills — the agent will load all of them.
 
@@ -329,6 +331,47 @@ description: A simple single-file skill
 
 Do the thing.
 ```
+
+### Inline Content
+
+Skills can be embedded directly in the request as raw markdown — no URL or download needed. Set `content` to the full `SKILL.md` text and `url` to `""`:
+
+```json
+{
+  "skills": [
+    {
+      "name": "my-inline-skill",
+      "version": "1",
+      "url": "",
+      "content": "---\nname: my-inline-skill\ndescription: An inline skill\n---\n\n# Instructions\n\nDo the thing."
+    }
+  ]
+}
+```
+
+Inline content always overwrites the local cache, so the agent always uses the latest version sent in the request.
+
+### S3 Storage
+
+Skills stored in S3 are downloaded recursively using the host's IAM role. Set `s3_path` to an `s3://bucket/prefix` URI and `url` to `""`:
+
+```json
+{
+  "skills": [
+    {
+      "name": "magic-iac",
+      "version": "0",
+      "url": "",
+      "s3_path": "s3://my-bucket/skills/magic-iac/"
+    }
+  ]
+}
+```
+
+All objects under the prefix are downloaded, preserving their relative paths. A `SKILL.md` file must exist directly in the prefix root — S3 skills do not support the auto-elevation that zip files do.
+
+!!! note "IAM credentials"
+    S3 skill download uses the default AWS credential chain (`aioboto3.Session()`). In Kubernetes, attach the appropriate IAM role to the pod's service account.
 
 ### Format Detection
 

@@ -134,7 +134,7 @@ class SkillManager:
                         MAX_SKILL_SIZE,
                     )
                     return None
-        except Exception:
+        except (httpx.RequestError, httpx.HTTPStatusError):
             logger.error(
                 "Failed to fetch skill '%s' v%s from %s",
                 skill.name,
@@ -186,7 +186,7 @@ class SkillManager:
 
             return str(target_dir)
 
-        except Exception:
+        except OSError:
             logger.error(
                 "Failed to cache skill '%s' v%s",
                 skill.name,
@@ -249,7 +249,9 @@ class SkillManager:
 
                         # Path traversal guard
                         dest_path = (temp_dir / rel_path).resolve()
-                        if not str(dest_path).startswith(str(temp_dir.resolve())):
+                        try:
+                            dest_path.relative_to(temp_dir.resolve())
+                        except ValueError:
                             logger.error(
                                 "Skill '%s' v%s: S3 key contains unsafe path: %s",
                                 skill.name,
@@ -310,7 +312,7 @@ class SkillManager:
 
             return str(target_dir)
 
-        except Exception:
+        except Exception:  # noqa: BLE001 — aioboto3 raises varied exception types
             logger.error(
                 "Failed to fetch skill '%s' v%s from %s",
                 skill.name,
@@ -343,7 +345,9 @@ class SkillManager:
             with zipfile.ZipFile(BytesIO(content)) as zf:
                 for member in zf.namelist():
                     member_path = (target / member).resolve()
-                    if not str(member_path).startswith(str(target.resolve())):
+                    try:
+                        member_path.relative_to(target.resolve())
+                    except ValueError:
                         logger.error(
                             "Skill '%s' v%s: zip contains unsafe path: %s",
                             skill.name,
@@ -453,7 +457,7 @@ class SkillManager:
                 target_dir,
             )
             return str(target_dir)
-        except Exception:
+        except OSError:
             logger.error(
                 "Failed to cache inline skill '%s' v%s",
                 skill.name,
