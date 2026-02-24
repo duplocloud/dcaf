@@ -665,6 +665,62 @@ class TestSkillTranslator:
         assert result[0].version == "0"
         assert result[0].url == "https://s3.example.com/skill.zip?token=abc"
         assert result[0].content is None
+        assert result[0].s3_path is None
+
+    def test_translate_package_s3_path(self):
+        """Package format with PackagePath='s3' routes to S3 using bucket+folder."""
+        raw = [
+            {
+                "FileStoreSignedUrl": "<redacted>",
+                "StorageBucketName": "duplo-ai-userdata-805863115079",
+                "SkillFolder": "skills/magic-iac/",
+                "Type": "Custom",
+                "Format": "Package",
+                "PackagePath": "s3",
+                "Id": "6997b6ce88178fec05d17e58",
+                "Name": "magic-iac",
+                "Description": "Magical IAC skills",
+                "IsActive": True,
+                "Version": 0,
+            }
+        ]
+        result = translate_skills(raw)
+        assert len(result) == 1
+        assert result[0].name == "magic-iac"
+        assert result[0].version == "0"
+        assert result[0].url == ""
+        assert result[0].s3_path == "s3://duplo-ai-userdata-805863115079/skills/magic-iac/"
+        assert result[0].content is None
+
+    def test_translate_package_s3_missing_bucket_skipped(self):
+        """Package/S3 without StorageBucketName is skipped."""
+        raw = [
+            {
+                "Name": "bad",
+                "Version": 1,
+                "Format": "Package",
+                "PackagePath": "s3",
+                "SkillFolder": "skills/bad/",
+                "IsActive": True,
+            }
+        ]
+        result = translate_skills(raw)
+        assert result == []
+
+    def test_translate_package_s3_missing_folder_skipped(self):
+        """Package/S3 without SkillFolder is skipped."""
+        raw = [
+            {
+                "Name": "bad",
+                "Version": 1,
+                "Format": "Package",
+                "PackagePath": "s3",
+                "StorageBucketName": "my-bucket",
+                "IsActive": True,
+            }
+        ]
+        result = translate_skills(raw)
+        assert result == []
 
     def test_filter_inactive_skills(self):
         """Inactive skills are excluded."""
@@ -855,4 +911,232 @@ class TestSkillManagerCacheInline:
         assert isinstance(result, Skills)
         # Verify the file was written
         cached = tmp_path / "skills" / "inline-resolved" / "0" / "SKILL.md"
+        assert cached.is_file()
+
+
+# ---------------------------------------------------------------------------
+# Helpers for S3 tests
+# ---------------------------------------------------------------------------
+
+
+class _AsyncPageIterator:
+    """Minimal async iterator that yields pre-built pages for paginator mocks."""
+
+    def __init__(self, pages):
+        self._pages = iter(pages)
+
+    def __aiter__(self):
+        return self
+
+    async def __anext__(self):
+        try:
+            return next(self._pages)
+        except StopIteration:
+            raise StopAsyncIteration
+
+
+def _make_s3_mocks(objects: list[dict], files: dict[str, bytes]):
+    """
+    Build the nested mock chain expected by fetch_and_cache_from_s3.
+
+    Returns (mock_session_cls, mock_s3) where mock_session_cls should be
+    used to patch ``aioboto3.Session``.
+    """
+    mock_s3 = AsyncMock()
+    # get_paginator is synchronous in aioboto3; override the default AsyncMock attribute
+    mock_s3.get_paginator = MagicMock()
+
+    mock_paginator = MagicMock()
+    mock_paginator.paginate.return_value = _AsyncPageIterator([{"Contents": objects}])
+    mock_s3.get_paginator.return_value = mock_paginator
+
+    async def _get_object(Bucket, Key):  # noqa: N803
+        body_mock = AsyncMock()
+        body_mock.read = AsyncMock(return_value=files.get(Key, b""))
+        return {"Body": body_mock}
+
+    mock_s3.get_object.side_effect = _get_object
+
+    client_cm = AsyncMock()
+    client_cm.__aenter__ = AsyncMock(return_value=mock_s3)
+    client_cm.__aexit__ = AsyncMock(return_value=False)
+
+    mock_session = MagicMock()
+    mock_session.client.return_value = client_cm
+
+    return mock_session, mock_s3
+
+
+# ---------------------------------------------------------------------------
+# TestSkillDefinitionS3Path
+# ---------------------------------------------------------------------------
+
+
+class TestSkillDefinitionS3Path:
+    def test_s3_path_defaults_to_none(self):
+        """s3_path field defaults to None for backward compatibility."""
+        skill = SkillDefinition(name="test", version="1.0.0", url="http://example.com/skill")
+        assert skill.s3_path is None
+
+    def test_s3_path_can_be_set(self):
+        """s3_path accepts an S3 URI."""
+        skill = SkillDefinition(
+            name="test", version="1.0.0", url="", s3_path="s3://my-bucket/skills/test"
+        )
+        assert skill.s3_path == "s3://my-bucket/skills/test"
+
+
+# ---------------------------------------------------------------------------
+# TestSkillTranslatorS3
+# ---------------------------------------------------------------------------
+
+
+class TestSkillTranslatorS3:
+    def test_translate_s3_format(self):
+        """S3 format creates SkillDefinition with s3_path set."""
+        raw = [
+            {
+                "Name": "s3-skill",
+                "Version": 2,
+                "Format": "S3",
+                "S3Path": "s3://my-bucket/skills/s3-skill",
+                "IsActive": True,
+            }
+        ]
+        result = translate_skills(raw)
+        assert len(result) == 1
+        assert result[0].name == "s3-skill"
+        assert result[0].version == "2"
+        assert result[0].url == ""
+        assert result[0].s3_path == "s3://my-bucket/skills/s3-skill"
+        assert result[0].content is None
+
+    def test_translate_s3_format_missing_path_skipped(self):
+        """S3 format without S3Path is skipped with a warning."""
+        raw = [{"Name": "bad-s3", "Version": 1, "Format": "S3", "IsActive": True}]
+        result = translate_skills(raw)
+        assert result == []
+
+    def test_internal_format_with_s3_path(self):
+        """Internal lowercase format passes s3_path through."""
+        raw = [{"name": "internal-s3", "version": "5", "url": "", "s3_path": "s3://b/p"}]
+        result = translate_skills(raw)
+        assert len(result) == 1
+        assert result[0].s3_path == "s3://b/p"
+
+    def test_internal_format_s3_path_defaults_none(self):
+        """Internal format without s3_path defaults to None."""
+        raw = [{"name": "no-s3", "version": "1", "url": "https://example.com/skill.zip"}]
+        result = translate_skills(raw)
+        assert len(result) == 1
+        assert result[0].s3_path is None
+
+
+# ---------------------------------------------------------------------------
+# TestSkillManagerS3
+# ---------------------------------------------------------------------------
+
+
+class TestSkillManagerS3:
+    @pytest.mark.asyncio
+    async def test_fetch_s3_skill(self, tmp_path):
+        """fetch_and_cache_from_s3 downloads files recursively and caches them."""
+        skill = SkillDefinition(
+            name="s3-skill", version="1.0.0", url="", s3_path="s3://my-bucket/skills/s3-skill"
+        )
+        manager = SkillManager(storage_path=str(tmp_path))
+
+        objects = [
+            {"Key": "skills/s3-skill/SKILL.md"},
+            {"Key": "skills/s3-skill/scripts/run.sh"},
+        ]
+        files = {
+            "skills/s3-skill/SKILL.md": b"# S3 Skill",
+            "skills/s3-skill/scripts/run.sh": b"echo hi",
+        }
+        mock_session, _ = _make_s3_mocks(objects, files)
+
+        with patch("aioboto3.Session", return_value=mock_session):
+            path = await manager.fetch_and_cache_from_s3(skill)
+
+        assert path is not None
+        assert (Path(path) / "SKILL.md").read_bytes() == b"# S3 Skill"
+        assert (Path(path) / "scripts" / "run.sh").read_bytes() == b"echo hi"
+
+    @pytest.mark.asyncio
+    async def test_fetch_s3_no_objects_returns_none(self, tmp_path):
+        """fetch_and_cache_from_s3 returns None when the S3 prefix is empty."""
+        skill = SkillDefinition(
+            name="empty-skill", version="1.0.0", url="", s3_path="s3://my-bucket/missing"
+        )
+        manager = SkillManager(storage_path=str(tmp_path))
+
+        mock_s3 = AsyncMock()
+        mock_s3.get_paginator = MagicMock()
+        mock_paginator = MagicMock()
+        mock_paginator.paginate.return_value = _AsyncPageIterator([{}])  # No "Contents" key
+        mock_s3.get_paginator.return_value = mock_paginator
+
+        client_cm = AsyncMock()
+        client_cm.__aenter__ = AsyncMock(return_value=mock_s3)
+        client_cm.__aexit__ = AsyncMock(return_value=False)
+        mock_session = MagicMock()
+        mock_session.client.return_value = client_cm
+
+        with patch("aioboto3.Session", return_value=mock_session):
+            path = await manager.fetch_and_cache_from_s3(skill)
+
+        assert path is None
+
+    @pytest.mark.asyncio
+    async def test_fetch_s3_missing_skill_md_returns_none(self, tmp_path):
+        """fetch_and_cache_from_s3 returns None when SKILL.md is absent."""
+        skill = SkillDefinition(
+            name="no-md", version="1.0.0", url="", s3_path="s3://my-bucket/skills/no-md"
+        )
+        manager = SkillManager(storage_path=str(tmp_path))
+
+        objects = [{"Key": "skills/no-md/just-a-script.sh"}]
+        files = {"skills/no-md/just-a-script.sh": b"echo hi"}
+        mock_session, _ = _make_s3_mocks(objects, files)
+
+        with patch("aioboto3.Session", return_value=mock_session):
+            path = await manager.fetch_and_cache_from_s3(skill)
+
+        assert path is None
+
+    @pytest.mark.asyncio
+    async def test_fetch_s3_invalid_uri_returns_none(self, tmp_path):
+        """fetch_and_cache_from_s3 returns None for a non-S3 URI."""
+        skill = SkillDefinition(
+            name="bad-uri", version="1.0.0", url="", s3_path="http://not-s3/path"
+        )
+        manager = SkillManager(storage_path=str(tmp_path))
+
+        path = await manager.fetch_and_cache_from_s3(skill)
+
+        assert path is None
+
+    @pytest.mark.asyncio
+    async def test_resolve_skills_routes_s3_path(self, tmp_path):
+        """resolve_skills calls fetch_and_cache_from_s3 when s3_path is set."""
+        from agno.skills import Skills
+
+        skill = SkillDefinition(
+            name="routed-s3",
+            version="1.0.0",
+            url="",
+            s3_path="s3://my-bucket/skills/routed-s3",
+        )
+        manager = SkillManager(storage_path=str(tmp_path))
+
+        objects = [{"Key": "skills/routed-s3/SKILL.md"}]
+        files = {"skills/routed-s3/SKILL.md": b"---\nname: routed-s3\n---\n# Routed"}
+        mock_session, _ = _make_s3_mocks(objects, files)
+
+        with patch("aioboto3.Session", return_value=mock_session):
+            result = await manager.resolve_skills([skill])
+
+        assert isinstance(result, Skills)
+        cached = tmp_path / "skills" / "routed-s3" / "1.0.0" / "SKILL.md"
         assert cached.is_file()
