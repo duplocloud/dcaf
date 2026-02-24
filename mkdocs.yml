@@ -180,10 +180,9 @@ extra:
     - icon: fontawesome/brands/twitter
       link: https://twitter.com/duplocloud
   
-  # Version provider for mike (only enable when deploying with mike)
-  # version:
-  #   provider: mike
-  #   default: latest
+  version:
+    provider: mike
+    default: latest
 
 # Temporarily disabled to debug code block issue
 # extra_css:

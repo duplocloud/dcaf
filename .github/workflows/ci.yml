@@ -1,5 +1,5 @@
 # Continuous Integration workflow
-# Runs on all pull requests and pushes to main, vnext, and feature branches
+# Runs on all pull requests and pushes to main, and feature branches
 
 name: CI
 
@@ -7,12 +7,10 @@ on:
   push:
     branches:
       - main
-      - vnext
       - 'feature/**'
   pull_request:
     branches:
       - main
-      - vnext
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
