@@ -360,9 +360,7 @@ class TestProcessApprovals:
 
     def test_command_type_approval(self):
         """Command-type approvals work through the same path."""
-        agent, tool = _make_mock_agent_with_tool(
-            "execute_terminal_cmd", "NAME  READY\nnginx  1/1"
-        )
+        agent, tool = _make_mock_agent_with_tool("execute_terminal_cmd", "NAME  READY\nnginx  1/1")
         adapter = ServerAdapter(agent)
 
         messages_list = [
@@ -418,9 +416,7 @@ def _make_mock_agent_for_invoke(tool_name: str, tool_result: str, llm_response: 
 
 class TestInvokeWithApprovals:
     def test_invoke_processes_approvals(self):
-        agent, tool = _make_mock_agent_for_invoke(
-            "list_pods", "pod1\npod2", "Here are your pods."
-        )
+        agent, tool = _make_mock_agent_for_invoke("list_pods", "pod1\npod2", "Here are your pods.")
         adapter = ServerAdapter(agent)
 
         messages = {
@@ -449,9 +445,7 @@ class TestInvokeWithApprovals:
         assert len(result.data.executed_approvals) == 1
 
     def test_invoke_stream_emits_executed_approvals_event(self):
-        agent, tool = _make_mock_agent_for_invoke(
-            "list_pods", "pod1", "Here are your pods."
-        )
+        agent, tool = _make_mock_agent_for_invoke("list_pods", "pod1", "Here are your pods.")
         adapter = ServerAdapter(agent)
 
         messages = {
