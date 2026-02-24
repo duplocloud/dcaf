@@ -215,6 +215,3 @@ qa-build-and-push.sh
 
 # Git worktrees
 .worktrees/
-
-# MCP config
-.mcp.json

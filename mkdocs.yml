@@ -9,9 +9,9 @@ site_author: DuploCloud
 site_url: https://duplocloud.github.io/dcaf/
 
 repo_name: duplocloud/dcaf
-repo_url: https://github.com/duplocloud/service-desk-agents
+repo_url: https://github.com/duplocloud/dcaf
 
-copyright: Copyright &copy; 2024 DuploCloud
+copyright: Copyright &copy; 2026 DuploCloud
 
 theme:
   name: material
