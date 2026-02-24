@@ -12,7 +12,7 @@
         <meta name="author" content="DuploCloud">
       
       
-        <link rel="canonical" href="https://duplocloud.github.io/dcaf/dev/plans/2025-02-05-merge-resolution-plan/">
+        <link rel="canonical" href="https://duplocloud.github.io/dcaf/dev/plans/2026-02-24-mcp-headers-design/">
       
       
       
@@ -25,7 +25,7 @@
     
     
       
-        <title>Merge Resolution Plan: vnext ← main - DCAF Documentation</title>
+        <title>MCPTool: Add headers Support - DCAF Documentation</title>
       
     
     
@@ -76,7 +76,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#merge-resolution-plan-vnext-main" class="md-skip">
+        <a href="#mcptool-add-headers-support" class="md-skip">
           Skip to content
         </a>
       
@@ -111,7 +111,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Merge Resolution Plan: vnext ← main
+              MCPTool: Add headers Support
             
           </span>
         </div>
@@ -2184,10 +2184,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#executive-summary" class="md-nav__link">
+  <a href="#problem" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Executive Summary
+        Problem
       
     </span>
   </a>
@@ -2195,22 +2195,33 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#conflict-1-dcafagent_serverpy" class="md-nav__link">
+  <a href="#approach" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Conflict 1: dcaf/agent_server.py
+        Approach
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Conflict 1: dcaf/agent_server.py">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changes
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Changes">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#what-main-added" class="md-nav__link">
+  <a href="#dcafmcptoolspy" class="md-nav__link">
     <span class="md-ellipsis">
       
-        What Main Added
+        dcaf/mcp/tools.py
       
     </span>
   </a>
@@ -2218,21 +2229,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#what-vnext-changed" class="md-nav__link">
+  <a href="#testscoretest_mcp_toolspy" class="md-nav__link">
     <span class="md-ellipsis">
       
-        What vnext Changed
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#resolution-strategy" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Resolution Strategy
+        tests/core/test_mcp_tools.py
       
     </span>
   </a>
@@ -2245,143 +2245,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#conflict-2-dcafllmbedrockpy" class="md-nav__link">
+  <a href="#usage" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Conflict 2: dcaf/llm/bedrock.py
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Conflict 2: dcaf/llm/bedrock.py">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#what-main-added_1" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        What Main Added
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#what-vnext-changed_1" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        What vnext Changed
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#resolution-strategy_1" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Resolution Strategy
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#conflict-3-dcafschemasmessagespy" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Conflict 3: dcaf/schemas/messages.py
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Conflict 3: dcaf/schemas/messages.py">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#what-main-added_2" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        What Main Added
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#what-vnext-changed_2" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        What vnext Changed
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#resolution-strategy_2" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Resolution Strategy
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#test-plan" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Test Plan
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#summary-table" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Summary Table
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#risk-assessment" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Risk Assessment
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#approval" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Approval
+        Usage
       
     </span>
   </a>
@@ -2416,258 +2283,37 @@
   
 
 
-<h1 id="merge-resolution-plan-vnext-main">Merge Resolution Plan: vnext ← main<a class="headerlink" href="#merge-resolution-plan-vnext-main" title="Permanent link">&para;</a></h1>
-<p><strong>Date</strong>: 2025-02-05
-<strong>Direction</strong>: Merging <code>vnext</code> into <code>main</code> (release direction)
-<strong>Conflicts</strong>: 3 files</p>
-<hr />
-<h2 id="executive-summary">Executive Summary<a class="headerlink" href="#executive-summary" title="Permanent link">&para;</a></h2>
-<p>The main branch has added <strong>new features</strong> while vnext has <strong>refactored the architecture</strong> for better async support and backwards compatibility. The resolution strategy is:</p>
+<h1 id="mcptool-add-headers-support">MCPTool: Add headers Support<a class="headerlink" href="#mcptool-add-headers-support" title="Permanent link">&para;</a></h1>
+<h2 id="problem">Problem<a class="headerlink" href="#problem" title="Permanent link">&para;</a></h2>
+<p>DCAF's <code>MCPTool</code> wraps Agno's <code>MCPTools</code> but does not forward headers when creating the Agno instance. Users connecting to authenticated MCP servers (e.g., behind Bearer tokens) have no way to pass HTTP headers through DCAF's API.</p>
+<h2 id="approach">Approach<a class="headerlink" href="#approach" title="Permanent link">&para;</a></h2>
+<p>Use Agno's existing <code>header_provider</code> parameter. Wrap a static <code>headers</code> dict as a <code>lambda: headers</code> callable. Agno handles merging headers into <code>StreamableHTTPClientParams</code> or <code>SSEClientParams</code> internally.</p>
+<h2 id="changes">Changes<a class="headerlink" href="#changes" title="Permanent link">&para;</a></h2>
+<h3 id="dcafmcptoolspy"><code>dcaf/mcp/tools.py</code><a class="headerlink" href="#dcafmcptoolspy" title="Permanent link">&para;</a></h3>
 <ol>
-<li><strong>Keep vnext's architecture</strong> (async handlers, modern type hints, new endpoints)</li>
-<li><strong>Add main's new features</strong> (A2A agent card, cache metrics, new schema fields)</li>
-<li><strong>Preserve all backwards compatibility</strong> work done in vnext</li>
+<li>Add <code>headers: dict[str, str] | None = None</code> parameter to <code>MCPTool.__init__</code></li>
+<li>Validate: raise <code>ValueError</code> if <code>headers</code> is provided with <code>stdio</code> transport</li>
+<li>Store as <code>self._headers</code></li>
+<li>In <code>_create_agno_mcp_tools()</code>, wrap as <code>header_provider=lambda: _headers</code> and pass to <code>AgnoMCPTools</code></li>
 </ol>
-<hr />
-<h2 id="conflict-1-dcafagent_serverpy">Conflict 1: <code>dcaf/agent_server.py</code><a class="headerlink" href="#conflict-1-dcafagent_serverpy" title="Permanent link">&para;</a></h2>
-<h3 id="what-main-added">What Main Added<a class="headerlink" href="#what-main-added" title="Permanent link">&para;</a></h3>
+<h3 id="testscoretest_mcp_toolspy"><code>tests/core/test_mcp_tools.py</code><a class="headerlink" href="#testscoretest_mcp_toolspy" title="Permanent link">&para;</a></h3>
 <ul>
-<li><code>a2a_agent_card_path</code> parameter to <code>create_chat_app()</code></li>
-<li><code>/.well-known/agent.json</code> endpoint for Agent2Agent protocol support</li>
+<li><code>test_headers_stored_on_init</code> — verify <code>_headers</code> is stored</li>
+<li><code>test_headers_raises_for_stdio</code> — verify <code>ValueError</code> for stdio transport</li>
+<li><code>test_headers_forwarded_as_header_provider</code> — verify Agno instance gets a callable</li>
+<li><code>test_headers_none_by_default</code> — verify default behavior unchanged</li>
 </ul>
-<h3 id="what-vnext-changed">What vnext Changed<a class="headerlink" href="#what-vnext-changed" title="Permanent link">&para;</a></h3>
-<ul>
-<li>Refactored sync handlers to async with <code>asyncio.to_thread()</code> for non-blocking health checks</li>
-<li>Added <code>/api/chat</code> and <code>/api/chat-stream</code> as preferred endpoints</li>
-<li>Added <code>/api/sendMessage</code> and <code>/api/sendMessageStream</code> as deprecated aliases (ADR-007)</li>
-<li>Added <code>/api/chat-ws</code> WebSocket endpoint</li>
-<li>Added <code>_has_invoke_stream()</code> fallback for v1 agents without streaming</li>
-<li>Added <code>_request_fields</code> forwarding for thread_id, tenant_id, etc.</li>
-</ul>
-<h3 id="resolution-strategy">Resolution Strategy<a class="headerlink" href="#resolution-strategy" title="Permanent link">&para;</a></h3>
-<p><strong>Keep vnext's architecture and ADD main's A2A feature.</strong></p>
-<p><strong>Rationale</strong>:
-1. vnext's async architecture is essential for non-blocking health checks in production
-2. vnext's legacy endpoint aliases are required for backwards compatibility (ADR-007)
-3. vnext's WebSocket support is a new feature we want to keep
-4. Main's A2A agent card feature is additive and non-breaking</p>
-<p><strong>Specific Changes</strong>:
-<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># Update function signature to include a2a_agent_card_path</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="k">def</span><span class="w"> </span><span class="nf">create_chat_app</span><span class="p">(</span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">agent</span><span class="p">:</span> <span class="n">AgentProtocol</span><span class="p">,</span>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">router</span><span class="p">:</span> <span class="n">ChannelResponseRouter</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">a2a_agent_card_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>  <span class="c1"># ADD from main</span>
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FastAPI</span><span class="p">:</span>
-</span></code></pre></div></p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># Add A2A endpoint after health check (from main)</span>
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="k">if</span> <span class="n">a2a_agent_card_path</span><span class="p">:</span>
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>    <span class="n">card_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">a2a_agent_card_path</span><span class="p">)</span>
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="nd">@app</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;/.well-known/agent.json&quot;</span><span class="p">,</span> <span class="n">tags</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;system&quot;</span><span class="p">])</span>
-</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">get_agent_card</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
-</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Serves the Agent2Agent agent card JSON.&quot;&quot;&quot;</span>
-</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>        <span class="c1"># ... (copy from main, update type hints to modern style)</span>
+<h2 id="usage">Usage<a class="headerlink" href="#usage" title="Permanent link">&para;</a></h2>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">dcaf.mcp</span><span class="w"> </span><span class="kn">import</span> <span class="n">MCPTool</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">mcp_tool</span> <span class="o">=</span> <span class="n">MCPTool</span><span class="p">(</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">url</span><span class="o">=</span><span class="s2">&quot;https://mcp-ai-studio.test21-apps.duplocloud.net/mcp&quot;</span><span class="p">,</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">transport</span><span class="o">=</span><span class="s2">&quot;streamable-http&quot;</span><span class="p">,</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">headers</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;Authorization&quot;</span><span class="p">:</span> <span class="sa">f</span><span class="s2">&quot;Bearer </span><span class="si">{</span><span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s1">&#39;DUPLO_HELPDESK_MCP_TOKEN&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">},</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="p">)</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="n">agent</span> <span class="o">=</span> <span class="n">Agent</span><span class="p">(</span><span class="n">tools</span><span class="o">=</span><span class="p">[</span><span class="n">mcp_tool</span><span class="p">])</span>
 </span></code></pre></div>
-<p><strong>Why This Choice</strong>:
-- Preserves vnext's async architecture (critical for production)
-- Preserves all backwards compatibility work
-- Adds A2A support without breaking anything
-- A2A is an additive feature that doesn't conflict with our architecture</p>
-<hr />
-<h2 id="conflict-2-dcafllmbedrockpy">Conflict 2: <code>dcaf/llm/bedrock.py</code><a class="headerlink" href="#conflict-2-dcafllmbedrockpy" title="Permanent link">&para;</a></h2>
-<h3 id="what-main-added_1">What Main Added<a class="headerlink" href="#what-main-added_1" title="Permanent link">&para;</a></h3>
-<ul>
-<li><code>CACHE_MIN_TOKENS</code> class constant for model-specific caching thresholds</li>
-<li><code>_get_cache_min_tokens()</code> method</li>
-<li><code>_log_cache_metrics()</code> method for logging cache hits/misses</li>
-<li><code>cache_system_prompt</code> parameter to <code>invoke_stream()</code> and <code>invoke()</code></li>
-<li><code>top_p</code> made optional with <code>None</code> default</li>
-</ul>
-<h3 id="what-vnext-changed_1">What vnext Changed<a class="headerlink" href="#what-vnext-changed_1" title="Permanent link">&para;</a></h3>
-<ul>
-<li>Modernized type hints (<code>Dict</code> → <code>dict</code>, <code>List</code> → <code>list</code>, <code>Optional</code> → <code>| None</code>)</li>
-<li>Minor formatting/style improvements</li>
-<li><code>**kwargs</code> → <code>**_kwargs: Any</code> for explicit unused parameter handling</li>
-</ul>
-<h3 id="resolution-strategy_1">Resolution Strategy<a class="headerlink" href="#resolution-strategy_1" title="Permanent link">&para;</a></h3>
-<p><strong>Keep vnext's modern type hints and ADD main's caching features.</strong></p>
-<p><strong>Rationale</strong>:
-1. vnext's modern type hints are preferred (Python 3.10+ style)
-2. Main's caching features are valuable for production performance
-3. The features are orthogonal - no architectural conflict</p>
-<p><strong>Specific Changes</strong>:
-<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">BedrockLLM</span><span class="p">(</span><span class="n">LLM</span><span class="p">):</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    <span class="c1"># ADD from main (with modern type hints)</span>
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    <span class="n">CACHE_MIN_TOKENS</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>        <span class="s2">&quot;claude-haiku-4-5&quot;</span><span class="p">:</span> <span class="mi">4096</span><span class="p">,</span>
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>        <span class="s2">&quot;claude-sonnet-4-5&quot;</span><span class="p">:</span> <span class="mi">1024</span><span class="p">,</span>
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>        <span class="c1"># ... etc</span>
-</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>    <span class="p">}</span>
-</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>
-</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">_get_cache_min_tokens</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">model_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
-</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>        <span class="c1"># ADD from main</span>
-</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>        <span class="o">...</span>
-</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>
-</span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">_log_cache_metrics</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">response</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="n">model_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="__span-2-14"><a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>        <span class="c1"># ADD from main</span>
-</span><span id="__span-2-15"><a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>        <span class="o">...</span>
-</span></code></pre></div></p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># Update invoke_stream signature to include cache_system_prompt</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="k">def</span><span class="w"> </span><span class="nf">invoke_stream</span><span class="p">(</span>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    <span class="bp">self</span><span class="p">,</span>
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    <span class="n">messages</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]],</span>
-</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    <span class="n">model_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
-</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>    <span class="n">system_prompt</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>    <span class="n">tools</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>    <span class="n">max_tokens</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1000</span><span class="p">,</span>
-</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>    <span class="n">temperature</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span>
-</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>    <span class="n">additional_params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>    <span class="n">cache_system_prompt</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>  <span class="c1"># ADD from main</span>
-</span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="p">):</span>
-</span></code></pre></div>
-<p><strong>Why This Choice</strong>:
-- Caching is a production performance feature - valuable to keep
-- Type hints are cosmetic but preferred modern style
-- No behavioral conflict between the changes</p>
-<hr />
-<h2 id="conflict-3-dcafschemasmessagespy">Conflict 3: <code>dcaf/schemas/messages.py</code><a class="headerlink" href="#conflict-3-dcafschemasmessagespy" title="Permanent link">&para;</a></h2>
-<h3 id="what-main-added_2">What Main Added<a class="headerlink" href="#what-main-added_2" title="Permanent link">&para;</a></h3>
-<ul>
-<li><code>FileObject.refers_persistent_file: Optional[str] = None</code> - reference to persistent file storage</li>
-<li><code>Data.user_file_uploads: List[FileObject] = Field(default_factory=list)</code> - user uploaded files</li>
-</ul>
-<h3 id="what-vnext-changed_2">What vnext Changed<a class="headerlink" href="#what-vnext-changed_2" title="Permanent link">&para;</a></h3>
-<ul>
-<li><code>PlatformContext.tenant_id: str | None = None</code> - tenant identification</li>
-<li><code>PlatformContext.user_roles: list[str] = Field(default_factory=list)</code> - access control</li>
-<li><code>PlatformContext.aws_region: str | None = None</code> - AWS region for credentials</li>
-<li><code>PlatformContext.model_config = ConfigDict(extra="allow")</code> - allow additional fields</li>
-<li><code>Data.session: dict[str, Any]</code> - session state persistence</li>
-<li><code>AgentMessage.from_agent_response()</code> class method - conversion helper</li>
-<li>Modernized type hints throughout</li>
-</ul>
-<h3 id="resolution-strategy_2">Resolution Strategy<a class="headerlink" href="#resolution-strategy_2" title="Permanent link">&para;</a></h3>
-<p><strong>COMBINE both sets of changes - they are complementary.</strong></p>
-<p><strong>Rationale</strong>:
-1. Main's <code>user_file_uploads</code> and <code>refers_persistent_file</code> are new features for file handling
-2. vnext's <code>PlatformContext</code> enhancements are for multi-tenant access control
-3. vnext's <code>Data.session</code> is for state persistence
-4. All changes are additive - no conflicts in meaning or behavior</p>
-<p><strong>Specific Changes</strong>:
-<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">FileObject</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>    <span class="n">file_path</span><span class="p">:</span> <span class="nb">str</span>
-</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>    <span class="n">file_content</span><span class="p">:</span> <span class="nb">str</span>
-</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>    <span class="n">refers_persistent_file</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># ADD from main</span>
-</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>
-</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>
-</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="k">class</span><span class="w"> </span><span class="nc">PlatformContext</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
-</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>    <span class="c1"># Keep ALL vnext fields</span>
-</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>    <span class="n">tenant_id</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
-</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>    <span class="n">tenant_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
-</span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>    <span class="n">user_roles</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
-</span><span id="__span-4-12"><a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>    <span class="n">k8s_namespace</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
-</span><span id="__span-4-13"><a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>    <span class="n">kubeconfig</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
-</span><span id="__span-4-14"><a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a>    <span class="n">duplo_base_url</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
-</span><span id="__span-4-15"><a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a>    <span class="n">duplo_token</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
-</span><span id="__span-4-16"><a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a>    <span class="n">aws_credentials</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
-</span><span id="__span-4-17"><a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a>    <span class="n">aws_region</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
-</span><span id="__span-4-18"><a id="__codelineno-4-18" name="__codelineno-4-18" href="#__codelineno-4-18"></a>
-</span><span id="__span-4-19"><a id="__codelineno-4-19" name="__codelineno-4-19" href="#__codelineno-4-19"></a>    <span class="n">model_config</span> <span class="o">=</span> <span class="n">ConfigDict</span><span class="p">(</span><span class="n">extra</span><span class="o">=</span><span class="s2">&quot;allow&quot;</span><span class="p">)</span>
-</span><span id="__span-4-20"><a id="__codelineno-4-20" name="__codelineno-4-20" href="#__codelineno-4-20"></a>
-</span><span id="__span-4-21"><a id="__codelineno-4-21" name="__codelineno-4-21" href="#__codelineno-4-21"></a>
-</span><span id="__span-4-22"><a id="__codelineno-4-22" name="__codelineno-4-22" href="#__codelineno-4-22"></a><span class="k">class</span><span class="w"> </span><span class="nc">Data</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
-</span><span id="__span-4-23"><a id="__codelineno-4-23" name="__codelineno-4-23" href="#__codelineno-4-23"></a>    <span class="n">cmds</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Command</span><span class="p">]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
-</span><span id="__span-4-24"><a id="__codelineno-4-24" name="__codelineno-4-24" href="#__codelineno-4-24"></a>    <span class="n">executed_cmds</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">ExecutedCommand</span><span class="p">]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
-</span><span id="__span-4-25"><a id="__codelineno-4-25" name="__codelineno-4-25" href="#__codelineno-4-25"></a>    <span class="n">tool_calls</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">ToolCall</span><span class="p">]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
-</span><span id="__span-4-26"><a id="__codelineno-4-26" name="__codelineno-4-26" href="#__codelineno-4-26"></a>    <span class="n">executed_tool_calls</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">ExecutedToolCall</span><span class="p">]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
-</span><span id="__span-4-27"><a id="__codelineno-4-27" name="__codelineno-4-27" href="#__codelineno-4-27"></a>    <span class="n">url_configs</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">URLConfig</span><span class="p">]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
-</span><span id="__span-4-28"><a id="__codelineno-4-28" name="__codelineno-4-28" href="#__codelineno-4-28"></a>    <span class="n">user_file_uploads</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">FileObject</span><span class="p">]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>  <span class="c1"># ADD from main</span>
-</span><span id="__span-4-29"><a id="__codelineno-4-29" name="__codelineno-4-29" href="#__codelineno-4-29"></a>    <span class="n">session</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">dict</span><span class="p">)</span>  <span class="c1"># Keep from vnext</span>
-</span></code></pre></div></p>
-<p><strong>Why This Choice</strong>:
-- Both branches added useful features to different parts of the schema
-- No semantic conflict - file uploads and platform context are independent concerns
-- All fields have defaults, so existing code won't break</p>
-<hr />
-<h2 id="test-plan">Test Plan<a class="headerlink" href="#test-plan" title="Permanent link">&para;</a></h2>
-<p>After resolving conflicts:</p>
-<ol>
-<li><strong>Run v1 compatibility tests</strong>: <code>pytest tests/test_v1_compatibility.py -v</code></li>
-<li><strong>Run full test suite</strong>: <code>pytest --tb=short</code></li>
-<li><strong>Verify new features work</strong>:</li>
-<li>A2A agent card endpoint responds correctly</li>
-<li>Cache metrics logging works</li>
-<li>File upload fields serialize/deserialize correctly</li>
-<li><strong>Verify legacy endpoints still work</strong>:</li>
-<li><code>/api/sendMessage</code> returns 200</li>
-<li><code>/api/sendMessageStream</code> streams correctly</li>
-</ol>
-<hr />
-<h2 id="summary-table">Summary Table<a class="headerlink" href="#summary-table" title="Permanent link">&para;</a></h2>
-<table>
-<thead>
-<tr>
-<th>File</th>
-<th>Main's Addition</th>
-<th>vnext's Change</th>
-<th>Resolution</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>agent_server.py</code></td>
-<td>A2A agent card endpoint</td>
-<td>Async architecture, legacy aliases, WebSocket</td>
-<td>Keep vnext architecture, ADD A2A</td>
-</tr>
-<tr>
-<td><code>bedrock.py</code></td>
-<td>System prompt caching</td>
-<td>Modern type hints</td>
-<td>Keep vnext types, ADD caching</td>
-</tr>
-<tr>
-<td><code>messages.py</code></td>
-<td>File upload fields</td>
-<td>Platform context fields, session</td>
-<td>COMBINE both</td>
-</tr>
-</tbody>
-</table>
-<hr />
-<h2 id="risk-assessment">Risk Assessment<a class="headerlink" href="#risk-assessment" title="Permanent link">&para;</a></h2>
-<table>
-<thead>
-<tr>
-<th>Risk</th>
-<th>Likelihood</th>
-<th>Mitigation</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>A2A endpoint breaks existing routes</td>
-<td>Low</td>
-<td>A2A uses <code>/.well-known/</code> path (standard, non-conflicting)</td>
-</tr>
-<tr>
-<td>Caching changes performance characteristics</td>
-<td>Low</td>
-<td>Caching is opt-in (<code>cache_system_prompt=False</code> default)</td>
-</tr>
-<tr>
-<td>New schema fields break serialization</td>
-<td>Low</td>
-<td>All new fields have defaults</td>
-</tr>
-</tbody>
-</table>
-<hr />
-<h2 id="approval">Approval<a class="headerlink" href="#approval" title="Permanent link">&para;</a></h2>
-<ul class="task-list">
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Plan reviewed and approved</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Ready to proceed with merge resolution</li>
-</ul>
 
 
 
