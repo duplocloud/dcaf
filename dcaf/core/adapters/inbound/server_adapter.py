@@ -15,6 +15,7 @@ Example:
 """
 
 import logging
+import subprocess
 from collections.abc import AsyncIterator
 from typing import Any, cast
 
@@ -22,10 +23,11 @@ from ....schemas.events import (
     DoneEvent,
     ErrorEvent,
     ExecutedApprovalsEvent,
+    ExecutedCommandsEvent,
     ExecutedToolCallsEvent,
     StreamEvent,
 )
-from ....schemas.messages import AgentMessage, ExecutedApproval, ExecutedToolCall
+from ....schemas.messages import AgentMessage, ExecutedApproval, ExecutedCommand, ExecutedToolCall
 from ...agent import Agent
 
 logger = logging.getLogger(__name__)
@@ -98,12 +100,17 @@ class ServerAdapter:
         # Check for approved tool calls that need to be processed
         executed_tool_calls = self._process_approved_tool_calls(messages_list, context)
 
+        # Process legacy command approvals
+        executed_commands = self._process_approved_commands(messages_list)
+
         # Process unified approvals
         executed_approvals = self._process_approvals(messages_list, context)
 
         # Convert to Core format and inject execution results
         core_messages = self._convert_messages(messages_list)
-        self._inject_execution_results(core_messages, executed_tool_calls, executed_approvals)
+        self._inject_execution_results(
+            core_messages, executed_tool_calls, executed_commands, executed_approvals
+        )
 
         if not core_messages:
             return AgentMessage(content="No messages provided.")
@@ -118,10 +125,11 @@ class ServerAdapter:
             # Convert to AgentMessage using native to_message()
             agent_msg = response.to_message()
 
-            # Add any executed tool calls from this request
+            # Add any executed results from this request
             if executed_tool_calls:
                 agent_msg.data.executed_tool_calls.extend(executed_tool_calls)  # type: ignore[arg-type]
-
+            if executed_commands:
+                agent_msg.data.executed_cmds.extend(executed_commands)  # type: ignore[arg-type]
             if executed_approvals:
                 agent_msg.data.executed_approvals.extend(executed_approvals)  # type: ignore[arg-type]
 
@@ -165,6 +173,11 @@ class ServerAdapter:
         if executed_tool_calls:
             yield ExecutedToolCallsEvent(executed_tool_calls=executed_tool_calls)
 
+        # Process legacy command approvals
+        executed_commands = self._process_approved_commands(messages_list)
+        if executed_commands:
+            yield ExecutedCommandsEvent(executed_cmds=executed_commands)
+
         # Process unified approvals
         executed_approvals = self._process_approvals(messages_list, context)
         if executed_approvals:
@@ -172,7 +185,9 @@ class ServerAdapter:
 
         # Convert to Core format and inject execution results
         core_messages = self._convert_messages(messages_list)
-        self._inject_execution_results(core_messages, executed_tool_calls, executed_approvals)
+        self._inject_execution_results(
+            core_messages, executed_tool_calls, executed_commands, executed_approvals
+        )
 
         if not core_messages:
             yield ErrorEvent(error="No messages provided")
@@ -197,14 +212,19 @@ class ServerAdapter:
         self,
         core_messages: list[dict[str, Any]],
         executed_tool_calls: list[ExecutedToolCall],
+        executed_commands: list[ExecutedCommand],
         executed_approvals: list[ExecutedApproval],
     ) -> None:
-        """Inject tool/approval results into the conversation as a user message."""
+        """Inject tool/command/approval results into the conversation as a user message."""
         parts: list[str] = []
         if executed_tool_calls:
             parts.extend(
                 f"Tool result for {tc.name} with inputs {tc.input}: {tc.output}"
                 for tc in executed_tool_calls
+            )
+        if executed_commands:
+            parts.extend(
+                f"Executed command: {ec.command}\nOutput: {ec.output}" for ec in executed_commands
             )
         if executed_approvals:
             parts.extend(
@@ -215,11 +235,7 @@ class ServerAdapter:
             return
         result_content = "\n\n".join(parts)
         if core_messages and core_messages[-1]["role"] == "user":
-            core_messages[-1]["content"] = (
-                core_messages[-1]["content"] + "\n\n" + result_content
-                if executed_approvals and not executed_tool_calls
-                else result_content
-            )
+            core_messages[-1]["content"] += "\n\n" + result_content
         else:
             core_messages.append({"role": "user", "content": result_content})
 
@@ -337,6 +353,56 @@ class ServerAdapter:
                     return f"Error executing {tool_name}: {str(e)}"
 
         return f"Tool '{tool_name}' not found"
+
+    def _execute_cmd(self, command: str) -> str:
+        """Execute a shell command and return combined stdout/stderr."""
+        try:
+            result = subprocess.run(command, shell=True, capture_output=True, text=True)  # noqa: S602
+            output = result.stdout
+            if result.stderr:
+                output = (
+                    (output + f"\n\nErrors:\n{result.stderr}")
+                    if output
+                    else f"Errors:\n{result.stderr}"
+                )
+            return output or "Command executed successfully with no output."
+        except Exception as e:
+            logger.error("Error executing command: %s", e)
+            return f"Error executing command: {e}"
+
+    def _process_approved_commands(
+        self,
+        messages_list: list[dict[str, Any]],
+    ) -> list[ExecutedCommand]:
+        """
+        Process approved/rejected commands from the legacy cmds field.
+
+        Reads data.cmds[] from the latest message. Approved commands are
+        executed via subprocess; rejected commands record the rejection reason.
+        """
+        executed: list[ExecutedCommand] = []
+
+        if not messages_list:
+            return executed
+
+        latest_message = messages_list[-1]
+        cmds = latest_message.get("data", {}).get("cmds", [])
+
+        for cmd in cmds:
+            command = cmd.get("command", "")
+            if cmd.get("execute", False):
+                logger.info("Executing approved command: %s", command)
+                output = self._execute_cmd(command)
+                executed.append(ExecutedCommand(command=command, output=output))
+            elif cmd.get("rejection_reason"):
+                executed.append(
+                    ExecutedCommand(
+                        command=command,
+                        output=f"Rejected: {cmd['rejection_reason']}",
+                    )
+                )
+
+        return executed
 
     def _process_approvals(
         self,
