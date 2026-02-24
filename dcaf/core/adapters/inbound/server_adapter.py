@@ -254,12 +254,12 @@ class ServerAdapter:
 
             # Only include user and assistant messages
             if role in ["user", "assistant"]:
-                core_messages.append(
-                    {
-                        "role": role,
-                        "content": content,
-                    }
-                )
+                # Re-inject previously executed command history so the LLM has context
+                # across turns (mirrors base_command_agent behaviour).
+                if role == "user":
+                    for ec in msg.get("data", {}).get("executed_cmds", []):
+                        content += f"\n\nPreviously executed: {ec.get('command', '')}\nOutput: {ec.get('output', '')}"
+                core_messages.append({"role": role, "content": content})
 
         return core_messages
 
