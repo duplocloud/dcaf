@@ -582,7 +582,13 @@ class TestDefaultToolkit:
         toolkits = adapter._build_default_toolkits()
 
         toolkit_types = {type(t) for t in toolkits}
-        expected_types = {FileTools, LocalFileSystemTools, PythonTools, ShellTools, FileGenerationTools}
+        expected_types = {
+            FileTools,
+            LocalFileSystemTools,
+            PythonTools,
+            ShellTools,
+            FileGenerationTools,
+        }
 
         assert toolkit_types == expected_types, (
             f"Expected types {expected_types}, got {toolkit_types}"
