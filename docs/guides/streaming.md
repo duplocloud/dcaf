@@ -62,14 +62,16 @@ Interim status updates emitted while the agent is working — before any text is
 ```json
 {
     "type": "intermittent_update",
-    "text": "Thinking..."
+    "text": "Thinking...",
+    "content": {}
 }
 ```
 
 ```json
 {
     "type": "intermittent_update",
-    "text": "Calling tool: get_pods"
+    "text": "Calling tool: get_pods",
+    "content": {}
 }
 ```
 
@@ -78,7 +80,14 @@ Emitted at two points:
 - When the LLM begins its reasoning phase → `"Thinking..."`
 - When a tool invocation starts → `"Calling tool: <name>"`
 
-**Use:** Display a transient indicator (spinner, status bar) so users know the agent is active.
+Fields:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `text` | `string` | Human-readable status label |
+| `content` | `object` | Arbitrary metadata for the update (defaults to `{}`) |
+
+**Use:** Display a transient indicator (spinner, status bar) so users know the agent is active. Use `content` to carry structured data (e.g. tool inputs, step counts) for richer UI.
 
 ### 3. tool_calls
 
