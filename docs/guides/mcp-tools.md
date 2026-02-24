@@ -159,6 +159,27 @@ Use stdio when:
 | `sse` | Legacy SSE servers | Older MCP implementations |
 | `stdio` | Local processes | CLI tools, scripts |
 
+### Authenticated MCP Servers
+
+Pass HTTP headers to MCP servers that require authentication:
+
+```python
+import os
+from dcaf.mcp import MCPTool
+
+mcp_tool = MCPTool(
+    url="https://mcp-server.example.com/mcp",
+    transport="streamable-http",
+    headers={
+        "Authorization": f"Bearer {os.environ['MCP_TOKEN']}"
+    },
+)
+```
+
+!!! note
+    The `headers` parameter is only supported with `sse` and `streamable-http` transports.
+    Using it with `stdio` transport raises a `ValueError`.
+
 ---
 
 ## Tool Filtering
@@ -1064,6 +1085,7 @@ class MCPTool:
         auto_approve_tools: Optional[List[str]] = None,
         pre_hook: Optional[Callable[[MCPToolCall], Awaitable[None] | None]] = None,
         post_hook: Optional[Callable[[MCPToolCall], Awaitable[Any] | Any]] = None,
+        headers: Optional[Dict[str, str]] = None,
     ): ...
 ```
 
@@ -1083,6 +1105,7 @@ class MCPTool:
 | `auto_approve_tools` | `List[str]` | Glob patterns for tools that execute without approval |
 | `pre_hook` | `Callable` | Function called before each tool execution |
 | `post_hook` | `Callable` | Function called after each tool execution |
+| `headers` | `Dict[str, str]` | HTTP headers to send with every MCP request (HTTP transports only) |
 
 ### Properties
 
