@@ -594,6 +594,54 @@ class TestDefaultToolkit:
             f"Expected types {expected_types}, got {toolkit_types}"
         )
 
+    def test_default_toolkit_disabled_by_default(self, monkeypatch):
+        """Verify default toolkit is NOT included when env var is unset."""
+        monkeypatch.delenv("DCAF_DEFAULT_TOOLKIT", raising=False)
+
+        from dcaf.core.adapters.outbound.agno.adapter import AgnoAdapter
+
+        adapter = AgnoAdapter(model_id="test", provider="bedrock")
+
+        from dcaf.core import tool
+
+        @tool(description="User tool")
+        def my_tool(x: str) -> str:
+            return x
+
+        agno_tools = adapter._prepare_tools_with_defaults([my_tool], platform_context=None)
+        # Should only have the user tool (converted), no default toolkits
+        assert len(agno_tools) == 1
+
+    def test_default_toolkit_enabled_merges_with_user_tools(self, monkeypatch):
+        """Verify default toolkits are merged when env var is true."""
+        monkeypatch.setenv("DCAF_DEFAULT_TOOLKIT", "true")
+
+        from dcaf.core.adapters.outbound.agno.adapter import AgnoAdapter
+
+        adapter = AgnoAdapter(model_id="test", provider="bedrock")
+
+        from dcaf.core import tool
+
+        @tool(description="User tool")
+        def my_tool(x: str) -> str:
+            return x
+
+        agno_tools = adapter._prepare_tools_with_defaults([my_tool], platform_context=None)
+        # Should have 5 default toolkits + 1 user tool = 6
+        assert len(agno_tools) == 6
+
+    def test_default_toolkit_enabled_no_user_tools(self, monkeypatch):
+        """Verify default toolkits work even with no user tools."""
+        monkeypatch.setenv("DCAF_DEFAULT_TOOLKIT", "true")
+
+        from dcaf.core.adapters.outbound.agno.adapter import AgnoAdapter
+
+        adapter = AgnoAdapter(model_id="test", provider="bedrock")
+
+        agno_tools = adapter._prepare_tools_with_defaults([], platform_context=None)
+        # Should have 5 default toolkits
+        assert len(agno_tools) == 5
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

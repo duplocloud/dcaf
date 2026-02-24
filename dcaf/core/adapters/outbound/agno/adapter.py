@@ -35,6 +35,7 @@ from ....application.dto.responses import (
     StreamEvent,
     StreamEventType,
 )
+from ....config import EnvVars
 from ....application.ports.mcp_protocol import MCPToolLike
 from ....events import Event, EventRegistry
 from ....services.skill_manager import SkillManager
@@ -645,8 +646,8 @@ class AgnoAdapter:
         # Create the model with async session
         model = await self._get_or_create_model_async()
 
-        # Convert tools to Agno format (with context injection for tools that need it)
-        agno_tools = self._convert_tools_to_agno(tools, platform_context)
+        # Convert tools to Agno format and optionally prepend default toolkits
+        agno_tools = self._prepare_tools_with_defaults(tools, platform_context)
 
         # WORKAROUND: Prepend instruction to prevent parallel tool calls
         # This is necessary because Agno has a bug handling multiple toolUse blocks
@@ -717,6 +718,36 @@ class AgnoAdapter:
             ShellTools(),
             FileGenerationTools(),
         ]
+
+    def _prepare_tools_with_defaults(
+        self,
+        tools: list[Any],
+        platform_context: dict[str, Any] | None = None,
+    ) -> list[Any]:
+        """
+        Convert user tools and optionally prepend default toolkits.
+
+        When DCAF_DEFAULT_TOOLKIT=true, the 5 built-in Agno toolkits are
+        prepended to the tools list. Default toolkits are native Agno objects
+        and bypass _convert_tools_to_agno().
+
+        Args:
+            tools: List of dcaf Tool objects from the caller.
+            platform_context: Optional platform context for tool injection.
+
+        Returns:
+            Combined list of Agno-compatible tools.
+        """
+        agno_tools = self._convert_tools_to_agno(tools, platform_context)
+
+        if os.getenv(EnvVars.DEFAULT_TOOLKIT, "false").lower() == "true":
+            default_toolkits = self._build_default_toolkits()
+            agno_tools = default_toolkits + agno_tools
+            logger.info(
+                f"Default toolkit enabled: added {len(default_toolkits)} built-in toolkits"
+            )
+
+        return agno_tools
 
     def _get_modified_system_prompt(self, system_prompt: str | None) -> str:
         """
