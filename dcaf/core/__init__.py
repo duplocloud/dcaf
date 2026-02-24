@@ -113,6 +113,7 @@ from .primitives import (
 from .schemas.events import (
     DoneEvent,
     ErrorEvent,
+    IntermittentUpdateEvent,
     TextDeltaEvent,
     ToolCallsEvent,
 )
@@ -163,6 +164,7 @@ __all__ = [
     "ToolCallsEvent",
     "DoneEvent",
     "ErrorEvent",
+    "IntermittentUpdateEvent",
     # Advanced API
     "AgentService",
     "ApprovalService",
