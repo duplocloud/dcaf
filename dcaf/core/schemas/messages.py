@@ -52,6 +52,7 @@ class SkillDefinitionSchema(BaseModel):
     version: str
     url: str
     s3_path: str | None = None
+    content: str | None = None
 
 
 class PlatformContext(BaseModel):
