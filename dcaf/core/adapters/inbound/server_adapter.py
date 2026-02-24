@@ -438,7 +438,10 @@ class ServerAdapter:
             tool_input = approval.get("input", {})
 
             if approval.get("execute", False):
-                result = self._execute_tool(name, tool_input, platform_context)
+                if approval_type == "command":
+                    result = self._execute_cmd(tool_input.get("command", name))
+                else:
+                    result = self._execute_tool(name, tool_input, platform_context)
                 executed.append(
                     ExecutedApproval(
                         id=approval_id,

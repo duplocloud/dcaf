@@ -359,9 +359,10 @@ class TestProcessApprovals:
         tool_b.execute.assert_not_called()
 
     def test_command_type_approval(self):
-        """Command-type approvals work through the same path."""
+        """Command-type approvals with type='command' route to subprocess, not tool registry."""
         agent, tool = _make_mock_agent_with_tool("execute_terminal_cmd", "NAME  READY\nnginx  1/1")
         adapter = ServerAdapter(agent)
+        adapter._execute_cmd = MagicMock(return_value="NAME  READY\nnginx  1/1")
 
         messages_list = [
             {
@@ -386,6 +387,8 @@ class TestProcessApprovals:
         assert len(result) == 1
         assert result[0].type == "command"
         assert result[0].output == "NAME  READY\nnginx  1/1"
+        adapter._execute_cmd.assert_called_once_with("kubectl get pods")
+        tool.execute.assert_not_called()
 
 
 def _make_mock_agent_for_invoke(tool_name: str, tool_result: str, llm_response: str):
@@ -457,7 +460,7 @@ class TestInvokeWithApprovals:
                         "approvals": [
                             {
                                 "id": "ap-1",
-                                "type": "command",
+                                "type": "tool_call",
                                 "name": "list_pods",
                                 "input": {},
                                 "execute": True,
