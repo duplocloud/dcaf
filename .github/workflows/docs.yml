@@ -5,7 +5,7 @@ name: Deploy Docs
 
 on:
   push:
-    branches: [main, vnext]
+    branches: [main]
     tags: ["v*"]
   workflow_dispatch:  # Allow manual trigger
 
@@ -52,9 +52,4 @@ jobs:
           echo "Deploying dev version"
           mike deploy dev --push
 
-      - name: Deploy vnext docs (for vnext branch)
-        if: github.ref == 'refs/heads/vnext'
-        run: |
-          echo "Deploying vnext version"
-          mike deploy vnext --push
 
