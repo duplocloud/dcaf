@@ -3718,6 +3718,10 @@
 </span></code></pre></div>
 <hr />
 <h2 id="approval-workflows">Approval Workflows<a class="headerlink" href="#approval-workflows" title="Permanent link">&para;</a></h2>
+<div class="admonition note">
+<p class="admonition-title">Unified Approvals</p>
+<p>DCAF now supports a unified <code>data.approvals[]</code> field that handles both tool calls and commands through a single approval path with a <code>type</code> discriminator. The <code>@tool(requires_approval=True)</code> decorator works the same way — the difference is in how the server processes and returns approvals. See the <a href="../../api-reference/schemas/#approval">Schemas Reference</a> and <a href="../message-protocol/#unified-approval-flow">Message Protocol</a> for details.</p>
+</div>
 <h3 id="when-to-require-approval">When to Require Approval<a class="headerlink" href="#when-to-require-approval" title="Permanent link">&para;</a></h3>
 <p>Require approval for operations that:</p>
 <ul>
@@ -3763,12 +3767,12 @@
 </span></code></pre></div>
 <h3 id="user-approval-flow">User Approval Flow<a class="headerlink" href="#user-approval-flow" title="Permanent link">&para;</a></h3>
 <ol>
-<li><strong>Agent calls tool</strong> → DCAF creates <code>ToolCall</code> object</li>
-<li><strong>Agent returns</strong> → Client receives pending tool call</li>
-<li><strong>User reviews</strong> → Sees tool, inputs, and description</li>
+<li><strong>Agent calls tool</strong> → DCAF creates an <code>Approval</code> (or legacy <code>ToolCall</code>) object</li>
+<li><strong>Agent returns</strong> → Client receives pending approval</li>
+<li><strong>User reviews</strong> → Sees tool name, inputs, description, and intent</li>
 <li><strong>User approves/rejects</strong> → Sets <code>execute=True</code> or <code>rejection_reason</code></li>
 <li><strong>Client sends back</strong> → Agent receives decision</li>
-<li><strong>Tool executes</strong> → If approved, runs and returns result</li>
+<li><strong>Tool executes</strong> → If approved, runs and returns result as <code>ExecutedApproval</code></li>
 </ol>
 <h3 id="client-side-display">Client-Side Display<a class="headerlink" href="#client-side-display" title="Permanent link">&para;</a></h3>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="c1"># Agent returns this for approval</span>
