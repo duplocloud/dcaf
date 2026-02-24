@@ -1,7 +1,30 @@
 """Tests for the unified approvals data models and processing."""
 
-import pytest
-from dcaf.schemas.messages import Approval, ExecutedApproval, Data
+import asyncio
+from unittest.mock import AsyncMock, MagicMock
+
+from dcaf.core.adapters.inbound.server_adapter import ServerAdapter
+from dcaf.core.schemas.events import (
+    ApprovalsEvent as CoreApprovalsEvent,
+)
+from dcaf.core.schemas.events import (
+    DoneEvent,
+    TextDeltaEvent,
+)
+from dcaf.core.schemas.events import (
+    ExecutedApprovalsEvent as CoreExecutedApprovalsEvent,
+)
+from dcaf.core.schemas.messages import (
+    Approval as CoreApproval,
+)
+from dcaf.core.schemas.messages import (
+    Data as CoreData,
+)
+from dcaf.core.schemas.messages import (
+    ExecutedApproval as CoreExecutedApproval,
+)
+from dcaf.schemas.events import ApprovalsEvent, ExecutedApprovalsEvent
+from dcaf.schemas.messages import Approval, Data, ExecutedApproval
 
 
 class TestApprovalModel:
@@ -104,13 +127,6 @@ class TestDataApprovalFields:
         assert data.executed_tool_calls == []
 
 
-from dcaf.core.schemas.messages import (
-    Approval as CoreApproval,
-    ExecutedApproval as CoreExecutedApproval,
-    Data as CoreData,
-)
-
-
 class TestCoreApprovalModel:
     def test_core_approval_matches_public(self):
         approval = CoreApproval(
@@ -131,10 +147,6 @@ class TestCoreApprovalModel:
         """Core Data has session field that public Data doesn't."""
         data = CoreData(session={"wizard_step": 2})
         assert data.session == {"wizard_step": 2}
-
-
-from dcaf.schemas.events import ApprovalsEvent, ExecutedApprovalsEvent
-from dcaf.schemas.messages import Approval, ExecutedApproval
 
 
 class TestApprovalEvents:
@@ -185,16 +197,6 @@ class TestApprovalEvents:
         assert data["approvals"][0]["name"] == "delete_pod"
 
 
-from dcaf.core.schemas.events import (
-    ApprovalsEvent as CoreApprovalsEvent,
-    ExecutedApprovalsEvent as CoreExecutedApprovalsEvent,
-)
-from dcaf.core.schemas.messages import (
-    Approval as CoreApproval,
-    ExecutedApproval as CoreExecutedApproval,
-)
-
-
 class TestCoreApprovalEvents:
     def test_core_approvals_event(self):
         event = CoreApprovalsEvent(
@@ -222,10 +224,6 @@ class TestCoreApprovalEvents:
             ]
         )
         assert event.type == "executed_approvals"
-
-
-from unittest.mock import MagicMock, AsyncMock
-from dcaf.core.adapters.inbound.server_adapter import ServerAdapter
 
 
 def _make_mock_agent_with_tool(tool_name: str, tool_result: str):
@@ -390,10 +388,6 @@ class TestProcessApprovals:
         assert len(result) == 1
         assert result[0].type == "command"
         assert result[0].output == "NAME  READY\nnginx  1/1"
-
-
-import asyncio
-from dcaf.core.schemas.events import TextDeltaEvent, DoneEvent
 
 
 def _make_mock_agent_for_invoke(tool_name: str, tool_result: str, llm_response: str):

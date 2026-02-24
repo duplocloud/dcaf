@@ -4,7 +4,14 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-from .messages import Approval, Command, ExecutedApproval, ExecutedCommand, ExecutedToolCall, ToolCall
+from .messages import (
+    Approval,
+    Command,
+    ExecutedApproval,
+    ExecutedCommand,
+    ExecutedToolCall,
+    ToolCall,
+)
 
 
 class StreamEvent(BaseModel):

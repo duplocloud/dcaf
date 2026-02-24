@@ -136,7 +136,7 @@ class ServerAdapter:
                 agent_msg.data.executed_tool_calls.extend(executed_tool_calls)  # type: ignore[arg-type]
 
             if executed_approvals:
-                agent_msg.data.executed_approvals.extend(executed_approvals)
+                agent_msg.data.executed_approvals.extend(executed_approvals)  # type: ignore[arg-type]
 
             # If there are pending approvals, ensure helpful content
             if response.needs_approval and not agent_msg.content:
