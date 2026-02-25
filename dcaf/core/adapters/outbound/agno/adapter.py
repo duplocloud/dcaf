@@ -852,7 +852,8 @@ class AgnoAdapter:
             # Native Agno Toolkit — pass through directly (no conversion needed)
             if isinstance(tool_obj, AgnoToolkit):
                 agno_tools.append(tool_obj)
-                logger.info(f"Added native Agno toolkit: {tool_obj.name}")
+                toolkit_name = getattr(tool_obj, "name", type(tool_obj).__name__)
+                logger.info(f"Added native Agno toolkit: {toolkit_name}")
                 continue
 
             # Get the full tool schema including input_schema
