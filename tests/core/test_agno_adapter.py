@@ -707,6 +707,61 @@ class TestAdditionalToolkits:
         toolkit_types = {type(t) for t in toolkits}
         assert toolkit_types == {FileTools, ShellTools}
 
+    def test_load_additional_toolkits_skips_invalid_format(self, monkeypatch):
+        """Verify entries without a dot are skipped."""
+        from dcaf.core.config import EnvVars
+
+        monkeypatch.setenv(EnvVars.ADDITIONAL_TOOLS, "NoDotsHere")
+
+        from dcaf.core.adapters.outbound.agno.adapter import AgnoAdapter
+
+        adapter = AgnoAdapter(model_id="test", provider="bedrock")
+        toolkits = adapter._load_additional_toolkits()
+
+        assert toolkits == []
+
+    def test_load_additional_toolkits_skips_import_failure(self, monkeypatch):
+        """Verify missing modules are skipped."""
+        from dcaf.core.config import EnvVars
+
+        monkeypatch.setenv(EnvVars.ADDITIONAL_TOOLS, "nonexistent_module.FakeTool")
+
+        from dcaf.core.adapters.outbound.agno.adapter import AgnoAdapter
+
+        adapter = AgnoAdapter(model_id="test", provider="bedrock")
+        toolkits = adapter._load_additional_toolkits()
+
+        assert toolkits == []
+
+    def test_load_additional_toolkits_skips_missing_class(self, monkeypatch):
+        """Verify missing class in valid module is skipped."""
+        from dcaf.core.config import EnvVars
+
+        monkeypatch.setenv(EnvVars.ADDITIONAL_TOOLS, "file.NonExistentClass")
+
+        from dcaf.core.adapters.outbound.agno.adapter import AgnoAdapter
+
+        adapter = AgnoAdapter(model_id="test", provider="bedrock")
+        toolkits = adapter._load_additional_toolkits()
+
+        assert toolkits == []
+
+    def test_load_additional_toolkits_partial_success(self, monkeypatch):
+        """Verify valid entries load even when mixed with invalid ones."""
+        from dcaf.core.config import EnvVars
+
+        monkeypatch.setenv(
+            EnvVars.ADDITIONAL_TOOLS,
+            "file.FileTools,nonexistent.Fake,shell.ShellTools",
+        )
+
+        from dcaf.core.adapters.outbound.agno.adapter import AgnoAdapter
+
+        adapter = AgnoAdapter(model_id="test", provider="bedrock")
+        toolkits = adapter._load_additional_toolkits()
+
+        assert len(toolkits) == 2
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
