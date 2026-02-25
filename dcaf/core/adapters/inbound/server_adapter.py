@@ -379,9 +379,18 @@ class ServerAdapter:
         try:
             if files:
                 work_dir = tempfile.mkdtemp()
+                written_names: set[str] = set()
                 for f in files:
-                    # Use basename only — never allow path traversal
-                    safe_name = os.path.basename(f.get("file_path", "file"))
+                    # Use basename only — never allow path traversal.
+                    # The `or "file"` guard handles the empty-string case
+                    # (f.get default only fires when the key is absent).
+                    safe_name = os.path.basename(f.get("file_path", "") or "file")
+                    if safe_name in written_names:
+                        logger.warning(
+                            "Duplicate filename '%s' in files list; overwriting previous content",
+                            safe_name,
+                        )
+                    written_names.add(safe_name)
                     with open(os.path.join(work_dir, safe_name), "w") as fh:
                         fh.write(f.get("file_content", ""))
 
