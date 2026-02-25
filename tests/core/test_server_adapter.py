@@ -236,7 +236,10 @@ class TestInvokeStreamEmitsApprovalsEvent:
         )
         adapter = ServerAdapter(agent)
 
-        events = [e async for e in adapter.invoke_stream({"messages": [{"role": "user", "content": "go"}]})]
+        events = [
+            e
+            async for e in adapter.invoke_stream({"messages": [{"role": "user", "content": "go"}]})
+        ]
         event_types = [e.type for e in events]
 
         assert "approvals" in event_types, "ApprovalsEvent must be emitted"
@@ -258,7 +261,10 @@ class TestInvokeStreamEmitsApprovalsEvent:
         )
         adapter = ServerAdapter(agent)
 
-        events = [e async for e in adapter.invoke_stream({"messages": [{"role": "user", "content": "go"}]})]
+        events = [
+            e
+            async for e in adapter.invoke_stream({"messages": [{"role": "user", "content": "go"}]})
+        ]
         approvals_events = [e for e in events if e.type == "approvals"]
 
         assert len(approvals_events) == 1
@@ -285,7 +291,10 @@ class TestInvokeStreamEmitsApprovalsEvent:
         )
         adapter = ServerAdapter(agent)
 
-        events = [e async for e in adapter.invoke_stream({"messages": [{"role": "user", "content": "go"}]})]
+        events = [
+            e
+            async for e in adapter.invoke_stream({"messages": [{"role": "user", "content": "go"}]})
+        ]
         types = [e.type for e in events]
 
         approvals_idx = types.index("approvals")
@@ -300,7 +309,10 @@ class TestInvokeStreamEmitsApprovalsEvent:
         )
         adapter = ServerAdapter(agent)
 
-        events = [e async for e in adapter.invoke_stream({"messages": [{"role": "user", "content": "hi"}]})]
+        events = [
+            e
+            async for e in adapter.invoke_stream({"messages": [{"role": "user", "content": "hi"}]})
+        ]
         assert not any(e.type == "approvals" for e in events)
 
 
