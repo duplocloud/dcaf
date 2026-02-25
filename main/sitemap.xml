@@ -169,6 +169,10 @@
          <lastmod>2026-02-25</lastmod>
     </url>
     <url>
+         <loc>https://duplocloud.github.io/dcaf/main/guides/agno-toolkits/</loc>
+         <lastmod>2026-02-25</lastmod>
+    </url>
+    <url>
          <loc>https://duplocloud.github.io/dcaf/main/guides/building-tools/</loc>
          <lastmod>2026-02-25</lastmod>
     </url>
@@ -298,6 +302,10 @@
     </url>
     <url>
          <loc>https://duplocloud.github.io/dcaf/main/plans/2026-02-24-mcp-headers-plan/</loc>
+         <lastmod>2026-02-25</lastmod>
+    </url>
+    <url>
+         <loc>https://duplocloud.github.io/dcaf/main/plans/2026-02-25-agno-toolkit-passthrough-design/</loc>
          <lastmod>2026-02-25</lastmod>
     </url>
     <url>

@@ -12,7 +12,7 @@
         <meta name="author" content="DuploCloud">
       
       
-        <link rel="canonical" href="https://duplocloud.github.io/dcaf/main/plans/2026-02-24-mcp-headers-design/">
+        <link rel="canonical" href="https://duplocloud.github.io/dcaf/main/plans/2026-02-25-agno-toolkit-passthrough-design/">
       
       
       
@@ -25,7 +25,7 @@
     
     
       
-        <title>MCPTool: Add headers Support - DCAF Documentation</title>
+        <title>Design: Native Agno Toolkit Pass-Through - DCAF Documentation</title>
       
     
     
@@ -76,7 +76,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#mcptool-add-headers-support" class="md-skip">
+        <a href="#design-native-agno-toolkit-pass-through" class="md-skip">
           Skip to content
         </a>
       
@@ -115,7 +115,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              MCPTool: Add headers Support
+              Design: Native Agno Toolkit Pass-Through
             
           </span>
         </div>
@@ -2289,10 +2289,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#approach" class="md-nav__link">
+  <a href="#root-cause" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Approach
+        Root Cause
       
     </span>
   </a>
@@ -2300,33 +2300,22 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#fix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fix
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Fix">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
   <a href="#changes" class="md-nav__link">
     <span class="md-ellipsis">
       
         Changes
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Changes">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#dcafmcptoolspy" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        dcaf/mcp/tools.py
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#testscoretest_mcp_toolspy" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        tests/core/test_mcp_tools.py
       
     </span>
   </a>
@@ -2339,10 +2328,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#usage" class="md-nav__link">
+  <a href="#decision" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Usage
+        Decision
       
     </span>
   </a>
@@ -2377,37 +2366,33 @@
   
 
 
-<h1 id="mcptool-add-headers-support">MCPTool: Add headers Support<a class="headerlink" href="#mcptool-add-headers-support" title="Permanent link">&para;</a></h1>
+<h1 id="design-native-agno-toolkit-pass-through">Design: Native Agno Toolkit Pass-Through<a class="headerlink" href="#design-native-agno-toolkit-pass-through" title="Permanent link">&para;</a></h1>
+<p><strong>Date:</strong> 2026-02-25
+<strong>Status:</strong> Approved</p>
 <h2 id="problem">Problem<a class="headerlink" href="#problem" title="Permanent link">&para;</a></h2>
-<p>DCAF's <code>MCPTool</code> wraps Agno's <code>MCPTools</code> but does not forward headers when creating the Agno instance. Users connecting to authenticated MCP servers (e.g., behind Bearer tokens) have no way to pass HTTP headers through DCAF's API.</p>
-<h2 id="approach">Approach<a class="headerlink" href="#approach" title="Permanent link">&para;</a></h2>
-<p>Use Agno's existing <code>header_provider</code> parameter. Wrap a static <code>headers</code> dict as a <code>lambda: headers</code> callable. Agno handles merging headers into <code>StreamableHTTPClientParams</code> or <code>SSEClientParams</code> internally.</p>
-<h2 id="changes">Changes<a class="headerlink" href="#changes" title="Permanent link">&para;</a></h2>
-<h3 id="dcafmcptoolspy"><code>dcaf/mcp/tools.py</code><a class="headerlink" href="#dcafmcptoolspy" title="Permanent link">&para;</a></h3>
-<ol>
-<li>Add <code>headers: dict[str, str] | None = None</code> parameter to <code>MCPTool.__init__</code></li>
-<li>Validate: raise <code>ValueError</code> if <code>headers</code> is provided with <code>stdio</code> transport</li>
-<li>Store as <code>self._headers</code></li>
-<li>In <code>_create_agno_mcp_tools()</code>, wrap as <code>header_provider=lambda: _headers</code> and pass to <code>AgnoMCPTools</code></li>
-</ol>
-<h3 id="testscoretest_mcp_toolspy"><code>tests/core/test_mcp_tools.py</code><a class="headerlink" href="#testscoretest_mcp_toolspy" title="Permanent link">&para;</a></h3>
-<ul>
-<li><code>test_headers_stored_on_init</code> — verify <code>_headers</code> is stored</li>
-<li><code>test_headers_raises_for_stdio</code> — verify <code>ValueError</code> for stdio transport</li>
-<li><code>test_headers_forwarded_as_header_provider</code> — verify Agno instance gets a callable</li>
-<li><code>test_headers_none_by_default</code> — verify default behavior unchanged</li>
-</ul>
-<h2 id="usage">Usage<a class="headerlink" href="#usage" title="Permanent link">&para;</a></h2>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">dcaf.mcp</span><span class="w"> </span><span class="kn">import</span> <span class="n">MCPTool</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">mcp_tool</span> <span class="o">=</span> <span class="n">MCPTool</span><span class="p">(</span>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">url</span><span class="o">=</span><span class="s2">&quot;https://mcp-ai-studio.test21-apps.duplocloud.net/mcp&quot;</span><span class="p">,</span>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">transport</span><span class="o">=</span><span class="s2">&quot;streamable-http&quot;</span><span class="p">,</span>
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">headers</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;Authorization&quot;</span><span class="p">:</span> <span class="sa">f</span><span class="s2">&quot;Bearer </span><span class="si">{</span><span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s1">&#39;DUPLO_HELPDESK_MCP_TOKEN&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">},</span>
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="p">)</span>
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="n">agent</span> <span class="o">=</span> <span class="n">Agent</span><span class="p">(</span><span class="n">tools</span><span class="o">=</span><span class="p">[</span><span class="n">mcp_tool</span><span class="p">])</span>
+<p>Native Agno <code>Toolkit</code> subclasses (e.g., <code>Neo4jTools</code>, <code>DuckDbTools</code>, <code>SqlTools</code>) passed via <code>Agent(tools=[...])</code> crash in <code>_convert_tools_to_agno()</code> because the DCAF tool converter accesses <code>.description</code>, which doesn't exist on Agno <code>Toolkit</code> instances.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>ERROR | dcaf.core.agent | Streaming error: &#39;Neo4jTools&#39; object has no attribute &#39;description&#39;
 </span></code></pre></div>
+<h2 id="root-cause">Root Cause<a class="headerlink" href="#root-cause" title="Permanent link">&para;</a></h2>
+<p><code>_convert_tools_to_agno()</code> handles two cases:</p>
+<ol>
+<li><strong>MCPToolLike</strong> - detected via <code>isinstance()</code>, passed through directly</li>
+<li><strong>Everything else</strong> - assumed to be a DCAF <code>Tool</code>, sent to <code>AgnoToolConverter.to_agno()</code> which accesses <code>tool.description</code></li>
+</ol>
+<p>Native Agno <code>Toolkit</code> instances fall into case 2 but lack <code>.description</code>, causing <code>AttributeError</code>.</p>
+<h2 id="fix">Fix<a class="headerlink" href="#fix" title="Permanent link">&para;</a></h2>
+<p>Add an <code>isinstance(tool_obj, AgnoToolkit)</code> check between the MCP check and the DCAF converter in <code>_convert_tools_to_agno()</code>. Native Agno toolkits pass through directly to <code>AgnoAgent</code>, matching the existing pattern in <code>_build_default_toolkits()</code>.</p>
+<h3 id="changes">Changes<a class="headerlink" href="#changes" title="Permanent link">&para;</a></h3>
+<p><strong><code>dcaf/core/adapters/outbound/agno/adapter.py</code>:</strong>
+- Import <code>Toolkit as AgnoToolkit</code> from <code>agno.tools.toolkit</code>
+- Add <code>isinstance(tool_obj, AgnoToolkit)</code> guard after MCP check, before DCAF converter
+- Log toolkit name when passing through</p>
+<p><strong>Tests:</strong>
+- Verify native Agno <code>Toolkit</code> instances pass through without conversion
+- Verify they don't crash <code>_convert_tools_to_agno()</code>
+- Verify existing DCAF <code>Tool</code> and MCP paths are unaffected</p>
+<h2 id="decision">Decision<a class="headerlink" href="#decision" title="Permanent link">&para;</a></h2>
+<p>Pass through as-is (no approval wrapping), matching <code>_build_default_toolkits()</code> behavior.</p>
 
 
 
