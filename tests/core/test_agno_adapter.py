@@ -762,6 +762,48 @@ class TestAdditionalToolkits:
 
         assert len(toolkits) == 2
 
+    def test_prepare_tools_includes_additional_toolkits(self, monkeypatch):
+        """Verify additional toolkits are appended in _prepare_tools_with_defaults."""
+        from dcaf.core.config import EnvVars
+
+        monkeypatch.delenv(EnvVars.DEFAULT_TOOLKIT, raising=False)
+        monkeypatch.setenv(EnvVars.ADDITIONAL_TOOLS, "file.FileTools")
+
+        from dcaf.core.adapters.outbound.agno.adapter import AgnoAdapter
+
+        adapter = AgnoAdapter(model_id="test", provider="bedrock")
+
+        from dcaf.core import tool
+
+        @tool(description="User tool")
+        def my_tool(x: str) -> str:
+            return x
+
+        agno_tools = adapter._prepare_tools_with_defaults([my_tool], platform_context=None)
+        # 1 user tool + 1 additional toolkit = 2
+        assert len(agno_tools) == 2
+
+    def test_prepare_tools_with_defaults_and_additional(self, monkeypatch):
+        """Verify all three sources merge: defaults + user tools + additional."""
+        from dcaf.core.config import EnvVars
+
+        monkeypatch.setenv(EnvVars.DEFAULT_TOOLKIT, "true")
+        monkeypatch.setenv(EnvVars.ADDITIONAL_TOOLS, "file.FileTools")
+
+        from dcaf.core.adapters.outbound.agno.adapter import AgnoAdapter
+
+        adapter = AgnoAdapter(model_id="test", provider="bedrock")
+
+        from dcaf.core import tool
+
+        @tool(description="User tool")
+        def my_tool(x: str) -> str:
+            return x
+
+        agno_tools = adapter._prepare_tools_with_defaults([my_tool], platform_context=None)
+        # 5 default toolkits + 1 user tool + 1 additional toolkit = 7
+        assert len(agno_tools) == 7
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

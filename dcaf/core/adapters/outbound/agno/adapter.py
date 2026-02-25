@@ -787,11 +787,12 @@ class AgnoAdapter:
         platform_context: dict[str, Any] | None = None,
     ) -> list[Any]:
         """
-        Convert user tools and optionally prepend default toolkits.
+        Convert user tools and optionally include default and additional toolkits.
 
         When DCAF_DEFAULT_TOOLKIT=true, the 5 built-in Agno toolkits are
-        prepended to the tools list. Default toolkits are native Agno objects
-        and bypass _convert_tools_to_agno().
+        prepended to the tools list. When DCAF_ADDITIONAL_TOOLS is set,
+        those toolkits are appended. Default and additional toolkits are
+        native Agno objects and bypass _convert_tools_to_agno().
 
         Args:
             tools: List of dcaf Tool objects from the caller.
@@ -806,6 +807,11 @@ class AgnoAdapter:
             default_toolkits = self._build_default_toolkits()
             agno_tools = default_toolkits + agno_tools
             logger.info(f"Default toolkit enabled: added {len(default_toolkits)} built-in toolkits")
+
+        additional_toolkits = self._load_additional_toolkits()
+        if additional_toolkits:
+            agno_tools = agno_tools + additional_toolkits
+            logger.info(f"Additional toolkits loaded: added {len(additional_toolkits)} toolkits")
 
         return agno_tools
 
