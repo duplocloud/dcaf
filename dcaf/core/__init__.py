@@ -97,6 +97,7 @@ from .interceptors import (
     create_request_from_messages,
     create_response_from_text,
 )
+from ._context import emit
 from .models import ChatMessage, PlatformContext
 
 # Primitives API (for custom agent functions)
@@ -125,6 +126,7 @@ from .tools import tool
 
 __all__ = [
     # Simple API
+    "emit",
     "Agent",
     "AgentResponse",
     "PendingToolCall",

@@ -1042,26 +1042,45 @@ class Agent:
             # Stream from the runtime
             pending_tool_calls: list[SchemaToolCall] = []
 
-            async for event in self._runtime.invoke_stream(
-                messages=conversation.messages,
-                tools=self.tools,
-                system_prompt=prepared.system_prompt,
-                static_system=prepared.static_system,
-                dynamic_system=prepared.dynamic_system,
-                platform_context=platform_context.to_dict() if platform_context else None,
-                event_registry=self._event_registry,
-            ):
-                # Convert internal stream events to server stream events
-                server_event = self._convert_stream_event(event, pending_tool_calls)
-                if server_event:
-                    yield server_event
+            # Set up the user-emit queue so tool/handler code can push events
+            # into the stream via dcaf.core.emit().
+            from collections import deque
 
-            # If there are pending tool calls that need approval, yield them
-            if pending_tool_calls:
-                yield ToolCallsEvent(tool_calls=pending_tool_calls)
+            from ._context import _active_queue
 
-            # Always end with a done event
-            yield DoneEvent()
+            user_events: deque = deque()
+            _queue_token = _active_queue.set(user_events)
+            try:
+                async for event in self._runtime.invoke_stream(
+                    messages=conversation.messages,
+                    tools=self.tools,
+                    system_prompt=prepared.system_prompt,
+                    static_system=prepared.static_system,
+                    dynamic_system=prepared.dynamic_system,
+                    platform_context=platform_context.to_dict() if platform_context else None,
+                    event_registry=self._event_registry,
+                ):
+                    # Drain user-emitted events before each framework event
+                    while user_events:
+                        yield user_events.popleft()
+
+                    # Convert internal stream events to server stream events
+                    server_event = self._convert_stream_event(event, pending_tool_calls)
+                    if server_event:
+                        yield server_event
+
+                # Final drain after the runtime loop ends
+                while user_events:
+                    yield user_events.popleft()
+
+                # If there are pending tool calls that need approval, yield them
+                if pending_tool_calls:
+                    yield ToolCallsEvent(tool_calls=pending_tool_calls)
+
+                # Always end with a done event
+                yield DoneEvent()
+            finally:
+                _active_queue.reset(_queue_token)
 
         except Exception as e:
             logger.error(f"Streaming error: {e}")
