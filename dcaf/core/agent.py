@@ -54,6 +54,7 @@ from .adapters.outbound.persistence import InMemoryConversationRepository
 from .application.dto import AgentRequest
 from .application.services import AgentService, ApprovalService
 from .domain.entities import Conversation, ToolCall
+from .domain.value_objects import PlatformContext
 from .events import EventRegistry
 
 # Import interceptor types and utilities
@@ -1036,25 +1037,7 @@ class Agent:
                 return
 
             # === BUILD CONVERSATION ===
-            from .domain.value_objects import PlatformContext
-
-            platform_context = PlatformContext.from_dict(prepared.context)
-
-            conversation = Conversation.create(context=platform_context)
-            if prepared.system_prompt:
-                conversation = conversation.with_system_prompt(prepared.system_prompt)
-
-            # Add messages from history
-            for msg in prepared.messages[:-1]:  # All except last
-                role = msg.get("role")
-                content = msg.get("content", "")
-                if role == "user":
-                    conversation.add_user_message(content)
-                elif role == "assistant":
-                    conversation.add_assistant_message(content)
-
-            # Add current message
-            conversation.add_user_message(prepared.current_message)
+            conversation, platform_context = self._build_conversation_from_prepared(prepared)
 
             # Stream from the runtime
             pending_tool_calls: list[SchemaToolCall] = []
@@ -1102,6 +1085,27 @@ class Agent:
         except Exception as e:
             logger.error(f"Streaming error: {e}")
             yield ErrorEvent(error=str(e))
+
+    def _build_conversation_from_prepared(
+        self, prepared: _PreparedRequest
+    ) -> tuple[Conversation, PlatformContext]:
+        """Build a ``Conversation`` from a prepared request.
+
+        Extracted to keep ``run_stream`` within branch-count limits.
+        """
+        platform_context = PlatformContext.from_dict(prepared.context)
+        conversation = Conversation.create(context=platform_context)
+        if prepared.system_prompt:
+            conversation = conversation.with_system_prompt(prepared.system_prompt)
+        for msg in prepared.messages[:-1]:
+            role = msg.get("role")
+            content = msg.get("content", "")
+            if role == "user":
+                conversation.add_user_message(content)
+            elif role == "assistant":
+                conversation.add_assistant_message(content)
+        conversation.add_user_message(prepared.current_message)
+        return conversation, platform_context
 
     def _system_update(self, key: str, data: dict[str, Any]) -> IntermittentUpdateEvent | None:
         """Return an IntermittentUpdateEvent for a configured system event, or None."""
