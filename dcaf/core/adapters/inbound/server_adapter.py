@@ -19,7 +19,7 @@ import os
 import shutil
 import subprocess
 import tempfile
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from typing import Any, cast
 
 from ....schemas.events import (
@@ -34,6 +34,8 @@ from ....schemas.messages import AgentMessage, ExecutedApproval, ExecutedCommand
 from ...agent import Agent
 
 logger = logging.getLogger(__name__)
+
+ExecutorFn = Callable[[str, list[dict[str, Any]] | None, dict[str, Any] | None], str]
 
 
 class ServerAdapter:
@@ -72,8 +74,13 @@ class ServerAdapter:
         uvicorn.run(app, host="0.0.0.0", port=8000)
     """
 
-    def __init__(self, agent: Agent):
+    def __init__(
+        self,
+        agent: Agent,
+        execute_cmd: ExecutorFn | None = None,
+    ) -> None:
         self.agent = agent
+        self._cmd_executor = execute_cmd
 
     async def invoke(self, messages: dict[str, list[dict[str, Any]]]) -> AgentMessage:
         """
@@ -367,14 +374,18 @@ class ServerAdapter:
         self,
         command: str,
         files: list[dict[str, Any]] | None = None,
-        context: dict[str, Any] | None = None,  # noqa: ARG002
+        context: dict[str, Any] | None = None,
     ) -> str:
-        """Execute a shell command, optionally writing files to a temp working directory.
+        """Execute a shell command. If a custom executor was provided at construction,
+        it is called instead of the built-in subprocess implementation.
 
-        If files are provided, they are written to a temporary directory which is
-        used as the working directory for the command. The directory is always
-        cleaned up after execution, even on error.
+        If files are provided (in the default path), they are written to a temporary
+        directory which is used as the working directory for the command. The directory
+        is always cleaned up after execution, even on error.
         """
+        if self._cmd_executor is not None:
+            return self._cmd_executor(command, files, context)
+
         work_dir: str | None = None
         try:
             if files:

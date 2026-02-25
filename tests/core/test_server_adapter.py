@@ -143,3 +143,62 @@ class TestExecuteCmdWithFiles:
         with patch("tempfile.mkdtemp") as mock_mkdtemp:
             adapter._execute_cmd("echo hello", files=None, context={})
             mock_mkdtemp.assert_not_called()
+
+
+class TestCustomExecutorCallback:
+    def test_custom_executor_called_instead_of_subprocess(self):
+        """When execute_cmd is provided, it is called instead of the built-in subprocess."""
+        calls: list[tuple] = []
+
+        def my_executor(
+            command: str,
+            files: list[dict] | None,
+            context: dict | None,
+        ) -> str:
+            calls.append((command, files, context))
+            return "custom output"
+
+        adapter = _make_adapter(execute_cmd=my_executor)
+
+        with patch("subprocess.run") as mock_run:
+            result = adapter._execute_cmd("echo hello", files=None, context={"tenant": "acme"})
+
+        assert result == "custom output"
+        assert calls == [("echo hello", None, {"tenant": "acme"})]
+        mock_run.assert_not_called()
+
+    def test_custom_executor_receives_files(self):
+        files = [{"file_path": "values.yaml", "file_content": "x: 1"}]
+
+        def my_executor(command, files, context):
+            return f"got {len(files)} file(s)"
+
+        adapter = _make_adapter(execute_cmd=my_executor)
+        result = adapter._execute_cmd("helm install .", files=files, context={})
+        assert result == "got 1 file(s)"
+
+    def test_no_executor_uses_default_subprocess(self):
+        """Without a custom executor, the built-in subprocess path is used."""
+        adapter = _make_adapter()  # no execute_cmd kwarg
+        result = adapter._execute_cmd("echo default", files=None, context={})
+        assert "default" in result
+
+    def test_custom_executor_wires_through_process_approved_commands(self):
+        """Custom executor is called end-to-end from _process_approved_commands."""
+        calls: list[str] = []
+
+        def my_executor(command, files, context):
+            calls.append(command)
+            return "custom result"
+
+        adapter = _make_adapter(execute_cmd=my_executor)
+        messages = [
+            {
+                "role": "user",
+                "content": "go",
+                "data": {"cmds": [{"command": "kubectl get pods", "execute": True}]},
+            }
+        ]
+        results = adapter._process_approved_commands(messages, {})
+        assert calls == ["kubectl get pods"]
+        assert results[0].output == "custom result"
