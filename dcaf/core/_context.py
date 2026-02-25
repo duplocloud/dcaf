@@ -1,8 +1,14 @@
 """Stream context for user-emitted events.
 
-Provides :func:`emit` — a module-level function that pushes any
-``StreamEvent`` subclass into the active stream from tools,
-``@agent.on()`` handlers, or interceptors.
+Provides two functions:
+
+* :func:`emit_update` — the simple, common-case shorthand for pushing a
+  transient status message (an ``IntermittentUpdateEvent``) into the stream.
+* :func:`emit` — the general form that accepts any ``StreamEvent`` subclass.
+
+``emit_update(text)`` is exactly equivalent to
+``emit(IntermittentUpdateEvent(text=text))``.  Use whichever reads more
+naturally for your use case.
 
 Design
 ------
@@ -83,3 +89,51 @@ def emit(event: Any) -> None:
     queue = _active_queue.get()
     if queue is not None:
         queue.append(event)
+
+
+def emit_update(text: str, content: dict[str, Any] | None = None) -> None:
+    """Push a transient status message into the active stream.
+
+    This is the simple shorthand for the most common case — sending a
+    human-readable status update to the UI while work is in progress.
+
+    Equivalent to::
+
+        emit(IntermittentUpdateEvent(text=text, content=content or {}))
+
+    Use :func:`emit` directly when you need to send a different event type
+    (e.g. ``TextDeltaEvent`` to stream content into the response body).
+
+    Args:
+        text:    Human-readable status label shown in the UI.
+                 Examples: ``"Searching..."``, ``"Generating script..."``,
+                 ``"Found 12 results"``.
+        content: Optional dict of structured metadata the UI can use for
+                 richer display (links found, file names, step counts, etc.).
+                 Defaults to ``{}``.
+
+    Example — basic status::
+
+        from dcaf.core import emit_update, tool
+
+        @tool(description="Search the web")
+        def web_search(query: str) -> str:
+            emit_update(f"Searching for: {query}")
+            results = _do_search(query)
+            emit_update("Search complete", content={"count": len(results)})
+            return format_results(results)
+
+    Example — multi-step progress::
+
+        @tool(description="Run a data pipeline")
+        def run_pipeline(dataset: str) -> str:
+            emit_update("Loading data...")
+            data = load(dataset)
+            emit_update("Cleaning...")
+            data = clean(data)
+            emit_update("Analyzing...")
+            return analyze(data)
+    """
+    from .schemas.events import IntermittentUpdateEvent
+
+    emit(IntermittentUpdateEvent(text=text, content=content or {}))

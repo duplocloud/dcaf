@@ -1,43 +1,156 @@
 # Emitting Events from Agent Code
 
-DCAF's `emit()` function lets you push any stream event into the active stream from anywhere in your agent code — tools, event handlers, or interceptors. This gives you real-time control over what the client UI sees while your agent is working.
+DCAF provides two functions for pushing stream events to the client UI from
+anywhere in your agent code — tools, event handlers, or interceptors.
+
+| Function | What it does |
+|---|---|
+| `emit_update(text, content={})` | Send a transient status message — the common case |
+| `emit(event)` | Send any stream event type — the general form |
+
+`emit_update` is the starting point for most use cases. `emit` unlocks the
+full power when you need to send different event types.
 
 ---
 
-## The Core Idea
+## The Mental Model
 
-The DCAF stream is a typed message channel. Every event you see in the client — `text_delta`, `intermittent_update`, `tool_calls`, `done` — is a JSON object that the UI reads to decide what to render. The `type` field is the discriminator.
+The DCAF stream is a **typed message channel**. Every event the client receives
+— `text_delta`, `intermittent_update`, `tool_calls`, `done` — is a JSON object
+where the `type` field tells the UI how to handle it.
 
-`emit()` is nothing more than **"push a typed message into that channel from wherever you are in the code"**.
+`emit_update()` and `emit()` are mechanisms to push messages into that channel
+from anywhere in your code while a stream is active.
 
 ```
-tool code ─────┐
-interceptor ───┼──► emit(event) ──► stream ──► client UI
-@agent.on() ───┘
+tool code ──────┐
+interceptor ────┼──► emit_update() / emit() ──► stream ──► client UI
+@agent.on() ────┘
 ```
-
-This means you can send any event type — not just status messages — from deep within your tool logic or event handlers.
 
 ---
 
-## Quick Start
+## `emit_update()` — The Simple Case
 
 ```python
-from dcaf.core import Agent, emit, tool
+from dcaf.core import emit_update
+```
+
+```python
+def emit_update(text: str, content: dict | None = None) -> None: ...
+```
+
+Send a transient status message to the UI. The UI shows it while the agent
+is working, then clears it when new content arrives.
+
+**This is exactly equivalent to:**
+
+```python
+from dcaf.core import emit
 from dcaf.core.schemas.events import IntermittentUpdateEvent
+
+emit(IntermittentUpdateEvent(text=text, content=content or {}))
+```
+
+Use `emit_update` when you just need to show status text. Use `emit` directly
+when you need to send a different event type (see [The General Form](#emit-the-general-form)).
+
+### Basic Usage
+
+```python
+from dcaf.core import emit_update, tool
 
 @tool(description="Search the web for information")
 def web_search(query: str) -> str:
-    emit(IntermittentUpdateEvent(text=f"Searching for: {query}"))
+    emit_update(f"Searching for: {query}")
     results = _do_search(query)
     return format_results(results)
+```
 
-agent = Agent(tools=[web_search])
+The client sees:
+```json
+{"type": "intermittent_update", "text": "Searching for: kubernetes pods", "content": {}}
+```
+
+### With Structured Content
+
+The optional `content` dict carries structured metadata the client UI can
+use to display richer information — links found, file names, step counts, etc.
+
+```python
+@tool(description="Search the web")
+def web_search(query: str) -> str:
+    emit_update(f"Searching for: {query}")
+    results = _do_search(query)
+
+    emit_update(
+        text=f"Found {len(results)} results",
+        content={
+            "count": len(results),
+            "sources": [r["url"] for r in results],
+        },
+    )
+    return format_results(results)
+```
+
+The second event the client receives:
+```json
+{
+    "type": "intermittent_update",
+    "text": "Found 8 results",
+    "content": {
+        "count": 8,
+        "sources": ["https://kubernetes.io/...", "https://docs.aws.amazon.com/..."]
+    }
+}
+```
+
+### Multi-Step Progress
+
+Show progress through a sequence of phases:
+
+```python
+@tool(description="Run a full data pipeline")
+def run_pipeline(dataset: str) -> str:
+    steps = [
+        ("Loading data",    load),
+        ("Cleaning",        clean),
+        ("Analyzing",       analyze),
+        ("Building report", build_report),
+    ]
+    result = dataset
+    for i, (label, fn) in enumerate(steps, start=1):
+        emit_update(
+            text=f"{label}...",
+            content={"step": i, "total": len(steps)},
+        )
+        result = fn(result)
+
+    emit_update("Pipeline complete", content={"steps": len(steps)})
+    return result
+```
+
+### Before-and-After Pattern
+
+Show a "started" message, do the work, then a "done" message:
+
+```python
+@tool(description="Generate a Python script")
+def generate_script(description: str) -> str:
+    emit_update("Generating script...")
+
+    code = _llm_generate(description)
+
+    emit_update(
+        text="Script ready",
+        content={"lines": len(code.splitlines())},
+    )
+    return code
 ```
 
 ---
 
-## The `emit()` Function
+## `emit()` — The General Form
 
 ```python
 from dcaf.core import emit
@@ -47,188 +160,139 @@ from dcaf.core import emit
 def emit(event: StreamEvent) -> None: ...
 ```
 
-**Behavior:**
+`emit()` accepts any `StreamEvent` subclass. Use it when `emit_update` is not
+enough — for example, to stream content directly into the response body.
 
-- Queues the event for delivery before the next framework-generated event in the same stream turn
-- **No-op** when called outside an active `run_stream()` invocation — safe to call from code that also runs in non-streaming contexts
-- Thread-safe: works correctly when tools run in a thread pool executor
+### Relationship to `emit_update`
 
----
+These two statements are **identical**:
 
-## Use Cases by Location
+```python
+# Simple form
+emit_update("Generating script...")
 
-### 1. From a `@tool` Function
+# Equivalent general form
+from dcaf.core.schemas.events import IntermittentUpdateEvent
+emit(IntermittentUpdateEvent(text="Generating script..."))
+```
 
-The most common use case. Emit status messages before and after long-running work.
+And with content:
+
+```python
+# Simple form
+emit_update("Search complete", content={"count": 8})
+
+# Equivalent general form
+emit(IntermittentUpdateEvent(text="Search complete", content={"count": 8}))
+```
+
+### Streaming Content into the Response
+
+Use `TextDeltaEvent` to push text directly into the response body from tool
+code. This is useful when a tool generates content you want the user to see
+immediately — before the LLM summarizes the tool result.
 
 ```python
 from dcaf.core import emit, tool
-from dcaf.core.schemas.events import IntermittentUpdateEvent
-
-@tool(description="Fetch and summarize a web page")
-def fetch_page(url: str) -> str:
-    emit(IntermittentUpdateEvent(text=f"Fetching {url}..."))
-    html = requests.get(url).text
-
-    emit(IntermittentUpdateEvent(text="Summarizing content..."))
-    summary = summarize(html)
-
-    return summary
-```
-
-#### With Structured Content
-
-Use the `content` field to send structured data alongside the status text. The client UI can use this to display richer information — links found, file names, step counts, etc.
-
-```python
-@tool(description="Search and return results")
-def search(query: str) -> str:
-    emit(IntermittentUpdateEvent(text=f"Searching: {query}"))
-    results = _search(query)
-
-    emit(IntermittentUpdateEvent(
-        text=f"Found {len(results)} results",
-        content={
-            "count": len(results),
-            "sources": [r["url"] for r in results],
-        },
-    ))
-    return format_results(results)
-```
-
-#### Streaming Content Directly from a Tool
-
-Tools can emit `TextDeltaEvent` to stream text directly into the response — for example, showing work-in-progress code before the final tool result is returned.
-
-```python
 from dcaf.core.schemas.events import IntermittentUpdateEvent, TextDeltaEvent
 
 @tool(description="Generate a Python script")
 def generate_script(description: str) -> str:
     emit(IntermittentUpdateEvent(text="Generating script..."))
+
     code = _llm_generate(description)
 
-    # Stream the WIP code to the UI immediately
+    # Stream the generated code directly into the response body
     emit(TextDeltaEvent(text=f"\n```python\n{code}\n```\n"))
 
-    # The return value becomes the tool result in the LLM context
+    # The return value becomes the tool result for the LLM's context
     return code
 ```
 
-!!! note
-    `TextDeltaEvent` text is accumulated by clients into the displayed response. Use it
-    for content you want visible in the conversation. Use `IntermittentUpdateEvent` for
-    transient status that the UI should show and then clear.
-
-#### Multi-Step Progress
-
-Long-running tools with multiple phases can emit a sequence of updates:
-
-```python
-@tool(description="Run a full data pipeline")
-def run_pipeline(dataset: str) -> str:
-    steps = [
-        ("Loading data", load_data),
-        ("Cleaning", clean),
-        ("Running analysis", analyze),
-        ("Building report", build_report),
-    ]
-    result = dataset
-    for label, fn in steps:
-        emit(IntermittentUpdateEvent(text=label + "..."))
-        result = fn(result)
-
-    emit(IntermittentUpdateEvent(text="Pipeline complete"))
-    return result
-```
+!!! note "text_delta vs intermittent_update"
+    `TextDeltaEvent` text is **accumulated** by clients into the displayed
+    response — it becomes part of the conversation content.
+    `IntermittentUpdateEvent` is **transient** — clients show it while work
+    is in progress and clear it when the next content arrives.
+    Choose based on whether you want the output to persist in the response.
 
 ---
 
-### 2. From an `@agent.on()` Event Handler
+## Use Cases by Location
 
-The existing event subscription system fires internal events during agent execution. You can combine it with `emit()` to translate internal events into client-visible stream events.
+Both functions work from any of these call sites within an active stream:
+
+### From a `@tool` Function
 
 ```python
-from dcaf.core import Agent, emit, TOOL_CALL_STARTED, TOOL_CALL_COMPLETED
-from dcaf.core.schemas.events import IntermittentUpdateEvent
+from dcaf.core import emit_update, tool
+
+@tool(description="Fetch and summarize a web page")
+def fetch_page(url: str) -> str:
+    emit_update(f"Fetching {url}...")
+    html = requests.get(url).text
+
+    emit_update("Summarizing content...")
+    return summarize(html)
+```
+
+### From an `@agent.on()` Handler
+
+Apply cross-cutting updates to every tool without modifying individual
+tool functions:
+
+```python
+from dcaf.core import Agent, emit_update, TOOL_CALL_STARTED, TOOL_CALL_COMPLETED
 
 agent = Agent(tools=[...])
 
 @agent.on(TOOL_CALL_STARTED)
 async def on_tool_start(event):
-    emit(IntermittentUpdateEvent(
+    emit_update(
         text=f"Running {event.tool_name}...",
         content={"tool": event.tool_name},
-    ))
+    )
 
 @agent.on(TOOL_CALL_COMPLETED)
 async def on_tool_done(event):
-    emit(IntermittentUpdateEvent(
+    emit_update(
         text=f"{event.tool_name} complete",
-        content={"tool": event.tool_name, "result": str(event.result)[:200]},
-    ))
+        content={"tool": event.tool_name},
+    )
 ```
 
-This is useful for **cross-cutting concerns** — you write the update logic once and it applies to every tool, without modifying individual tool functions.
+### From an Interceptor
 
-#### Combining with Tool-Level Emits
-
-Tool-level `emit()` calls and `@agent.on()` emits can coexist. The order of delivery depends on when `emit()` is called relative to the internal event that triggers the handler:
-
-```
-TOOL_CALL_STARTED fires
-  → @agent.on handler emit() → queued
-  → tool body runs
-      → tool emit() calls → queued
-TOOL_CALL_COMPLETED fires
-  → @agent.on handler emit() → queued
-```
-
-All queued events are delivered before the next framework event.
-
----
-
-### 3. From an Interceptor
-
-Request and response interceptors run as part of the `run_stream()` call stack, so `emit()` works here too.
+Interceptors run before the LLM call, so events emitted here appear at the
+very start of the stream:
 
 ```python
-from dcaf.core import LLMRequest, emit
-from dcaf.core.schemas.events import IntermittentUpdateEvent
+from dcaf.core import LLMRequest, emit_update
 
-def enrich_context(request: LLMRequest) -> LLMRequest:
-    tenant = request.context.get("tenant_name", "unknown")
-
-    emit(IntermittentUpdateEvent(
-        text=f"Loading context for tenant: {tenant}",
+def add_tenant_context(request: LLMRequest) -> LLMRequest:
+    tenant = request.context.get("tenant_name", "default")
+    emit_update(
+        text=f"Loading context for: {tenant}",
         content={"tenant": tenant},
-    ))
-
-    # ... add context to request ...
+    )
+    request.add_system_context(f"Tenant: {tenant}")
     return request
 
-agent = Agent(
-    tools=[...],
-    request_interceptors=[enrich_context],
-)
+agent = Agent(tools=[...], request_interceptors=[add_tenant_context])
 ```
 
-!!! warning
-    Interceptors run **before the LLM call**, so events emitted here will appear
-    at the very start of the stream — before any `text_delta` or tool events.
+### From a Helper Function
 
----
-
-### 4. From a Helper Function
-
-Because `emit()` reads from a `ContextVar`, it works in any function in the call chain — including deeply nested helpers. You don't need to thread an emitter through your call stack.
+Both functions work in any nested helper — no need to pass an emitter through
+your call stack:
 
 ```python
 def _fetch_with_retry(url: str, retries: int = 3) -> str:
     for attempt in range(1, retries + 1):
-        emit(IntermittentUpdateEvent(
+        emit_update(
             text=f"Fetching {url} (attempt {attempt}/{retries})",
-        ))
+            content={"url": url, "attempt": attempt},
+        )
         try:
             return requests.get(url, timeout=10).text
         except requests.Timeout:
@@ -243,66 +307,28 @@ def fetch_page(url: str) -> str:
 
 ---
 
-## What Events Can You Emit?
+## Safe Outside Streaming
 
-Any `StreamEvent` subclass. The most useful ones:
-
-| Event | When to use |
-|---|---|
-| `IntermittentUpdateEvent` | WIP status — "Searching...", "Generating code...", progress steps |
-| `TextDeltaEvent` | Stream content directly — WIP code, partial results you want visible in the response |
-
-Events you generally should **not** emit from user code:
-
-| Event | Why to avoid |
-|---|---|
-| `DoneEvent` | Terminates the stream; framework emits this automatically |
-| `ErrorEvent` | Raises an error state; let exceptions propagate naturally |
-| `ToolCallsEvent` | Managed by the approval workflow; emitting manually bypasses approval logic |
-
----
-
-## Event Delivery Ordering
-
-User-emitted events are drained **before each framework-generated event**. The delivery sequence for a typical tool call looks like this:
-
-```
-[user emit] IntermittentUpdateEvent("Thinking...")     ← from @agent.on(REASONING_STARTED)
-[framework] IntermittentUpdateEvent("Thinking...")     ← system event (auto)
-[framework] IntermittentUpdateEvent("Calling tool: X") ← system event (auto)
-[user emit] IntermittentUpdateEvent("Fetching URL...")  ← from tool body
-[user emit] IntermittentUpdateEvent("Parsing results") ← from tool body
-[framework] TextDeltaEvent(...)                        ← LLM response text
-[framework] DoneEvent()
-```
-
-The interleaving happens naturally: tool code runs synchronously, filling the queue, then the async framework loop drains it before the next event.
-
----
-
-## Safe Use Outside Streaming
-
-`emit()` is always safe to call, even when no stream is active:
+Both functions are always safe to call — they are no-ops when no stream is active:
 
 ```python
 @tool(description="Analyze data")
 def analyze(data: str) -> str:
-    emit(IntermittentUpdateEvent(text="Analyzing..."))  # no-op if not streaming
+    emit_update("Analyzing...")  # no-op when called via agent.run()
     return _analyze(data)
 
-# Works in both contexts:
-result = agent.run(messages=[...])        # emit() is a no-op
-async for e in agent.run_stream(msgs):    # emit() pushes to stream
+# Works in both contexts — no guards needed:
+result = agent.run(messages=[...])        # emit_update() is a no-op
+async for e in agent.run_stream(msgs):    # emit_update() sends to stream
     ...
 ```
-
-This means you don't need to guard `emit()` calls or maintain two versions of your tools.
 
 ---
 
 ## Testing
 
-When testing tools in isolation, `emit()` is a no-op since there's no active stream. If you want to assert on emitted events in tests, activate a queue manually:
+When testing tools in isolation, both functions are no-ops since there is no
+active stream. To assert on emitted events in tests, activate the queue manually:
 
 ```python
 from collections import deque
@@ -319,6 +345,8 @@ def test_tool_emits_status():
 
     updates = [e for e in queue if isinstance(e, IntermittentUpdateEvent)]
     assert updates[0].text == "Searching for: kubernetes pods"
+    assert updates[1].text == "Search complete"
+    assert updates[1].content["count"] > 0
 ```
 
 ---
@@ -328,17 +356,18 @@ def test_tool_emits_status():
 An agent that uses all three emit locations — tool, event handler, and interceptor:
 
 ```python
-from dcaf.core import Agent, emit, serve, tool, TOOL_CALL_STARTED
-from dcaf.core import LLMRequest
-from dcaf.core.schemas.events import IntermittentUpdateEvent, TextDeltaEvent
+from dcaf.core import (
+    Agent, serve, tool,
+    emit, emit_update,
+    LLMRequest,
+    TOOL_CALL_STARTED,
+)
+from dcaf.core.schemas.events import TextDeltaEvent
 
 # ── Interceptor ────────────────────────────────────────────────────────────
 def add_tenant_context(request: LLMRequest) -> LLMRequest:
     tenant = request.context.get("tenant_name", "default")
-    emit(IntermittentUpdateEvent(
-        text=f"Loading context for: {tenant}",
-        content={"tenant": tenant},
-    ))
+    emit_update(f"Loading context for: {tenant}", content={"tenant": tenant})
     request.add_system_context(f"Tenant: {tenant}")
     return request
 
@@ -346,22 +375,15 @@ def add_tenant_context(request: LLMRequest) -> LLMRequest:
 # ── Tools ──────────────────────────────────────────────────────────────────
 @tool(description="Search Kubernetes pods")
 def list_pods(namespace: str = "default") -> str:
-    emit(IntermittentUpdateEvent(
-        text=f"Querying namespace: {namespace}",
-        content={"namespace": namespace},
-    ))
+    emit_update(f"Querying namespace: {namespace}", content={"namespace": namespace})
     output = kubectl(f"get pods -n {namespace}")
-
-    emit(IntermittentUpdateEvent(
-        text="Query complete",
-        content={"namespace": namespace, "lines": len(output.splitlines())},
-    ))
+    emit_update("Query complete", content={"lines": len(output.splitlines())})
     return output
 
 
 @tool(description="Generate a kubectl command")
 def generate_command(description: str) -> str:
-    emit(IntermittentUpdateEvent(text="Generating command..."))
+    emit_update("Generating command...")
     cmd = _generate_cmd(description)
 
     # Stream the generated command directly so the user sees it immediately
@@ -376,14 +398,13 @@ agent = Agent(
 )
 
 
-# ── Cross-cutting event handler ────────────────────────────────────────────
+# ── Cross-cutting update for every tool ───────────────────────────────────
 @agent.on(TOOL_CALL_STARTED)
 async def log_tool_start(event):
-    # Supplemental update from the event system (in addition to tool-level emits)
-    emit(IntermittentUpdateEvent(
+    emit_update(
         text=f"▶ {event.tool_name}",
-        content={"tool": event.tool_name, "source": "event_handler"},
-    ))
+        content={"tool": event.tool_name},
+    )
 
 
 serve(agent)
@@ -391,9 +412,20 @@ serve(agent)
 
 ---
 
+## Quick Reference
+
+| Goal | Use |
+|---|---|
+| Show a status message | `emit_update("Searching...")` |
+| Show status with metadata | `emit_update("Found 8 results", content={"count": 8})` |
+| Stream content into response body | `emit(TextDeltaEvent(text="..."))` |
+| Send an `IntermittentUpdateEvent` explicitly | `emit(IntermittentUpdateEvent(text="..."))` |
+
+---
+
 ## See Also
 
-- [Streaming Responses](./streaming.md) — full event type reference
+- [Streaming Responses](./streaming.md) — full event type reference and client examples
 - [Building Tools](./building-tools.md) — `@tool` decorator reference
 - [Interceptors](./interceptors.md) — request/response pipeline
 - [Event Subscriptions](./event-subscriptions.md) — `@agent.on()` reference
