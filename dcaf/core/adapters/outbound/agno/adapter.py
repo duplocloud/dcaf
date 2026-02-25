@@ -770,21 +770,14 @@ class AgnoAdapter:
 
             cls = getattr(module, class_name, None)
             if cls is None:
-                logger.warning(
-                    f"Class '{class_name}' not found in module '{module_path}'"
-                )
+                logger.warning(f"Class '{class_name}' not found in module '{module_path}'")
                 continue
 
             try:
                 toolkits.append(cls())
-                logger.info(
-                    f"Loaded additional toolkit: {class_name} from {module_path}"
-                )
+                logger.info(f"Loaded additional toolkit: {class_name} from {module_path}")
             except Exception as e:
-                logger.warning(
-                    f"Failed to instantiate '{class_name}' "
-                    f"from '{module_path}': {e}"
-                )
+                logger.warning(f"Failed to instantiate '{class_name}' from '{module_path}': {e}")
 
         return toolkits
 
