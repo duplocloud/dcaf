@@ -670,6 +670,7 @@ class AgnoAdapter:
             stream=stream,
             tool_call_limit=self._tool_call_limit,
             skills=agno_skills,
+            telemetry=False,
         )
 
         return agent
