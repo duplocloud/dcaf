@@ -10,6 +10,6 @@ Examples:
     - Message queue consumers
 """
 
-from .server_adapter import ServerAdapter
+from .server_adapter import ExecutorFn, ServerAdapter
 
-__all__ = ["ServerAdapter"]
+__all__ = ["ExecutorFn", "ServerAdapter"]

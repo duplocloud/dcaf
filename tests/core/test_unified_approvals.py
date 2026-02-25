@@ -387,7 +387,7 @@ class TestProcessApprovals:
         assert len(result) == 1
         assert result[0].type == "command"
         assert result[0].output == "NAME  READY\nnginx  1/1"
-        adapter._execute_cmd.assert_called_once_with("kubectl get pods")
+        adapter._execute_cmd.assert_called_once_with("kubectl get pods", files=None, context={})
         tool.execute.assert_not_called()
 
 
