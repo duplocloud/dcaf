@@ -15,7 +15,10 @@ Example:
 """
 
 import logging
+import os
+import shutil
 import subprocess
+import tempfile
 from collections.abc import AsyncIterator
 from typing import Any, cast
 
@@ -363,12 +366,32 @@ class ServerAdapter:
     def _execute_cmd(
         self,
         command: str,
-        files: list[dict[str, Any]] | None = None,  # noqa: ARG002
+        files: list[dict[str, Any]] | None = None,
         context: dict[str, Any] | None = None,  # noqa: ARG002
     ) -> str:
-        """Execute a shell command and return combined stdout/stderr."""
+        """Execute a shell command, optionally writing files to a temp working directory.
+
+        If files are provided, they are written to a temporary directory which is
+        used as the working directory for the command. The directory is always
+        cleaned up after execution, even on error.
+        """
+        work_dir: str | None = None
         try:
-            result = subprocess.run(command, shell=True, capture_output=True, text=True)  # noqa: S602
+            if files:
+                work_dir = tempfile.mkdtemp()
+                for f in files:
+                    # Use basename only — never allow path traversal
+                    safe_name = os.path.basename(f.get("file_path", "file"))
+                    with open(os.path.join(work_dir, safe_name), "w") as fh:
+                        fh.write(f.get("file_content", ""))
+
+            result = subprocess.run(  # noqa: S602
+                command,
+                shell=True,
+                capture_output=True,
+                text=True,
+                cwd=work_dir,
+            )
             output = result.stdout
             if result.stderr:
                 output = (
@@ -380,6 +403,9 @@ class ServerAdapter:
         except Exception as e:
             logger.error("Error executing command: %s", e)
             return f"Error executing command: {e}"
+        finally:
+            if work_dir:
+                shutil.rmtree(work_dir, ignore_errors=True)
 
     def _process_approved_commands(
         self,
@@ -402,9 +428,10 @@ class ServerAdapter:
 
         for cmd in cmds:
             command = cmd.get("command", "")
+            files = cmd.get("files") or None  # list[dict] | None
             if cmd.get("execute", False):
                 logger.info("Executing approved command: %s", command)
-                output = self._execute_cmd(command, files=None, context=context)
+                output = self._execute_cmd(command, files=files, context=context)
                 executed.append(ExecutedCommand(command=command, output=output))
             elif cmd.get("rejection_reason"):
                 executed.append(
