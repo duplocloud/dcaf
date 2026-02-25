@@ -671,5 +671,22 @@ class TestDefaultToolkit:
         assert len(agno_tools) == expected_count
 
 
+class TestAdditionalToolkits:
+    """Tests for the DCAF_ADDITIONAL_TOOLS feature."""
+
+    def test_load_additional_toolkits_returns_empty_when_unset(self, monkeypatch):
+        """Verify empty list when DCAF_ADDITIONAL_TOOLS is not set."""
+        from dcaf.core.config import EnvVars
+
+        monkeypatch.delenv(EnvVars.ADDITIONAL_TOOLS, raising=False)
+
+        from dcaf.core.adapters.outbound.agno.adapter import AgnoAdapter
+
+        adapter = AgnoAdapter(model_id="test", provider="bedrock")
+        toolkits = adapter._load_additional_toolkits()
+
+        assert toolkits == []
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

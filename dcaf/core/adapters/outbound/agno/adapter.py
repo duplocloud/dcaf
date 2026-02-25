@@ -14,6 +14,7 @@ This adapter incorporates production-proven patterns for Bedrock compatibility,
 including message history filtering and parallel tool execution workarounds.
 """
 
+import importlib
 import logging
 import os
 from collections.abc import AsyncIterator
@@ -718,6 +719,74 @@ class AgnoAdapter:
             ShellTools(),
             FileGenerationTools(),
         ]
+
+    def _load_additional_toolkits(self) -> list[Any]:
+        """
+        Load additional Agno toolkits from the DCAF_ADDITIONAL_TOOLS env var.
+
+        The env var is a comma-separated list of entries in the format
+        ``<submodule>.<ClassName>``, resolved as
+        ``from agno.tools.<submodule> import <ClassName>``.
+
+        Example:
+            DCAF_ADDITIONAL_TOOLS="neo4j.Neo4jTools,duckdb.DuckDbTools"
+
+        Invalid entries are logged as warnings and skipped.
+
+        Returns:
+            List of instantiated Agno toolkit objects.
+        """
+        raw = os.getenv(EnvVars.ADDITIONAL_TOOLS, "")
+        if not raw.strip():
+            return []
+
+        toolkits: list[Any] = []
+        for entry in raw.split(","):
+            entry = entry.strip()
+            if not entry:
+                continue
+
+            # Split on last dot: submodule.ClassName
+            dot_index = entry.rfind(".")
+            if dot_index <= 0:
+                logger.warning(
+                    f"Invalid DCAF_ADDITIONAL_TOOLS entry '{entry}': "
+                    f"expected format 'submodule.ClassName'"
+                )
+                continue
+
+            submodule = entry[:dot_index]
+            class_name = entry[dot_index + 1 :]
+            module_path = f"agno.tools.{submodule}"
+
+            try:
+                module = importlib.import_module(module_path)
+            except ImportError:
+                logger.warning(
+                    f"Failed to import module '{module_path}' "
+                    f"for DCAF_ADDITIONAL_TOOLS entry '{entry}'"
+                )
+                continue
+
+            cls = getattr(module, class_name, None)
+            if cls is None:
+                logger.warning(
+                    f"Class '{class_name}' not found in module '{module_path}'"
+                )
+                continue
+
+            try:
+                toolkits.append(cls())
+                logger.info(
+                    f"Loaded additional toolkit: {class_name} from {module_path}"
+                )
+            except Exception as e:
+                logger.warning(
+                    f"Failed to instantiate '{class_name}' "
+                    f"from '{module_path}': {e}"
+                )
+
+        return toolkits
 
     def _prepare_tools_with_defaults(
         self,
