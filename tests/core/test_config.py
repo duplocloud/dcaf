@@ -199,3 +199,9 @@ class TestEnvVarsConstants:
 
         assert hasattr(EnvVars, "DEFAULT_TOOLKIT")
         assert EnvVars.DEFAULT_TOOLKIT == "DCAF_DEFAULT_TOOLKIT"
+
+    def test_additional_tools_env_var_defined(self):
+        from dcaf.core.config import EnvVars
+
+        assert hasattr(EnvVars, "ADDITIONAL_TOOLS")
+        assert EnvVars.ADDITIONAL_TOOLS == "DCAF_ADDITIONAL_TOOLS"
