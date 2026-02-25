@@ -28,6 +28,7 @@ from agno.tools.file_generation import FileGenerationTools
 from agno.tools.local_file_system import LocalFileSystemTools
 from agno.tools.python import PythonTools
 from agno.tools.shell import ShellTools
+from agno.tools.toolkit import Toolkit as AgnoToolkit
 from agno.utils.log import set_log_level_to_debug, set_log_level_to_info
 
 from ....application.dto.responses import (
@@ -846,6 +847,13 @@ class AgnoAdapter:
                         f"🔌 MCP: Added MCPTool to agent - will auto-connect "
                         f"(transport={tool_obj._transport}, target={target})"
                     )
+                continue
+
+            # Native Agno Toolkit — pass through directly (no conversion needed)
+            if isinstance(tool_obj, AgnoToolkit):
+                agno_tools.append(tool_obj)
+                toolkit_name = getattr(tool_obj, "name", type(tool_obj).__name__)
+                logger.info(f"Added native Agno toolkit: {toolkit_name}")
                 continue
 
             # Get the full tool schema including input_schema
