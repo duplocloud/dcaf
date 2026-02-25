@@ -309,19 +309,43 @@ def fetch_page(url: str) -> str:
 
 ## Safe Outside Streaming
 
-Both functions are always safe to call — they are no-ops when no stream is active:
+`emit_update()` and `emit()` are **always safe to call**. When no stream is
+active they silently do nothing — no exception, no warning, no side effect.
+You never need to guard a call site with `if streaming:`.
+
+### When they are no-ops
+
+| Context | Behaviour |
+|---|---|
+| `agent.run()` (non-streaming) | no-op — events are discarded silently |
+| Unit test calling a tool directly | no-op — no queue is active |
+| Script running a tool standalone | no-op — no queue is active |
+| `agent.run_stream()` | active — events are delivered to the client |
+
+### Code example
 
 ```python
+from dcaf.core import emit_update, tool
+
 @tool(description="Analyze data")
 def analyze(data: str) -> str:
-    emit_update("Analyzing...")  # no-op when called via agent.run()
+    emit_update("Analyzing...")  # safe in all contexts below
     return _analyze(data)
 
-# Works in both contexts — no guards needed:
-result = agent.run(messages=[...])        # emit_update() is a no-op
-async for e in agent.run_stream(msgs):    # emit_update() sends to stream
+# Non-streaming — emit_update() is silently discarded
+result = agent.run(messages=[...])
+
+# Streaming — emit_update() sends to the client
+async for event in agent.run_stream(messages=[...]):
     ...
+
+# Direct call in a test — emit_update() is silently discarded
+result = analyze("some data")  # no error, no queue needed
 ```
+
+This means a tool or helper never needs to know how it's being called.
+Write `emit_update()` calls freely — they activate automatically when a
+stream is open and cost nothing when one isn't.
 
 ---
 

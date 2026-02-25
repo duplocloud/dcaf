@@ -96,6 +96,8 @@ def emit_update(text: str, content: dict[str, Any] | None = None) -> None:
 
     This is the simple shorthand for the most common case — sending a
     human-readable status update to the UI while work is in progress.
+    Has no effect when called outside an active ``run_stream()`` invocation
+    (e.g. ``agent.run()`` or a standalone test) — no guards needed.
 
     Equivalent to::
 
