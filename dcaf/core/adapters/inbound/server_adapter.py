@@ -32,6 +32,8 @@ from ....schemas.events import (
 )
 from ....schemas.messages import AgentMessage, ExecutedApproval, ExecutedCommand, ExecutedToolCall
 from ...agent import Agent
+from ...schemas.events import ApprovalsEvent, ToolCallsEvent
+from ...schemas.messages import Approval
 
 logger = logging.getLogger(__name__)
 
@@ -230,6 +232,23 @@ class ServerAdapter:
                 # Echo top-level request fields in DoneEvent for client correlation
                 if isinstance(event, DoneEvent) and request_fields:
                     event.meta_data["request_context"] = request_fields
+
+                # Gap 1: translate ToolCallsEvent → ApprovalsEvent for unified approval clients
+                # ApprovalsEvent is emitted first; ToolCallsEvent follows for backward compat
+                if isinstance(event, ToolCallsEvent) and event.tool_calls:
+                    approvals = [
+                        Approval(
+                            id=tc.id,
+                            type="tool_call",
+                            name=tc.name,
+                            input=tc.input,
+                            description=tc.tool_description,
+                            intent=tc.intent,
+                        )
+                        for tc in event.tool_calls
+                    ]
+                    yield ApprovalsEvent(approvals=approvals)  # type: ignore[misc]
+
                 yield event  # type: ignore[misc]
 
         except Exception as e:
