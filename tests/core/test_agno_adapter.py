@@ -687,6 +687,26 @@ class TestAdditionalToolkits:
 
         assert toolkits == []
 
+    def test_load_additional_toolkits_returns_valid_toolkits(self, monkeypatch):
+        """Verify valid entries are imported and instantiated."""
+        from dcaf.core.config import EnvVars
+
+        # Use toolkits already available in agno (no extra install needed)
+        monkeypatch.setenv(EnvVars.ADDITIONAL_TOOLS, "file.FileTools,shell.ShellTools")
+
+        from dcaf.core.adapters.outbound.agno.adapter import AgnoAdapter
+
+        adapter = AgnoAdapter(model_id="test", provider="bedrock")
+        toolkits = adapter._load_additional_toolkits()
+
+        assert len(toolkits) == 2
+
+        from agno.tools.file import FileTools
+        from agno.tools.shell import ShellTools
+
+        toolkit_types = {type(t) for t in toolkits}
+        assert toolkit_types == {FileTools, ShellTools}
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
