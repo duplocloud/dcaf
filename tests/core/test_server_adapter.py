@@ -1,12 +1,11 @@
 """Tests for ServerAdapter — gap fixes for command-executing agents."""
 
-import asyncio
 import os
 import tempfile
 from unittest.mock import MagicMock, patch
 
 from dcaf.core.adapters.inbound.server_adapter import ServerAdapter
-from dcaf.core.schemas.events import ApprovalsEvent, DoneEvent, TextDeltaEvent, ToolCallsEvent
+from dcaf.core.schemas.events import DoneEvent, TextDeltaEvent, ToolCallsEvent
 from dcaf.core.schemas.messages import ToolCall
 
 
@@ -221,7 +220,7 @@ def _make_agent_that_streams(*events):
 
 
 class TestInvokeStreamEmitsApprovalsEvent:
-    def test_tool_calls_event_produces_approvals_event(self):
+    async def test_tool_calls_event_produces_approvals_event(self):
         """When agent yields ToolCallsEvent, invoke_stream also yields ApprovalsEvent."""
         tool_call = ToolCall(
             id="tc-1",
@@ -237,16 +236,13 @@ class TestInvokeStreamEmitsApprovalsEvent:
         )
         adapter = ServerAdapter(agent)
 
-        async def collect():
-            return [e async for e in adapter.invoke_stream({"messages": [{"role": "user", "content": "go"}]})]
-
-        events = asyncio.get_event_loop().run_until_complete(collect())
+        events = [e async for e in adapter.invoke_stream({"messages": [{"role": "user", "content": "go"}]})]
         event_types = [e.type for e in events]
 
         assert "approvals" in event_types, "ApprovalsEvent must be emitted"
         assert "tool_calls" in event_types, "ToolCallsEvent must still be emitted (backward compat)"
 
-    def test_approvals_event_contains_correct_approval(self):
+    async def test_approvals_event_contains_correct_approval(self):
         """The ApprovalsEvent approval must map ToolCall fields correctly."""
         tool_call = ToolCall(
             id="tc-42",
@@ -262,10 +258,7 @@ class TestInvokeStreamEmitsApprovalsEvent:
         )
         adapter = ServerAdapter(agent)
 
-        async def collect():
-            return [e async for e in adapter.invoke_stream({"messages": [{"role": "user", "content": "go"}]})]
-
-        events = asyncio.get_event_loop().run_until_complete(collect())
+        events = [e async for e in adapter.invoke_stream({"messages": [{"role": "user", "content": "go"}]})]
         approvals_events = [e for e in events if e.type == "approvals"]
 
         assert len(approvals_events) == 1
@@ -277,7 +270,7 @@ class TestInvokeStreamEmitsApprovalsEvent:
         assert approval.description == "Delete a pod"
         assert approval.intent == "Remove the pod"
 
-    def test_approvals_event_emitted_before_tool_calls_event(self):
+    async def test_approvals_event_emitted_before_tool_calls_event(self):
         """ApprovalsEvent should appear before ToolCallsEvent in the stream."""
         tool_call = ToolCall(
             id="tc-1",
@@ -292,17 +285,14 @@ class TestInvokeStreamEmitsApprovalsEvent:
         )
         adapter = ServerAdapter(agent)
 
-        async def collect():
-            return [e async for e in adapter.invoke_stream({"messages": [{"role": "user", "content": "go"}]})]
-
-        events = asyncio.get_event_loop().run_until_complete(collect())
+        events = [e async for e in adapter.invoke_stream({"messages": [{"role": "user", "content": "go"}]})]
         types = [e.type for e in events]
 
         approvals_idx = types.index("approvals")
         tool_calls_idx = types.index("tool_calls")
         assert approvals_idx < tool_calls_idx, "ApprovalsEvent must precede ToolCallsEvent"
 
-    def test_no_tool_calls_event_no_approvals_event(self):
+    async def test_no_tool_calls_event_no_approvals_event(self):
         """If the agent never yields ToolCallsEvent, no ApprovalsEvent is emitted."""
         agent = _make_agent_that_streams(
             TextDeltaEvent(text="hello"),
@@ -310,8 +300,5 @@ class TestInvokeStreamEmitsApprovalsEvent:
         )
         adapter = ServerAdapter(agent)
 
-        async def collect():
-            return [e async for e in adapter.invoke_stream({"messages": [{"role": "user", "content": "hi"}]})]
-
-        events = asyncio.get_event_loop().run_until_complete(collect())
+        events = [e async for e in adapter.invoke_stream({"messages": [{"role": "user", "content": "hi"}]})]
         assert not any(e.type == "approvals" for e in events)
