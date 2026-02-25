@@ -302,3 +302,27 @@ class TestInvokeStreamEmitsApprovalsEvent:
 
         events = [e async for e in adapter.invoke_stream({"messages": [{"role": "user", "content": "hi"}]})]
         assert not any(e.type == "approvals" for e in events)
+
+
+class TestThreadIdFlowsThroughContext:
+    def test_thread_id_in_platform_context_reaches_custom_executor(self):
+        """thread_id placed in platform_context flows to the custom executor via context."""
+        received: list[dict] = []
+
+        def my_executor(command, files, context):
+            received.append(context or {})
+            return "ok"
+
+        adapter = _make_adapter(execute_cmd=my_executor)
+        messages = [
+            {
+                "role": "user",
+                "content": "go",
+                "platform_context": {"thread_id": "thread-abc", "tenant_name": "acme"},
+                "data": {"cmds": [{"command": "ls", "execute": True}]},
+            }
+        ]
+        ctx = adapter._extract_platform_context(messages)
+        adapter._process_approved_commands(messages, ctx)
+
+        assert received[0].get("thread_id") == "thread-abc"
