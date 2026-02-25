@@ -116,6 +116,8 @@ class AmbientContext(BaseModel):
 
 
 class Data(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
     cmds: list[Command] = Field(default_factory=list)
     executed_cmds: list[ExecutedCommand] = Field(default_factory=list)
     tool_calls: list[ToolCall] = Field(default_factory=list)
