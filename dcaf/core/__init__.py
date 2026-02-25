@@ -123,6 +123,7 @@ from .session import Session
 from .system_events import (
     DEFAULT_SYSTEM_EVENTS,
     THINKING,
+    THINKING_COMPLETE,
     TOOL_COMPLETED,
     TOOL_FAILED,
     TOOL_STARTED,
@@ -194,6 +195,7 @@ __all__ = [
     # System event descriptors
     "SystemEvent",
     "THINKING",
+    "THINKING_COMPLETE",
     "TOOL_STARTED",
     "TOOL_COMPLETED",
     "TOOL_FAILED",

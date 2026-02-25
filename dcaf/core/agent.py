@@ -1123,8 +1123,16 @@ class Agent:
             if internal_event.event_type == StreamEventType.TEXT_DELTA:
                 text = internal_event.data.get("text", "")
                 return TextDeltaEvent(text=text)
-            elif internal_event.event_type == StreamEventType.REASONING_STARTED:
-                return self._system_update("reasoning_started", {})
+            elif internal_event.event_type in (
+                StreamEventType.REASONING_STARTED,
+                StreamEventType.REASONING_COMPLETED,
+            ):
+                key = (
+                    "reasoning_started"
+                    if internal_event.event_type == StreamEventType.REASONING_STARTED
+                    else "reasoning_completed"
+                )
+                return self._system_update(key, {})
             elif internal_event.event_type == StreamEventType.TOOL_USE_START:
                 # Accumulate tool calls for later
                 tool_call_id = internal_event.data.get("tool_call_id", "")

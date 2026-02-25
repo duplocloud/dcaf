@@ -153,6 +153,20 @@ Example::
     TOOL_COMPLETED.with_formatter(lambda d: f"✓ {d['tool_name']}")
 """
 
+THINKING_COMPLETE = SystemEvent("reasoning_completed", "Done thinking")
+"""Emitted when the model finishes its reasoning phase.
+
+Pairs with ``THINKING`` to bracket the reasoning window.  Off by default.
+Opt in via ``system_events=[THINKING, THINKING_COMPLETE, TOOL_STARTED]``.
+
+No template variables available.
+
+Example::
+
+    THINKING_COMPLETE.with_text("Ready")
+    THINKING_COMPLETE.with_formatter(lambda _: translations["thinking_done"])
+"""
+
 TOOL_FAILED = SystemEvent("tool_call_failed", "Failed: {tool_name}")
 """Emitted when a tool raises an exception.
 
@@ -180,5 +194,5 @@ DEFAULT_SYSTEM_EVENTS: list[SystemEvent] = [THINKING, TOOL_STARTED]
 """The system events enabled by default in every ``Agent``.
 
 Currently: ``THINKING`` (reasoning started) and ``TOOL_STARTED`` (tool begins).
-All other constants (``TOOL_COMPLETED``, ``TOOL_FAILED``) are opt-in.
+All other constants are opt-in.
 """

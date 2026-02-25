@@ -32,18 +32,19 @@ Each system event is represented by a `SystemEvent` object. Import the pre-built
 constants — these are the intended public API:
 
 ```python
-from dcaf.core import THINKING, TOOL_STARTED, TOOL_COMPLETED, TOOL_FAILED
+from dcaf.core import THINKING, THINKING_COMPLETE, TOOL_STARTED, TOOL_COMPLETED, TOOL_FAILED
 ```
 
-| Constant | Fires when | Default text | Available variables |
-|---|---|---|---|
-| `THINKING` | Model begins reasoning | `"Thinking..."` | — |
-| `TOOL_STARTED` | A tool begins executing | `"Calling tool: {tool_name}"` | `{tool_name}` |
-| `TOOL_COMPLETED` | A tool finishes successfully | `"Done: {tool_name}"` | `{tool_name}` |
-| `TOOL_FAILED` | A tool raises an exception | `"Failed: {tool_name}"` | `{tool_name}`, `{error}` |
+| Constant | Fires when | Default text | Available variables | Default |
+|---|---|---|---|---|
+| `THINKING` | Model begins reasoning | `"Thinking..."` | — | ✓ on |
+| `THINKING_COMPLETE` | Model finishes reasoning | `"Done thinking"` | — | off |
+| `TOOL_STARTED` | A tool begins executing | `"Calling tool: {tool_name}"` | `{tool_name}` | ✓ on |
+| `TOOL_COMPLETED` | A tool finishes successfully | `"Done: {tool_name}"` | `{tool_name}` | off |
+| `TOOL_FAILED` | A tool raises an exception | `"Failed: {tool_name}"` | `{tool_name}`, `{error}` | off |
 
-`THINKING` and `TOOL_STARTED` are **on by default**. `TOOL_COMPLETED` and
-`TOOL_FAILED` are **off by default** — opt in when you want them.
+`THINKING` and `TOOL_STARTED` are **on by default**. All others are **off by
+default** — opt in when you want them.
 
 ---
 
@@ -123,43 +124,62 @@ The formatter receives a `dict` containing the available variables for that even
 
 ## Internationalisation (i18n)
 
-Because formatters accept any callable, you can plug in any translation system.
-The `data` dict is the same shape regardless of language:
+Because `.with_formatter()` accepts any callable, you can plug in any translation
+system. The formatter receives the same `data` dict regardless of language —
+all you supply is the function.
+
+The example below shows a generic pattern. `translate()` is your own function
+(a `gettext` wrapper, a dict lookup, an API call — whatever fits your project):
 
 ```python
-from dcaf.core import THINKING, TOOL_STARTED, TOOL_COMPLETED, TOOL_FAILED
+from dcaf.core import THINKING, THINKING_COMPLETE, TOOL_STARTED, TOOL_COMPLETED, TOOL_FAILED
 
-def _(key: str, **kwargs) -> str:
-    """Your translation function."""
+# Your translation function — DCAF doesn't care how it works
+def translate(key: str, **kwargs) -> str:
     return translations[locale][key].format(**kwargs)
 
 agent = Agent(
     tools=[...],
     system_events=[
-        THINKING.with_formatter(lambda _d: _("agent.thinking")),
-        TOOL_STARTED.with_formatter(lambda d: _("agent.tool_started", tool_name=d["tool_name"])),
-        TOOL_COMPLETED.with_formatter(lambda d: _("agent.tool_done", tool_name=d["tool_name"])),
-        TOOL_FAILED.with_formatter(lambda d: _("agent.tool_failed",
-                                                tool_name=d["tool_name"],
-                                                error=d.get("error", ""))),
+        THINKING.with_formatter(
+            lambda _d: translate("agent.thinking")
+        ),
+        THINKING_COMPLETE.with_formatter(
+            lambda _d: translate("agent.thinking_done")
+        ),
+        TOOL_STARTED.with_formatter(
+            lambda d: translate("agent.tool_started", tool_name=d["tool_name"])
+        ),
+        TOOL_COMPLETED.with_formatter(
+            lambda d: translate("agent.tool_done", tool_name=d["tool_name"])
+        ),
+        TOOL_FAILED.with_formatter(
+            lambda d: translate("agent.tool_failed",
+                                tool_name=d["tool_name"],
+                                error=d.get("error", ""))
+        ),
     ],
 )
 ```
+
+The formatters are plain Python functions — they can branch on `locale`, call a
+remote service, or read from any data structure. DCAF passes the event data dict
+and uses whatever string you return.
 
 ---
 
 ## Opting Into Optional Events
 
-`TOOL_COMPLETED` and `TOOL_FAILED` are not in the defaults to avoid doubling the
-noise for every tool call. Add them explicitly when you want the full lifecycle:
+The three off-by-default events let you bracket each phase of the lifecycle:
 
 ```python
-from dcaf.core import THINKING, TOOL_STARTED, TOOL_COMPLETED, TOOL_FAILED
+from dcaf.core import THINKING, THINKING_COMPLETE, TOOL_STARTED, TOOL_COMPLETED, TOOL_FAILED
 
 agent = Agent(
     tools=[...],
     system_events=[
         THINKING,
+        THINKING_COMPLETE,
         TOOL_STARTED,
         TOOL_COMPLETED,
         TOOL_FAILED.with_text("Error in {tool_name}: {error}"),
@@ -167,10 +187,13 @@ agent = Agent(
 )
 ```
 
-With this configuration the client receives four potential update events per tool:
+With this configuration the client receives events for the full lifecycle:
 
 ```
-TOOL_STARTED fires  → "Calling tool: list_pods"
+THINKING fires          → "Thinking..."
+THINKING_COMPLETE fires → "Done thinking"
+
+TOOL_STARTED fires   → "Calling tool: list_pods"
 TOOL_COMPLETED fires → "Done: list_pods"
 
 TOOL_STARTED fires  → "Calling tool: delete_pod"
@@ -216,7 +239,8 @@ See [Emitting Events](./emitting-events.md) for the full `emit_update()` /
 | Custom text | `TOOL_STARTED.with_text("Running {tool_name}...")` |
 | Custom formatter | `TOOL_STARTED.with_formatter(lambda d: ...)` |
 | Add tool completion | `system_events=[..., TOOL_COMPLETED]` |
-| Full lifecycle | `system_events=[THINKING, TOOL_STARTED, TOOL_COMPLETED, TOOL_FAILED]` |
+| Bracket reasoning | `system_events=[THINKING, THINKING_COMPLETE, TOOL_STARTED]` |
+| Full lifecycle | `system_events=[THINKING, THINKING_COMPLETE, TOOL_STARTED, TOOL_COMPLETED, TOOL_FAILED]` |
 
 ---
 
