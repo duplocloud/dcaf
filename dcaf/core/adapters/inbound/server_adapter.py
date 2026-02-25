@@ -101,7 +101,7 @@ class ServerAdapter:
         executed_tool_calls = self._process_approved_tool_calls(messages_list, context)
 
         # Process legacy command approvals
-        executed_commands = self._process_approved_commands(messages_list)
+        executed_commands = self._process_approved_commands(messages_list, context)
 
         # Process unified approvals
         executed_approvals = self._process_approvals(messages_list, context)
@@ -174,7 +174,7 @@ class ServerAdapter:
             yield ExecutedToolCallsEvent(executed_tool_calls=executed_tool_calls)
 
         # Process legacy command approvals
-        executed_commands = self._process_approved_commands(messages_list)
+        executed_commands = self._process_approved_commands(messages_list, context)
         if executed_commands:
             yield ExecutedCommandsEvent(executed_cmds=executed_commands)
 
@@ -360,7 +360,12 @@ class ServerAdapter:
 
         return f"Tool '{tool_name}' not found"
 
-    def _execute_cmd(self, command: str) -> str:
+    def _execute_cmd(
+        self,
+        command: str,
+        files: list[dict[str, Any]] | None = None,  # noqa: ARG002
+        context: dict[str, Any] | None = None,  # noqa: ARG002
+    ) -> str:
         """Execute a shell command and return combined stdout/stderr."""
         try:
             result = subprocess.run(command, shell=True, capture_output=True, text=True)  # noqa: S602
@@ -379,6 +384,7 @@ class ServerAdapter:
     def _process_approved_commands(
         self,
         messages_list: list[dict[str, Any]],
+        context: dict[str, Any] | None = None,
     ) -> list[ExecutedCommand]:
         """
         Process approved/rejected commands from the legacy cmds field.
@@ -398,7 +404,7 @@ class ServerAdapter:
             command = cmd.get("command", "")
             if cmd.get("execute", False):
                 logger.info("Executing approved command: %s", command)
-                output = self._execute_cmd(command)
+                output = self._execute_cmd(command, files=None, context=context)
                 executed.append(ExecutedCommand(command=command, output=output))
             elif cmd.get("rejection_reason"):
                 executed.append(
@@ -439,7 +445,9 @@ class ServerAdapter:
 
             if approval.get("execute", False):
                 if approval_type == "command":
-                    result = self._execute_cmd(tool_input.get("command", name))
+                    result = self._execute_cmd(
+                        tool_input.get("command", name), files=None, context=platform_context
+                    )
                 else:
                     result = self._execute_tool(name, tool_input, platform_context)
                 executed.append(
