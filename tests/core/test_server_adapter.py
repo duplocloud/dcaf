@@ -2,8 +2,6 @@
 
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from dcaf.core.adapters.inbound.server_adapter import ServerAdapter
 
 
@@ -18,7 +16,7 @@ class TestProcessApprovedCommandsReceivesContext:
     def test_context_is_passed_to_execute_cmd(self):
         """_process_approved_commands must forward platform_context to _execute_cmd."""
         adapter = _make_adapter()
-        ctx = {"tenant_name": "acme", "kubeconfig": "/tmp/kubeconfig"}
+        ctx = {"tenant_name": "acme", "kubeconfig": "/home/user/.kube/config"}
 
         with patch.object(adapter, "_execute_cmd", return_value="ok") as mock_exec:
             messages = [
