@@ -159,8 +159,10 @@ class AgnoResponseConverter:
             )
 
         elif event_type in ("ToolCallCompletedEvent", "ToolCallCompleted"):
+            tool_name = getattr(agno_event, "tool_name", "")
             return StreamEvent(
                 event_type=StreamEventType.TOOL_USE_END,
+                data={"tool_name": tool_name},
                 index=0,
             )
 

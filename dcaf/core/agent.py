@@ -46,6 +46,8 @@ from typing import TYPE_CHECKING, Any, cast
 if TYPE_CHECKING:
     from dcaf.core.schemas.messages import AgentMessage
 
+    from .system_events import SystemEvent
+
 from .adapters.loader import load_adapter
 from .adapters.outbound.agno.types import DEFAULT_FRAMEWORK, DEFAULT_MODEL_ID, DEFAULT_PROVIDER
 from .adapters.outbound.persistence import InMemoryConversationRepository
@@ -476,6 +478,8 @@ class Agent:
         # A2A configuration
         name: str | None = None,
         description: str | None = None,
+        # System event configuration
+        system_events: "list[SystemEvent] | bool | None" = None,
     ) -> None:
         """
         Create a new Agent.
@@ -494,6 +498,19 @@ class Agent:
         # A2A identity
         self.name = name or "dcaf-agent"
         self.description = description or system_prompt or "A DCAF agent"
+
+        # Resolve system events: build a lookup dict keyed by public event type string.
+        # False  → disable all (empty dict)
+        # None / True → use the two built-in defaults
+        # list   → use exactly the provided descriptors
+        from .system_events import DEFAULT_SYSTEM_EVENTS, SystemEvent
+
+        if system_events is False:
+            self._system_event_lookup: dict[str, SystemEvent] = {}
+        elif system_events is None or system_events is True:
+            self._system_event_lookup = {se.event_type: se for se in DEFAULT_SYSTEM_EVENTS}
+        else:
+            self._system_event_lookup = {se.event_type: se for se in system_events}
 
         # Store provider-specific configuration
         self._aws_profile = aws_profile
@@ -1086,6 +1103,13 @@ class Agent:
             logger.error(f"Streaming error: {e}")
             yield ErrorEvent(error=str(e))
 
+    def _system_update(self, key: str, data: dict[str, Any]) -> IntermittentUpdateEvent | None:
+        """Return an IntermittentUpdateEvent for a configured system event, or None."""
+        se = self._system_event_lookup.get(key)
+        if se:
+            return IntermittentUpdateEvent(text=se.format(data))
+        return None
+
     def _convert_stream_event(
         self,
         internal_event: Any,
@@ -1100,7 +1124,7 @@ class Agent:
                 text = internal_event.data.get("text", "")
                 return TextDeltaEvent(text=text)
             elif internal_event.event_type == StreamEventType.REASONING_STARTED:
-                return IntermittentUpdateEvent(text="Thinking...")
+                return self._system_update("reasoning_started", {})
             elif internal_event.event_type == StreamEventType.TOOL_USE_START:
                 # Accumulate tool calls for later
                 tool_call_id = internal_event.data.get("tool_call_id", "")
@@ -1114,7 +1138,10 @@ class Agent:
                         input_description={},
                     )
                 )
-                return IntermittentUpdateEvent(text=f"Calling tool: {tool_name}")
+                return self._system_update("tool_call_started", {"tool_name": tool_name})
+            elif internal_event.event_type == StreamEventType.TOOL_USE_END:
+                tool_name = internal_event.data.get("tool_name", "")
+                return self._system_update("tool_call_completed", {"tool_name": tool_name})
             elif internal_event.event_type == StreamEventType.TOOL_CALLS:
                 # Tool calls requiring approval (from RunPausedEvent)
                 tool_calls_data = internal_event.data.get("tool_calls", [])
