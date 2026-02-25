@@ -42,6 +42,7 @@ from importlib.metadata import version as _pkg_version
 __version__ = _pkg_version("dcaf")
 
 from ..channel_routing import ChannelResponseRouter, SlackResponseRouter
+from ._context import emit, emit_update
 from .agent import Agent, AgentResponse, PendingToolCall
 
 # HelpDesk Protocol DTOs (for full compatibility)
@@ -119,12 +120,23 @@ from .schemas.events import (
 )
 from .server import create_app, serve
 from .session import Session
+from .system_events import (
+    DEFAULT_SYSTEM_EVENTS,
+    THINKING,
+    THINKING_COMPLETE,
+    TOOL_COMPLETED,
+    TOOL_FAILED,
+    TOOL_STARTED,
+    SystemEvent,
+)
 
 # Tool decorator (v2 copy for complete separation)
 from .tools import tool
 
 __all__ = [
     # Simple API
+    "emit_update",
+    "emit",
     "Agent",
     "AgentResponse",
     "PendingToolCall",
@@ -180,6 +192,14 @@ __all__ = [
     "ConversationStarted",
     "ApprovalRequested",
     "ToolExecuted",
+    # System event descriptors
+    "SystemEvent",
+    "THINKING",
+    "THINKING_COMPLETE",
+    "TOOL_STARTED",
+    "TOOL_COMPLETED",
+    "TOOL_FAILED",
+    "DEFAULT_SYSTEM_EVENTS",
     # Event subscription system
     "Event",
     "TOOL_CALL_STARTED",
