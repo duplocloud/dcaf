@@ -12,13 +12,13 @@
         <meta name="author" content="DuploCloud">
       
       
-        <link rel="canonical" href="https://duplocloud.github.io/dcaf/main/guides/prompt-caching/">
+        <link rel="canonical" href="https://duplocloud.github.io/dcaf/main/guides/system-events/">
       
       
-        <link rel="prev" href="../working-with-gemini/">
+        <link rel="prev" href="../emitting-events/">
       
       
-        <link rel="next" href="../message-protocol/">
+        <link rel="next" href="../event-subscriptions/">
       
       
         
@@ -29,7 +29,7 @@
     
     
       
-        <title>Prompt Caching - DCAF Documentation</title>
+        <title>System Events - DCAF Documentation</title>
       
     
     
@@ -80,7 +80,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#bedrock-prompt-caching-guide" class="md-skip">
+        <a href="#system-events" class="md-skip">
           Skip to content
         </a>
       
@@ -119,7 +119,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Prompt Caching
+              System Events
             
           </span>
         </div>
@@ -1545,37 +1545,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Prompt Caching
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../prompt-caching/" class="md-nav__link">
         
   
   
@@ -1591,315 +1564,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#overview" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Overview
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#how-it-works" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        How It Works
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#quick-start" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Quick Start
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Quick Start">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#basic-usage" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Basic Usage
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#separating-static-and-dynamic-content" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Separating Static and Dynamic Content
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#requirements" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Requirements
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Requirements">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#minimum-token-count" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Minimum Token Count
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#best-practices" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Best Practices
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Best Practices">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#1-put-static-content-first" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        1. Put Static Content First
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#2-make-static-content-detailed" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        2. Make Static Content Detailed
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#3-use-callable-for-dynamic-context" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        3. Use Callable for Dynamic Context
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#monitoring" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Monitoring
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Monitoring">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#cache-performance-logs" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Cache Performance Logs
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#first-request-is-always-a-miss" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        First Request is Always a MISS
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#troubleshooting" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Troubleshooting
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Troubleshooting">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#no-cache-metrics-in-logs" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        No Cache Metrics in Logs
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#caching-not-enabled" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Caching Not Enabled
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#cost-comparison" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Cost Comparison
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Cost Comparison">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#example-scenario" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Example Scenario
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#supported-models" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Supported Models
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#when-not-to-use-caching" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        When NOT to Use Caching
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#future-plans" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Future Plans
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#related-documentation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Related Documentation
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -1993,10 +1657,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../system-events/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    System Events
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -2012,6 +1703,192 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#what-are-system-events" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What Are System Events?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-systemevent-descriptor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The SystemEvent Descriptor
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuring-system-events" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuring System Events
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Configuring System Events">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#keep-the-defaults-no-configuration-needed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Keep the defaults (no configuration needed)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#disable-all-system-events" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Disable all system events
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#choose-specific-events" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Choose specific events
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#customising-the-text" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Customising the Text
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Customising the Text">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#simple-text-override" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Simple text override
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#custom-formatter-function" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Custom formatter function
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#internationalisation-i18n" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Internationalisation (i18n)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#opting-into-optional-events" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Opting Into Optional Events
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#relationship-to-emit_update" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Relationship to emit_update()
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#quick-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick Reference
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#see-also" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        See Also
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -2593,10 +2470,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#overview" class="md-nav__link">
+  <a href="#what-are-system-events" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Overview
+        What Are System Events?
       
     </span>
   </a>
@@ -2604,10 +2481,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#how-it-works" class="md-nav__link">
+  <a href="#the-systemevent-descriptor" class="md-nav__link">
     <span class="md-ellipsis">
       
-        How It Works
+        The SystemEvent Descriptor
       
     </span>
   </a>
@@ -2615,22 +2492,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#quick-start" class="md-nav__link">
+  <a href="#configuring-system-events" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Quick Start
+        Configuring System Events
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Quick Start">
+    <nav class="md-nav" aria-label="Configuring System Events">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#basic-usage" class="md-nav__link">
+  <a href="#keep-the-defaults-no-configuration-needed" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Basic Usage
+        Keep the defaults (no configuration needed)
       
     </span>
   </a>
@@ -2638,10 +2515,21 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#separating-static-and-dynamic-content" class="md-nav__link">
+  <a href="#disable-all-system-events" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Separating Static and Dynamic Content
+        Disable all system events
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#choose-specific-events" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Choose specific events
       
     </span>
   </a>
@@ -2654,22 +2542,33 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#requirements" class="md-nav__link">
+  <a href="#customising-the-text" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Requirements
+        Customising the Text
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Requirements">
+    <nav class="md-nav" aria-label="Customising the Text">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#minimum-token-count" class="md-nav__link">
+  <a href="#simple-text-override" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Minimum Token Count
+        Simple text override
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#custom-formatter-function" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Custom formatter function
       
     </span>
   </a>
@@ -2682,166 +2581,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#best-practices" class="md-nav__link">
+  <a href="#internationalisation-i18n" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Best Practices
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Best Practices">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#1-put-static-content-first" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        1. Put Static Content First
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#2-make-static-content-detailed" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        2. Make Static Content Detailed
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#3-use-callable-for-dynamic-context" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        3. Use Callable for Dynamic Context
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#monitoring" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Monitoring
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Monitoring">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#cache-performance-logs" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Cache Performance Logs
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#first-request-is-always-a-miss" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        First Request is Always a MISS
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#troubleshooting" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Troubleshooting
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Troubleshooting">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#no-cache-metrics-in-logs" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        No Cache Metrics in Logs
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#caching-not-enabled" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Caching Not Enabled
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#cost-comparison" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Cost Comparison
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Cost Comparison">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#example-scenario" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Example Scenario
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#supported-models" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Supported Models
+        Internationalisation (i18n)
       
     </span>
   </a>
@@ -2849,10 +2592,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#when-not-to-use-caching" class="md-nav__link">
+  <a href="#opting-into-optional-events" class="md-nav__link">
     <span class="md-ellipsis">
       
-        When NOT to Use Caching
+        Opting Into Optional Events
       
     </span>
   </a>
@@ -2860,10 +2603,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#future-plans" class="md-nav__link">
+  <a href="#relationship-to-emit_update" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Future Plans
+        Relationship to emit_update()
       
     </span>
   </a>
@@ -2871,10 +2614,21 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#related-documentation" class="md-nav__link">
+  <a href="#quick-reference" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Related Documentation
+        Quick Reference
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#see-also" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        See Also
       
     </span>
   </a>
@@ -2949,160 +2703,280 @@
   
 
 
-<h1 id="bedrock-prompt-caching-guide">Bedrock Prompt Caching Guide<a class="headerlink" href="#bedrock-prompt-caching-guide" title="Permanent link">&para;</a></h1>
-<h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
-<p>AWS Bedrock's prompt caching feature can reduce costs by up to 90% and latency by up to 85% for agents with static instructions and dynamic context.</p>
-<p><strong>Status</strong>: Experimental (v1) - Temporary implementation until Agno adds native support</p>
-<h2 id="how-it-works">How It Works<a class="headerlink" href="#how-it-works" title="Permanent link">&para;</a></h2>
-<p>When you enable caching, DCAF places a "cache checkpoint" in your system prompt. Everything before the checkpoint is cached by Bedrock for 5 minutes (TTL resets on each use).</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>[Static Instructions] ← CACHED
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>      ↓
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>[Cache Checkpoint]
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>      ↓
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>[Dynamic Context]     ← NOT cached (fresh each time)
+<h1 id="system-events">System Events<a class="headerlink" href="#system-events" title="Permanent link">&para;</a></h1>
+<p>DCAF automatically emits <code>intermittent_update</code> stream events for key moments in
+agent execution — when the model starts reasoning and when a tool begins executing.
+This page explains how to configure, customise, and extend those built-in signals.</p>
+<hr />
+<h2 id="what-are-system-events">What Are System Events?<a class="headerlink" href="#what-are-system-events" title="Permanent link">&para;</a></h2>
+<p>While your agent is running, DCAF emits transient status messages to the client UI
+at certain points in the lifecycle. These are called <strong>system events</strong> — they are
+generated by the framework itself, not by your tool code.</p>
+<p>By default, two are active:</p>
+<table>
+<thead>
+<tr>
+<th>When it fires</th>
+<th>Default text</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Model begins reasoning</td>
+<td><code>"Thinking..."</code></td>
+</tr>
+<tr>
+<td>A tool begins executing</td>
+<td><code>"Calling tool: {tool_name}"</code></td>
+</tr>
+</tbody>
+</table>
+<p>These appear on the client as <code>intermittent_update</code> stream events — the same type
+that <a href="../emitting-events/"><code>emit_update()</code></a> sends from your code. The UI shows
+them while the agent is working and clears them when the next piece of content
+arrives.</p>
+<hr />
+<h2 id="the-systemevent-descriptor">The <code>SystemEvent</code> Descriptor<a class="headerlink" href="#the-systemevent-descriptor" title="Permanent link">&para;</a></h2>
+<p>Each system event is represented by a <code>SystemEvent</code> object. Import the pre-built
+constants — these are the intended public API:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">dcaf.core</span><span class="w"> </span><span class="kn">import</span> <span class="n">THINKING</span><span class="p">,</span> <span class="n">THINKING_COMPLETE</span><span class="p">,</span> <span class="n">TOOL_STARTED</span><span class="p">,</span> <span class="n">TOOL_COMPLETED</span><span class="p">,</span> <span class="n">TOOL_FAILED</span>
 </span></code></pre></div>
-<h2 id="quick-start">Quick Start<a class="headerlink" href="#quick-start" title="Permanent link">&para;</a></h2>
-<h3 id="basic-usage">Basic Usage<a class="headerlink" href="#basic-usage" title="Permanent link">&para;</a></h3>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">dcaf.core</span><span class="w"> </span><span class="kn">import</span> <span class="n">Agent</span>
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">agent</span> <span class="o">=</span> <span class="n">Agent</span><span class="p">(</span>
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>    <span class="n">system_prompt</span><span class="o">=</span><span class="s2">&quot;You are a Kubernetes expert... [long instructions]&quot;</span><span class="p">,</span>
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="n">tools</span><span class="o">=</span><span class="p">[</span><span class="n">list_pods</span><span class="p">,</span> <span class="n">delete_pod</span><span class="p">],</span>
-</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>    <span class="n">model_config</span><span class="o">=</span><span class="p">{</span>
-</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>        <span class="s2">&quot;cache_system_prompt&quot;</span><span class="p">:</span> <span class="kc">True</span>  <span class="c1"># Enable caching</span>
-</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>    <span class="p">}</span>
-</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="p">)</span>
+<table>
+<thead>
+<tr>
+<th>Constant</th>
+<th>Fires when</th>
+<th>Default text</th>
+<th>Available variables</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>THINKING</code></td>
+<td>Model begins reasoning</td>
+<td><code>"Thinking..."</code></td>
+<td>—</td>
+<td>✓ on</td>
+</tr>
+<tr>
+<td><code>THINKING_COMPLETE</code></td>
+<td>Model finishes reasoning</td>
+<td><code>"Done thinking"</code></td>
+<td>—</td>
+<td>off</td>
+</tr>
+<tr>
+<td><code>TOOL_STARTED</code></td>
+<td>A tool begins executing</td>
+<td><code>"Calling tool: {tool_name}"</code></td>
+<td><code>{tool_name}</code></td>
+<td>✓ on</td>
+</tr>
+<tr>
+<td><code>TOOL_COMPLETED</code></td>
+<td>A tool finishes successfully</td>
+<td><code>"Done: {tool_name}"</code></td>
+<td><code>{tool_name}</code></td>
+<td>off</td>
+</tr>
+<tr>
+<td><code>TOOL_FAILED</code></td>
+<td>A tool raises an exception</td>
+<td><code>"Failed: {tool_name}"</code></td>
+<td><code>{tool_name}</code>, <code>{error}</code></td>
+<td>off</td>
+</tr>
+</tbody>
+</table>
+<p><code>THINKING</code> and <code>TOOL_STARTED</code> are <strong>on by default</strong>. All others are <strong>off by
+default</strong> — opt in when you want them.</p>
+<hr />
+<h2 id="configuring-system-events">Configuring System Events<a class="headerlink" href="#configuring-system-events" title="Permanent link">&para;</a></h2>
+<p>Pass <code>system_events</code> to the <code>Agent</code> constructor.</p>
+<h3 id="keep-the-defaults-no-configuration-needed">Keep the defaults (no configuration needed)<a class="headerlink" href="#keep-the-defaults-no-configuration-needed" title="Permanent link">&para;</a></h3>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">agent</span> <span class="o">=</span> <span class="n">Agent</span><span class="p">(</span><span class="n">tools</span><span class="o">=</span><span class="p">[</span><span class="o">...</span><span class="p">])</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="c1"># Equivalent to:</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">agent</span> <span class="o">=</span> <span class="n">Agent</span><span class="p">(</span><span class="n">tools</span><span class="o">=</span><span class="p">[</span><span class="o">...</span><span class="p">],</span> <span class="n">system_events</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
 </span></code></pre></div>
-<h3 id="separating-static-and-dynamic-content">Separating Static and Dynamic Content<a class="headerlink" href="#separating-static-and-dynamic-content" title="Permanent link">&para;</a></h3>
-<p>This is the <strong>key pattern</strong> for effective caching:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">dcaf.core</span><span class="w"> </span><span class="kn">import</span> <span class="n">Agent</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">agent</span> <span class="o">=</span> <span class="n">Agent</span><span class="p">(</span>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="c1"># Static - cached</span>
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="n">system_prompt</span><span class="o">=</span><span class="s2">&quot;You are a Kubernetes expert. Your job is to help users manage their clusters...&quot;</span><span class="p">,</span>
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>
-</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>    <span class="c1"># Dynamic - NOT cached</span>
-</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>    <span class="n">system_context</span><span class="o">=</span><span class="k">lambda</span> <span class="n">ctx</span><span class="p">:</span> <span class="sa">f</span><span class="s2">&quot;&quot;&quot;</span>
-</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="s2">    Current tenant: </span><span class="si">{</span><span class="n">ctx</span><span class="p">[</span><span class="s1">&#39;tenant_name&#39;</span><span class="p">]</span><span class="si">}</span>
-</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="s2">    Namespace: </span><span class="si">{</span><span class="n">ctx</span><span class="p">[</span><span class="s1">&#39;k8s_namespace&#39;</span><span class="p">]</span><span class="si">}</span>
-</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="s2">    User: </span><span class="si">{</span><span class="n">ctx</span><span class="p">[</span><span class="s1">&#39;user_email&#39;</span><span class="p">]</span><span class="si">}</span>
-</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="s2">    &quot;&quot;&quot;</span><span class="p">,</span>
-</span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>
-</span><span id="__span-2-14"><a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>    <span class="n">model_config</span><span class="o">=</span><span class="p">{</span>
-</span><span id="__span-2-15"><a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>        <span class="s2">&quot;cache_system_prompt&quot;</span><span class="p">:</span> <span class="kc">True</span>
-</span><span id="__span-2-16"><a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a>    <span class="p">}</span>
-</span><span id="__span-2-17"><a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a><span class="p">)</span>
+<h3 id="disable-all-system-events">Disable all system events<a class="headerlink" href="#disable-all-system-events" title="Permanent link">&para;</a></h3>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">agent</span> <span class="o">=</span> <span class="n">Agent</span><span class="p">(</span><span class="n">tools</span><span class="o">=</span><span class="p">[</span><span class="o">...</span><span class="p">],</span> <span class="n">system_events</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
 </span></code></pre></div>
-<h2 id="requirements">Requirements<a class="headerlink" href="#requirements" title="Permanent link">&para;</a></h2>
-<h3 id="minimum-token-count">Minimum Token Count<a class="headerlink" href="#minimum-token-count" title="Permanent link">&para;</a></h3>
-<p>Your static system prompt must be at least:
-- <strong>Claude 3.7 Sonnet</strong>: 1024 tokens
-- <strong>Claude 3.5 Haiku</strong>: 2048 tokens</p>
-<p>If below threshold, caching is automatically disabled with a warning log.</p>
-<p><strong>Rule of thumb</strong>: ~4 characters = 1 token, so aim for 4000+ character prompts.</p>
-<h2 id="best-practices">Best Practices<a class="headerlink" href="#best-practices" title="Permanent link">&para;</a></h2>
-<h3 id="1-put-static-content-first">1. Put Static Content First<a class="headerlink" href="#1-put-static-content-first" title="Permanent link">&para;</a></h3>
-<p>✅ <strong>Good</strong>: Static instructions, then dynamic context
-<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">system_prompt</span><span class="o">=</span><span class="s2">&quot;You are a K8s expert. [lengthy guidelines]&quot;</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">system_context</span><span class="o">=</span><span class="s2">&quot;Current tenant: acme-corp&quot;</span>
-</span></code></pre></div></p>
-<p>❌ <strong>Bad</strong>: Mixing static and dynamic
-<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">system_prompt</span><span class="o">=</span><span class="s2">&quot;You are a K8s expert for tenant: acme-corp. [guidelines]&quot;</span>
-</span></code></pre></div></p>
-<h3 id="2-make-static-content-detailed">2. Make Static Content Detailed<a class="headerlink" href="#2-make-static-content-detailed" title="Permanent link">&para;</a></h3>
-<p>The more static content you cache, the bigger the savings:</p>
-<p>✅ <strong>Good</strong>: Detailed instructions (1500+ tokens)
-<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">system_prompt</span><span class="o">=</span><span class="s2">&quot;&quot;&quot;</span>
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="s2">You are a Kubernetes expert assistant.</span>
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>
-</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="s2">Guidelines:</span>
-</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="s2">- Always verify namespace before operations</span>
-</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="s2">- Explain commands clearly</span>
-</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="s2">- Ask for confirmation on destructive operations</span>
-</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="s2">- Follow kubectl best practices</span>
-</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="s2">- Provide helpful error messages</span>
-</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>
-</span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a><span class="s2">[More detailed guidelines...]</span>
-</span><span id="__span-5-12"><a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a><span class="s2">&quot;&quot;&quot;</span>
-</span></code></pre></div></p>
-<p>❌ <strong>Bad</strong>: Brief instructions (50 tokens)
-<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="n">system_prompt</span><span class="o">=</span><span class="s2">&quot;You are a helpful Kubernetes assistant.&quot;</span>
-</span></code></pre></div></p>
-<h3 id="3-use-callable-for-dynamic-context">3. Use Callable for Dynamic Context<a class="headerlink" href="#3-use-callable-for-dynamic-context" title="Permanent link">&para;</a></h3>
-<p>For runtime data, use a lambda or function:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="n">system_context</span><span class="o">=</span><span class="k">lambda</span> <span class="n">ctx</span><span class="p">:</span> <span class="sa">f</span><span class="s2">&quot;&quot;&quot;</span>
-</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="s2">Tenant: </span><span class="si">{</span><span class="n">ctx</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;tenant_name&#39;</span><span class="p">)</span><span class="si">}</span>
-</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="s2">Namespace: </span><span class="si">{</span><span class="n">ctx</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;k8s_namespace&#39;</span><span class="p">)</span><span class="si">}</span>
-</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="s2">User: </span><span class="si">{</span><span class="n">ctx</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;user_email&#39;</span><span class="p">)</span><span class="si">}</span>
-</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="s2">&quot;&quot;&quot;</span>
+<h3 id="choose-specific-events">Choose specific events<a class="headerlink" href="#choose-specific-events" title="Permanent link">&para;</a></h3>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">dcaf.core</span><span class="w"> </span><span class="kn">import</span> <span class="n">THINKING</span><span class="p">,</span> <span class="n">TOOL_STARTED</span><span class="p">,</span> <span class="n">TOOL_COMPLETED</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">agent</span> <span class="o">=</span> <span class="n">Agent</span><span class="p">(</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    <span class="n">tools</span><span class="o">=</span><span class="p">[</span><span class="o">...</span><span class="p">],</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    <span class="n">system_events</span><span class="o">=</span><span class="p">[</span><span class="n">THINKING</span><span class="p">,</span> <span class="n">TOOL_STARTED</span><span class="p">,</span> <span class="n">TOOL_COMPLETED</span><span class="p">],</span>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="p">)</span>
 </span></code></pre></div>
-<h2 id="monitoring">Monitoring<a class="headerlink" href="#monitoring" title="Permanent link">&para;</a></h2>
-<h3 id="cache-performance-logs">Cache Performance Logs<a class="headerlink" href="#cache-performance-logs" title="Permanent link">&para;</a></h3>
-<p>DCAF logs cache performance when available:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>INFO: ✅ Cache HIT: 950 tokens reused (~90% cost reduction)
-</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>INFO: 📝 Cache MISS: 950 tokens cached for next request (cache created)
+<p>Only the events in the list will fire. The default two (<code>THINKING</code>, <code>TOOL_STARTED</code>)
+are not added automatically when you pass a list — you are taking full control.</p>
+<hr />
+<h2 id="customising-the-text">Customising the Text<a class="headerlink" href="#customising-the-text" title="Permanent link">&para;</a></h2>
+<h3 id="simple-text-override">Simple text override<a class="headerlink" href="#simple-text-override" title="Permanent link">&para;</a></h3>
+<p>Replace the default string with your own. Template variables in <code>{curly_braces}</code>
+are still supported:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">dcaf.core</span><span class="w"> </span><span class="kn">import</span> <span class="n">THINKING</span><span class="p">,</span> <span class="n">TOOL_STARTED</span><span class="p">,</span> <span class="n">TOOL_COMPLETED</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="n">agent</span> <span class="o">=</span> <span class="n">Agent</span><span class="p">(</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>    <span class="n">tools</span><span class="o">=</span><span class="p">[</span><span class="o">...</span><span class="p">],</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>    <span class="n">system_events</span><span class="o">=</span><span class="p">[</span>
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>        <span class="n">THINKING</span><span class="o">.</span><span class="n">with_text</span><span class="p">(</span><span class="s2">&quot;Working...&quot;</span><span class="p">),</span>
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>        <span class="n">TOOL_STARTED</span><span class="o">.</span><span class="n">with_text</span><span class="p">(</span><span class="s2">&quot;Running </span><span class="si">{tool_name}</span><span class="s2">...&quot;</span><span class="p">),</span>
+</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>        <span class="n">TOOL_COMPLETED</span><span class="o">.</span><span class="n">with_text</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">{tool_name}</span><span class="s2"> complete&quot;</span><span class="p">),</span>
+</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>    <span class="p">],</span>
+</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="p">)</span>
 </span></code></pre></div>
-<h3 id="first-request-is-always-a-miss">First Request is Always a MISS<a class="headerlink" href="#first-request-is-always-a-miss" title="Permanent link">&para;</a></h3>
-<p>The first request creates the cache (MISS). Subsequent requests within 5 minutes are HITs:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>Request 1: MISS (creates cache)  → Full cost
-</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>Request 2: HIT  (uses cache)     → 10% cost
-</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>Request 3: HIT  (uses cache)     → 10% cost
-</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>...
-</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>Request N: MISS (cache expired)  → Full cost
+<h3 id="custom-formatter-function">Custom formatter function<a class="headerlink" href="#custom-formatter-function" title="Permanent link">&para;</a></h3>
+<p>For dynamic logic — branching, lookups, or anything a template can't express:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">dcaf.core</span><span class="w"> </span><span class="kn">import</span> <span class="n">TOOL_STARTED</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="n">agent</span> <span class="o">=</span> <span class="n">Agent</span><span class="p">(</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>    <span class="n">tools</span><span class="o">=</span><span class="p">[</span><span class="o">...</span><span class="p">],</span>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>    <span class="n">system_events</span><span class="o">=</span><span class="p">[</span>
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>        <span class="n">TOOL_STARTED</span><span class="o">.</span><span class="n">with_formatter</span><span class="p">(</span><span class="k">lambda</span> <span class="n">d</span><span class="p">:</span> <span class="sa">f</span><span class="s2">&quot;▶ </span><span class="si">{</span><span class="n">d</span><span class="p">[</span><span class="s1">&#39;tool_name&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">),</span>
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>    <span class="p">],</span>
+</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="p">)</span>
 </span></code></pre></div>
-<h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
-<h3 id="no-cache-metrics-in-logs">No Cache Metrics in Logs<a class="headerlink" href="#no-cache-metrics-in-logs" title="Permanent link">&para;</a></h3>
-<p><strong>Symptom</strong>: Caching enabled but no "Cache HIT/MISS" logs</p>
-<p><strong>Possible causes</strong>:
-1. System prompt below minimum token threshold
-2. Model doesn't support caching
-3. Bedrock API change</p>
-<p><strong>Solution</strong>: Check logs for warnings about token threshold</p>
-<h3 id="caching-not-enabled">Caching Not Enabled<a class="headerlink" href="#caching-not-enabled" title="Permanent link">&para;</a></h3>
-<p><strong>Symptom</strong>: No cache-related logs at all</p>
-<p><strong>Checklist</strong>:
-- [ ] <code>model_config={"cache_system_prompt": True}</code> set?
-- [ ] Using Bedrock provider (not OpenAI)?
-- [ ] Using supported model (Claude 3.5/3.7)?</p>
-<h2 id="cost-comparison">Cost Comparison<a class="headerlink" href="#cost-comparison" title="Permanent link">&para;</a></h2>
-<h3 id="example-scenario">Example Scenario<a class="headerlink" href="#example-scenario" title="Permanent link">&para;</a></h3>
+<p>The formatter receives a <code>dict</code> containing the available variables for that event
+(see the table above) and must return a <code>str</code>.</p>
+<hr />
+<h2 id="internationalisation-i18n">Internationalisation (i18n)<a class="headerlink" href="#internationalisation-i18n" title="Permanent link">&para;</a></h2>
+<p>Because <code>.with_formatter()</code> accepts any callable, you can plug in any translation
+system. The formatter receives the same <code>data</code> dict regardless of language —
+all you supply is the function.</p>
+<p>The example below shows a generic pattern. <code>translate()</code> is your own function
+(a <code>gettext</code> wrapper, a dict lookup, an API call — whatever fits your project):</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">dcaf.core</span><span class="w"> </span><span class="kn">import</span> <span class="n">THINKING</span><span class="p">,</span> <span class="n">THINKING_COMPLETE</span><span class="p">,</span> <span class="n">TOOL_STARTED</span><span class="p">,</span> <span class="n">TOOL_COMPLETED</span><span class="p">,</span> <span class="n">TOOL_FAILED</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="c1"># Your translation function — DCAF doesn&#39;t care how it works</span>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="k">def</span><span class="w"> </span><span class="nf">translate</span><span class="p">(</span><span class="n">key</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>    <span class="k">return</span> <span class="n">translations</span><span class="p">[</span><span class="n">locale</span><span class="p">][</span><span class="n">key</span><span class="p">]</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>
+</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="n">agent</span> <span class="o">=</span> <span class="n">Agent</span><span class="p">(</span>
+</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>    <span class="n">tools</span><span class="o">=</span><span class="p">[</span><span class="o">...</span><span class="p">],</span>
+</span><span id="__span-6-9"><a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>    <span class="n">system_events</span><span class="o">=</span><span class="p">[</span>
+</span><span id="__span-6-10"><a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>        <span class="n">THINKING</span><span class="o">.</span><span class="n">with_formatter</span><span class="p">(</span>
+</span><span id="__span-6-11"><a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a>            <span class="k">lambda</span> <span class="n">_d</span><span class="p">:</span> <span class="n">translate</span><span class="p">(</span><span class="s2">&quot;agent.thinking&quot;</span><span class="p">)</span>
+</span><span id="__span-6-12"><a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a>        <span class="p">),</span>
+</span><span id="__span-6-13"><a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a>        <span class="n">THINKING_COMPLETE</span><span class="o">.</span><span class="n">with_formatter</span><span class="p">(</span>
+</span><span id="__span-6-14"><a id="__codelineno-6-14" name="__codelineno-6-14" href="#__codelineno-6-14"></a>            <span class="k">lambda</span> <span class="n">_d</span><span class="p">:</span> <span class="n">translate</span><span class="p">(</span><span class="s2">&quot;agent.thinking_done&quot;</span><span class="p">)</span>
+</span><span id="__span-6-15"><a id="__codelineno-6-15" name="__codelineno-6-15" href="#__codelineno-6-15"></a>        <span class="p">),</span>
+</span><span id="__span-6-16"><a id="__codelineno-6-16" name="__codelineno-6-16" href="#__codelineno-6-16"></a>        <span class="n">TOOL_STARTED</span><span class="o">.</span><span class="n">with_formatter</span><span class="p">(</span>
+</span><span id="__span-6-17"><a id="__codelineno-6-17" name="__codelineno-6-17" href="#__codelineno-6-17"></a>            <span class="k">lambda</span> <span class="n">d</span><span class="p">:</span> <span class="n">translate</span><span class="p">(</span><span class="s2">&quot;agent.tool_started&quot;</span><span class="p">,</span> <span class="n">tool_name</span><span class="o">=</span><span class="n">d</span><span class="p">[</span><span class="s2">&quot;tool_name&quot;</span><span class="p">])</span>
+</span><span id="__span-6-18"><a id="__codelineno-6-18" name="__codelineno-6-18" href="#__codelineno-6-18"></a>        <span class="p">),</span>
+</span><span id="__span-6-19"><a id="__codelineno-6-19" name="__codelineno-6-19" href="#__codelineno-6-19"></a>        <span class="n">TOOL_COMPLETED</span><span class="o">.</span><span class="n">with_formatter</span><span class="p">(</span>
+</span><span id="__span-6-20"><a id="__codelineno-6-20" name="__codelineno-6-20" href="#__codelineno-6-20"></a>            <span class="k">lambda</span> <span class="n">d</span><span class="p">:</span> <span class="n">translate</span><span class="p">(</span><span class="s2">&quot;agent.tool_done&quot;</span><span class="p">,</span> <span class="n">tool_name</span><span class="o">=</span><span class="n">d</span><span class="p">[</span><span class="s2">&quot;tool_name&quot;</span><span class="p">])</span>
+</span><span id="__span-6-21"><a id="__codelineno-6-21" name="__codelineno-6-21" href="#__codelineno-6-21"></a>        <span class="p">),</span>
+</span><span id="__span-6-22"><a id="__codelineno-6-22" name="__codelineno-6-22" href="#__codelineno-6-22"></a>        <span class="n">TOOL_FAILED</span><span class="o">.</span><span class="n">with_formatter</span><span class="p">(</span>
+</span><span id="__span-6-23"><a id="__codelineno-6-23" name="__codelineno-6-23" href="#__codelineno-6-23"></a>            <span class="k">lambda</span> <span class="n">d</span><span class="p">:</span> <span class="n">translate</span><span class="p">(</span><span class="s2">&quot;agent.tool_failed&quot;</span><span class="p">,</span>
+</span><span id="__span-6-24"><a id="__codelineno-6-24" name="__codelineno-6-24" href="#__codelineno-6-24"></a>                                <span class="n">tool_name</span><span class="o">=</span><span class="n">d</span><span class="p">[</span><span class="s2">&quot;tool_name&quot;</span><span class="p">],</span>
+</span><span id="__span-6-25"><a id="__codelineno-6-25" name="__codelineno-6-25" href="#__codelineno-6-25"></a>                                <span class="n">error</span><span class="o">=</span><span class="n">d</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;error&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">))</span>
+</span><span id="__span-6-26"><a id="__codelineno-6-26" name="__codelineno-6-26" href="#__codelineno-6-26"></a>        <span class="p">),</span>
+</span><span id="__span-6-27"><a id="__codelineno-6-27" name="__codelineno-6-27" href="#__codelineno-6-27"></a>    <span class="p">],</span>
+</span><span id="__span-6-28"><a id="__codelineno-6-28" name="__codelineno-6-28" href="#__codelineno-6-28"></a><span class="p">)</span>
+</span></code></pre></div>
+<p>The formatters are plain Python functions — they can branch on <code>locale</code>, call a
+remote service, or read from any data structure. DCAF passes the event data dict
+and uses whatever string you return.</p>
+<hr />
+<h2 id="opting-into-optional-events">Opting Into Optional Events<a class="headerlink" href="#opting-into-optional-events" title="Permanent link">&para;</a></h2>
+<p>The three off-by-default events let you bracket each phase of the lifecycle:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">dcaf.core</span><span class="w"> </span><span class="kn">import</span> <span class="n">THINKING</span><span class="p">,</span> <span class="n">THINKING_COMPLETE</span><span class="p">,</span> <span class="n">TOOL_STARTED</span><span class="p">,</span> <span class="n">TOOL_COMPLETED</span><span class="p">,</span> <span class="n">TOOL_FAILED</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="n">agent</span> <span class="o">=</span> <span class="n">Agent</span><span class="p">(</span>
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>    <span class="n">tools</span><span class="o">=</span><span class="p">[</span><span class="o">...</span><span class="p">],</span>
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>    <span class="n">system_events</span><span class="o">=</span><span class="p">[</span>
+</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>        <span class="n">THINKING</span><span class="p">,</span>
+</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>        <span class="n">THINKING_COMPLETE</span><span class="p">,</span>
+</span><span id="__span-7-8"><a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>        <span class="n">TOOL_STARTED</span><span class="p">,</span>
+</span><span id="__span-7-9"><a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a>        <span class="n">TOOL_COMPLETED</span><span class="p">,</span>
+</span><span id="__span-7-10"><a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a>        <span class="n">TOOL_FAILED</span><span class="o">.</span><span class="n">with_text</span><span class="p">(</span><span class="s2">&quot;Error in </span><span class="si">{tool_name}</span><span class="s2">: </span><span class="si">{error}</span><span class="s2">&quot;</span><span class="p">),</span>
+</span><span id="__span-7-11"><a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a>    <span class="p">],</span>
+</span><span id="__span-7-12"><a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a><span class="p">)</span>
+</span></code></pre></div>
+<p>With this configuration the client receives events for the full lifecycle:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>THINKING fires          → &quot;Thinking...&quot;
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>THINKING_COMPLETE fires → &quot;Done thinking&quot;
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>TOOL_STARTED fires   → &quot;Calling tool: list_pods&quot;
+</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>TOOL_COMPLETED fires → &quot;Done: list_pods&quot;
+</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>
+</span><span id="__span-8-7"><a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a>TOOL_STARTED fires  → &quot;Calling tool: delete_pod&quot;
+</span><span id="__span-8-8"><a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>TOOL_FAILED fires   → &quot;Error in delete_pod: permission denied&quot;
+</span></code></pre></div>
+<hr />
+<h2 id="relationship-to-emit_update">Relationship to <code>emit_update()</code><a class="headerlink" href="#relationship-to-emit_update" title="Permanent link">&para;</a></h2>
+<p>System events and user-defined events are complementary. System events fire
+automatically from the framework; user-defined events let your tool code push
+any message at any time:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">dcaf.core</span><span class="w"> </span><span class="kn">import</span> <span class="n">emit_update</span><span class="p">,</span> <span class="n">tool</span>
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="nd">@tool</span><span class="p">(</span><span class="n">description</span><span class="o">=</span><span class="s2">&quot;Search for pods&quot;</span><span class="p">)</span>
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="k">def</span><span class="w"> </span><span class="nf">search_pods</span><span class="p">(</span><span class="n">query</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>    <span class="c1"># Your code pushing a status update (user-defined)</span>
+</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>    <span class="n">emit_update</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Searching for: </span><span class="si">{</span><span class="n">query</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>    <span class="n">results</span> <span class="o">=</span> <span class="n">_do_search</span><span class="p">(</span><span class="n">query</span><span class="p">)</span>
+</span><span id="__span-9-8"><a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>    <span class="n">emit_update</span><span class="p">(</span><span class="s2">&quot;Search complete&quot;</span><span class="p">,</span> <span class="n">content</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;count&quot;</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">results</span><span class="p">)})</span>
+</span><span id="__span-9-9"><a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a>    <span class="k">return</span> <span class="n">format_results</span><span class="p">(</span><span class="n">results</span><span class="p">)</span>
+</span><span id="__span-9-10"><a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a>
+</span><span id="__span-9-11"><a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a><span class="c1"># The framework automatically adds:</span>
+</span><span id="__span-9-12"><a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a><span class="c1">#   &quot;Calling tool: search_pods&quot;   ← system event (TOOL_STARTED)</span>
+</span><span id="__span-9-13"><a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a><span class="c1"># before your tool runs</span>
+</span></code></pre></div>
+<p>See <a href="../emitting-events/">Emitting Events</a> for the full <code>emit_update()</code> /
+<code>emit()</code> reference.</p>
+<hr />
+<h2 id="quick-reference">Quick Reference<a class="headerlink" href="#quick-reference" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Goal</th>
+<th>Code</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Keep defaults</td>
+<td><code>Agent(tools=[...])</code></td>
+</tr>
+<tr>
+<td>Disable all</td>
+<td><code>Agent(..., system_events=False)</code></td>
+</tr>
+<tr>
+<td>Choose events</td>
+<td><code>Agent(..., system_events=[THINKING, TOOL_STARTED])</code></td>
+</tr>
+<tr>
+<td>Custom text</td>
+<td><code>TOOL_STARTED.with_text("Running {tool_name}...")</code></td>
+</tr>
+<tr>
+<td>Custom formatter</td>
+<td><code>TOOL_STARTED.with_formatter(lambda d: ...)</code></td>
+</tr>
+<tr>
+<td>Add tool completion</td>
+<td><code>system_events=[..., TOOL_COMPLETED]</code></td>
+</tr>
+<tr>
+<td>Bracket reasoning</td>
+<td><code>system_events=[THINKING, THINKING_COMPLETE, TOOL_STARTED]</code></td>
+</tr>
+<tr>
+<td>Full lifecycle</td>
+<td><code>system_events=[THINKING, THINKING_COMPLETE, TOOL_STARTED, TOOL_COMPLETED, TOOL_FAILED]</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="see-also">See Also<a class="headerlink" href="#see-also" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Static prompt: 1500 tokens</li>
-<li>Dynamic context: 100 tokens</li>
-<li>100 requests</li>
-</ul>
-<p><strong>Without caching:</strong>
-- Per request: 1600 tokens
-- Total: 160,000 tokens
-- Cost: ~$0.48</p>
-<p><strong>With caching:</strong>
-- First request: 1600 tokens (MISS)
-- Next 99 requests: 100 tokens each (HIT)
-- Total: 11,500 tokens
-- Cost: ~$0.035</p>
-<p><strong>Savings: ~93%</strong> 💰</p>
-<h2 id="supported-models">Supported Models<a class="headerlink" href="#supported-models" title="Permanent link">&para;</a></h2>
-<p>Prompt caching is supported on:
-- <code>anthropic.claude-3-7-sonnet-20250219-v1:0</code>
-- <code>anthropic.claude-3-5-sonnet-20241022-v2:0</code>
-- <code>anthropic.claude-3-5-haiku-20241022-v1:0</code></p>
-<h2 id="when-not-to-use-caching">When NOT to Use Caching<a class="headerlink" href="#when-not-to-use-caching" title="Permanent link">&para;</a></h2>
-<p>❌ <strong>Don't use caching when</strong>:
-- System prompt changes frequently
-- System prompt is very short (&lt;1024 tokens)
-- Low request volume (cache expires between requests)
-- Using non-Bedrock providers</p>
-<p>✅ <strong>DO use caching when</strong>:
-- Long, static system prompts
-- High request volume (multiple requests per 5 minutes)
-- Multi-tenant scenarios (static instructions, dynamic tenant context)</p>
-<h2 id="future-plans">Future Plans<a class="headerlink" href="#future-plans" title="Permanent link">&para;</a></h2>
-<p>This is a temporary implementation. Once Agno adds native prompt caching support, we'll migrate to their implementation and remove the custom code.</p>
-<h2 id="related-documentation">Related Documentation<a class="headerlink" href="#related-documentation" title="Permanent link">&para;</a></h2>
-<ul>
-<li><a href="../../api-reference/agents/">Agent API Reference</a></li>
-<li><a href="../custom-agents/">Creating Custom Agents</a></li>
-<li><a href="../working-with-bedrock/">AWS Bedrock Guide</a></li>
+<li><a href="../emitting-events/">Emitting Events</a> — <code>emit_update()</code> / <code>emit()</code> for user-defined updates</li>
+<li><a href="../event-subscriptions/">Event Subscriptions</a> — <code>@agent.on()</code> for reacting to events in code</li>
+<li><a href="../streaming/">Streaming Responses</a> — full event type reference</li>
 </ul>
 
 
