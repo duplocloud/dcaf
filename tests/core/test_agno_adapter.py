@@ -671,5 +671,74 @@ class TestDefaultToolkit:
         assert len(agno_tools) == expected_count
 
 
+# =============================================================================
+# Test: Native Agno Toolkit pass-through
+# =============================================================================
+
+
+class TestNativeAgnoToolkitPassthrough:
+    """Tests verifying native Agno Toolkit instances pass through _convert_tools_to_agno()."""
+
+    def test_native_agno_toolkit_passes_through_without_conversion(self):
+        """Native Agno Toolkit instances should be appended directly, not sent to tool_converter."""
+        from agno.tools.toolkit import Toolkit as AgnoToolkit
+
+        from dcaf.core.adapters.outbound.agno.adapter import AgnoAdapter
+
+        # Create a minimal native Agno Toolkit subclass
+        class FakeNeo4jTools(AgnoToolkit):
+            def __init__(self):
+                super().__init__(name="neo4j_tools")
+
+        adapter = AgnoAdapter(model_id="test", provider="bedrock")
+        toolkit = FakeNeo4jTools()
+
+        agno_tools = adapter._convert_tools_to_agno([toolkit])
+
+        assert len(agno_tools) == 1
+        assert agno_tools[0] is toolkit
+
+    def test_native_agno_toolkit_does_not_crash(self):
+        """Regression: native Agno Toolkit should not raise AttributeError on missing .description."""
+        from agno.tools.toolkit import Toolkit as AgnoToolkit
+
+        from dcaf.core.adapters.outbound.agno.adapter import AgnoAdapter
+
+        class FakeDuckDbTools(AgnoToolkit):
+            def __init__(self):
+                super().__init__(name="duckdb_tools")
+
+        adapter = AgnoAdapter(model_id="test", provider="bedrock")
+        toolkit = FakeDuckDbTools()
+
+        # This should NOT raise AttributeError: 'FakeDuckDbTools' object has no attribute 'description'
+        agno_tools = adapter._convert_tools_to_agno([toolkit])
+        assert len(agno_tools) == 1
+
+    def test_mixed_dcaf_tools_and_native_toolkits(self):
+        """DCAF Tools and native Agno Toolkits should coexist in the same tools list."""
+        from agno.tools.toolkit import Toolkit as AgnoToolkit
+
+        from dcaf.core import tool
+        from dcaf.core.adapters.outbound.agno.adapter import AgnoAdapter
+
+        class FakeSqlTools(AgnoToolkit):
+            def __init__(self):
+                super().__init__(name="sql_tools")
+
+        @tool(description="A DCAF tool")
+        def my_dcaf_tool(x: str) -> str:
+            return x
+
+        adapter = AgnoAdapter(model_id="test", provider="bedrock")
+        toolkit = FakeSqlTools()
+
+        agno_tools = adapter._convert_tools_to_agno([toolkit, my_dcaf_tool])
+
+        # Should have 2 items: the native toolkit (passed through) + the DCAF tool (converted)
+        assert len(agno_tools) == 2
+        assert agno_tools[0] is toolkit  # Native toolkit first, passed through directly
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
