@@ -53,6 +53,13 @@ class ServerAdapter:
 
     Args:
         agent: The Core Agent instance to wrap
+        execute_cmd: Optional custom command executor. When provided, replaces the
+            built-in subprocess implementation for all command execution paths.
+            Signature: ``(command: str, files: list[dict] | None, context: dict | None) -> str``
+
+            Use this for domain-specific execution: kubeconfig injection, sandboxing,
+            timeouts, environment setup. ``context`` carries the full platform_context
+            including ``thread_id`` if sent by the client.
 
     Example:
         from dcaf.core import Agent
@@ -72,6 +79,17 @@ class ServerAdapter:
         # Create and run the app
         app = create_chat_app(adapter)
         uvicorn.run(app, host="0.0.0.0", port=8000)
+
+        # Custom executor with kubeconfig injection
+        import os, subprocess
+
+        def k8s_executor(command, files, context):
+            env = os.environ.copy()
+            env["KUBECONFIG"] = (context or {}).get("kubeconfig_path", "")
+            result = subprocess.run(command, shell=True, env=env, capture_output=True, text=True)
+            return result.stdout
+
+        adapter = ServerAdapter(agent, execute_cmd=k8s_executor)
     """
 
     def __init__(
