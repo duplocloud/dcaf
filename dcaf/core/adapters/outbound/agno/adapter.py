@@ -39,6 +39,7 @@ from ....application.dto.responses import (
 from ....application.ports.mcp_protocol import MCPToolLike
 from ....config import EnvVars
 from ....events import Event, EventRegistry
+from ....llm import LLM as DcafLLM
 from ....services.skill_manager import SkillManager
 from ....services.skill_translator import translate_skills
 from .gcp_metadata import GCPMetadataManager, get_default_gcp_metadata_manager
@@ -146,6 +147,8 @@ class AgnoAdapter:
         tool_call_limit: int | None = None,
         disable_history: bool = False,
         disable_tool_filtering: bool = False,
+        # LLM layer (optional — if provided, model creation is delegated)
+        llm: DcafLLM | None = None,
         **kwargs: Any,
     ) -> None:
         """
@@ -227,24 +230,30 @@ class AgnoAdapter:
         self._static_system: str | None = None
         self._dynamic_system: str | None = None
 
-        # Create model factory (model created lazily)
-        self._model_factory = AgnoModelFactory(
-            config=ModelConfig(
-                model_id=model_id,
-                provider=provider.lower(),
-                max_tokens=max_tokens,
-                temperature=temperature,
-                aws_profile=aws_profile,
-                aws_region=self._aws_region,
-                aws_access_key=aws_access_key,
-                aws_secret_key=aws_secret_key,
-                api_key=api_key,
-                google_project_id=google_project_id,
-                google_location=google_location,
-                cache_system_prompt=self._model_config.get("cache_system_prompt", False),
-            ),
-            gcp_metadata_manager=self._gcp_metadata_manager,
-        )
+        # LLM layer — if provided, delegate model creation to it.
+        # Otherwise, create our own model factory (backward compatible).
+        self._llm = llm
+        if llm is not None:
+            self._model_factory = llm._model_factory
+        else:
+            # Create model factory (model created lazily)
+            self._model_factory = AgnoModelFactory(
+                config=ModelConfig(
+                    model_id=model_id,
+                    provider=provider.lower(),
+                    max_tokens=max_tokens,
+                    temperature=temperature,
+                    aws_profile=aws_profile,
+                    aws_region=self._aws_region,
+                    aws_access_key=aws_access_key,
+                    aws_secret_key=aws_secret_key,
+                    api_key=api_key,
+                    google_project_id=google_project_id,
+                    google_location=google_location,
+                    cache_system_prompt=self._model_config.get("cache_system_prompt", False),
+                ),
+                gcp_metadata_manager=self._gcp_metadata_manager,
+            )
 
         # Sync Agno's logging with DCAF's logging level
         _sync_agno_log_level()
