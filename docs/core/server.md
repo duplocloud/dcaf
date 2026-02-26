@@ -271,10 +271,21 @@ curl -X POST http://localhost:8000/api/chat-stream \
 | Event Type | Description |
 |------------|-------------|
 | `text_delta` | Text token(s) from the LLM |
-| `tool_calls` | Tool calls requiring approval |
-| `executed_tool_calls` | Results from executed tools |
+| `intermittent_update` | Inline status message (e.g. `"Calling tool: neo4j_query"`, `"Thinking..."`) |
+| `tool_calls` | Tool calls pending approval — contains populated `id`, `name`, and `input` fields |
+| `approvals` | Unified approval requests (companion to `tool_calls`); use this event to drive approval UI |
+| `commands` | Shell commands pending approval |
+| `executed_tool_calls` | Tool call results injected *before* the LLM call — only present when the client sends back approved `tool_calls` with `"execute": true` in a follow-up request |
+| `executed_commands` | Shell command results injected *before* the LLM call — only present when approved `cmds` are sent back |
+| `executed_approvals` | Results of unified approval execution — only present when approved `approvals` are sent back |
 | `done` | Stream completed successfully |
 | `error` | An error occurred |
+
+!!! note "`executed_*` events require a round-trip"
+    `executed_tool_calls`, `executed_commands`, and `executed_approvals` are **not** emitted when the agent
+    executes tools automatically. They are emitted at the *start* of the next request when the client sends
+    back an approved `tool_calls`, `cmds`, or `approvals` array. A first-turn request will never contain
+    these events.
 
 ### Handling Streams in Python
 

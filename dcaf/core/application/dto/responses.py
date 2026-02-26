@@ -625,12 +625,17 @@ class StreamEvent:
         cls,
         tool_call_id: str,
         tool_name: str,
+        tool_args: dict[str, Any] | None = None,
         index: int = 0,
     ) -> "StreamEvent":
         """Create a tool use start event."""
         return cls(
             event_type=StreamEventType.TOOL_USE_START,
-            data={"tool_call_id": tool_call_id, "tool_name": tool_name},
+            data={
+                "tool_call_id": tool_call_id,
+                "tool_name": tool_name,
+                "tool_args": tool_args or {},
+            },
             index=index,
         )
 
