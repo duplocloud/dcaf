@@ -3,6 +3,9 @@ from dcaf.core.discovery import (
     DiscoveryEdge,
     DiscoveryNode,
     DiscoveryPayload,
+    drain_discovery_queue,
+    emit_discovery,
+    reset_discovery_queue,
 )
 
 
@@ -84,3 +87,75 @@ class TestDiscoveryModels:
                 }
             ],
         }
+
+
+class TestEmitDiscovery:
+    def setup_method(self):
+        reset_discovery_queue()
+
+    def test_emit_discovery_queues_payload(self):
+        emit_discovery(
+            nodes=[{"id": "n1", "labels": ["Service"], "properties": {"name": "web-api"}}],
+            edges=[],
+        )
+        payloads = drain_discovery_queue()
+        assert len(payloads) == 1
+        assert payloads[0].nodes[0].id == "n1"
+
+    def test_emit_discovery_multiple_calls_queue_in_order(self):
+        emit_discovery(
+            nodes=[{"id": "n1", "labels": ["Service"], "properties": {"name": "first"}}],
+            edges=[],
+        )
+        emit_discovery(
+            nodes=[{"id": "n2", "labels": ["Database"], "properties": {"name": "second"}}],
+            edges=[],
+        )
+        payloads = drain_discovery_queue()
+        assert len(payloads) == 2
+        assert payloads[0].nodes[0].properties["name"] == "first"
+        assert payloads[1].nodes[0].properties["name"] == "second"
+
+    def test_drain_clears_queue(self):
+        emit_discovery(
+            nodes=[{"id": "n1", "labels": ["Service"], "properties": {"name": "web-api"}}],
+            edges=[],
+        )
+        drain_discovery_queue()
+        payloads = drain_discovery_queue()
+        assert len(payloads) == 0
+
+    def test_drain_empty_queue_returns_empty_list(self):
+        payloads = drain_discovery_queue()
+        assert payloads == []
+
+    def test_emit_discovery_with_edges(self):
+        emit_discovery(
+            nodes=[
+                {"id": "n1", "labels": ["Service"], "properties": {"name": "web-api"}},
+                {"id": "n2", "labels": ["Database"], "properties": {"name": "postgres"}},
+            ],
+            edges=[
+                {
+                    "id": "e1",
+                    "type": "CONNECTS_TO",
+                    "startNode": "n1",
+                    "endNode": "n2",
+                    "properties": {"port": 5432},
+                }
+            ],
+        )
+        payloads = drain_discovery_queue()
+        assert len(payloads) == 1
+        assert len(payloads[0].nodes) == 2
+        assert len(payloads[0].edges) == 1
+        assert payloads[0].edges[0].type == "CONNECTS_TO"
+
+    def test_reset_clears_queue(self):
+        emit_discovery(
+            nodes=[{"id": "n1", "labels": ["Service"], "properties": {"name": "web-api"}}],
+            edges=[],
+        )
+        reset_discovery_queue()
+        payloads = drain_discovery_queue()
+        assert payloads == []
