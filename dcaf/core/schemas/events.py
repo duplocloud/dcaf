@@ -4,6 +4,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
+from ..discovery import DiscoveryPayload
+
 from .messages import (
     Approval,
     Command,
@@ -92,5 +94,12 @@ class IntermittentUpdateEvent(StreamEvent):
     content: dict = Field(default_factory=dict)
 
 
-# Total event types: 10
-# They are: executed_commands, executed_tool_calls, text_delta, tool_calls, commands, approvals, executed_approvals, done, error, intermittent_update
+class DiscoveryEvent(StreamEvent):
+    """Graph data for the Discovery panel (nodes and edges)."""
+
+    type: Literal["discovery"] = "discovery"
+    discovery: DiscoveryPayload
+
+
+# Total event types: 11
+# They are: executed_commands, executed_tool_calls, text_delta, tool_calls, commands, approvals, executed_approvals, done, error, intermittent_update, discovery

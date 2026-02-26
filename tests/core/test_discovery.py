@@ -159,3 +159,62 @@ class TestEmitDiscovery:
         reset_discovery_queue()
         payloads = drain_discovery_queue()
         assert payloads == []
+
+
+class TestDiscoveryEvent:
+    def test_discovery_event_type(self):
+        from dcaf.core.schemas.events import DiscoveryEvent
+
+        event = DiscoveryEvent(
+            discovery=DiscoveryPayload(
+                nodes=[DiscoveryNode(id="n1", labels=["Service"], properties={"name": "web-api"})],
+                edges=[],
+            )
+        )
+        assert event.type == "discovery"
+
+    def test_discovery_event_serialization_matches_ui_format(self):
+        from dcaf.core.schemas.events import DiscoveryEvent
+
+        event = DiscoveryEvent(
+            discovery=DiscoveryPayload(
+                nodes=[
+                    DiscoveryNode(
+                        id="n1",
+                        labels=["Service"],
+                        properties={"name": "web-api", "status": "running"},
+                    )
+                ],
+                edges=[
+                    DiscoveryEdge(
+                        id="e1",
+                        type="CONNECTS_TO",
+                        startNode="n1",
+                        endNode="n2",
+                        properties={"port": 5432},
+                    )
+                ],
+            )
+        )
+        data = event.model_dump()
+        assert data["type"] == "discovery"
+        assert "discovery" in data
+        assert data["discovery"]["nodes"][0]["id"] == "n1"
+        assert data["discovery"]["edges"][0]["type"] == "CONNECTS_TO"
+
+    def test_discovery_event_json_serialization(self):
+        """Verify model_dump_json() produces valid JSON the server can stream."""
+        import json
+
+        from dcaf.core.schemas.events import DiscoveryEvent
+
+        event = DiscoveryEvent(
+            discovery=DiscoveryPayload(
+                nodes=[DiscoveryNode(id="n1", labels=["Host"], properties={"name": "worker-1"})],
+                edges=[],
+            )
+        )
+        json_str = event.model_dump_json()
+        parsed = json.loads(json_str)
+        assert parsed["type"] == "discovery"
+        assert parsed["discovery"]["nodes"][0]["properties"]["name"] == "worker-1"
