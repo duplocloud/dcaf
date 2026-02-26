@@ -23,17 +23,23 @@ from collections.abc import AsyncIterator, Callable
 from typing import Any, cast
 
 from ....schemas.events import (
+    ApprovalsEvent,
     DoneEvent,
     ErrorEvent,
     ExecutedApprovalsEvent,
     ExecutedCommandsEvent,
     ExecutedToolCallsEvent,
     StreamEvent,
+    ToolCallsEvent,
 )
-from ....schemas.messages import AgentMessage, ExecutedApproval, ExecutedCommand, ExecutedToolCall
+from ....schemas.messages import (
+    AgentMessage,
+    Approval,
+    ExecutedApproval,
+    ExecutedCommand,
+    ExecutedToolCall,
+)
 from ...agent import Agent
-from ...schemas.events import ApprovalsEvent, ToolCallsEvent
-from ...schemas.messages import Approval
 
 logger = logging.getLogger(__name__)
 
@@ -157,11 +163,11 @@ class ServerAdapter:
 
             # Add any executed results from this request
             if executed_tool_calls:
-                agent_msg.data.executed_tool_calls.extend(executed_tool_calls)  # type: ignore[arg-type]
+                agent_msg.data.executed_tool_calls.extend(executed_tool_calls)
             if executed_commands:
-                agent_msg.data.executed_cmds.extend(executed_commands)  # type: ignore[arg-type]
+                agent_msg.data.executed_cmds.extend(executed_commands)
             if executed_approvals:
-                agent_msg.data.executed_approvals.extend(executed_approvals)  # type: ignore[arg-type]
+                agent_msg.data.executed_approvals.extend(executed_approvals)
 
             # If there are pending approvals, ensure helpful content
             if response.needs_approval and not agent_msg.content:
@@ -247,9 +253,9 @@ class ServerAdapter:
                         )
                         for tc in event.tool_calls
                     ]
-                    yield ApprovalsEvent(approvals=approvals)  # type: ignore[misc]
+                    yield ApprovalsEvent(approvals=approvals)
 
-                yield event  # type: ignore[misc]
+                yield event
 
         except Exception as e:
             logger.exception(f"Stream error: {e}")

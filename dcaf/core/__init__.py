@@ -98,6 +98,10 @@ from .interceptors import (
     create_request_from_messages,
     create_response_from_text,
 )
+
+# LLM Layer (for direct LLM calls without agent orchestration)
+from .llm import LLM, create_llm
+from .llm import LLMResponse as LLMResponseBase
 from .models import ChatMessage, PlatformContext
 
 # Primitives API (for custom agent functions)
@@ -166,6 +170,10 @@ __all__ = [
     "InterceptorError",
     "create_request_from_messages",
     "create_response_from_text",
+    # LLM Layer (direct LLM calls)
+    "LLM",
+    "LLMResponseBase",
+    "create_llm",
     # Primitives API (for custom agent functions)
     "AgentResult",
     "ToolApproval",
