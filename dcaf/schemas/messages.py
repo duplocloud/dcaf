@@ -65,6 +65,8 @@ class URLConfig(BaseModel):
 
 
 class PlatformContext(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
     k8s_namespace: str | None = None
     duplo_base_url: str | None = None
     duplo_token: str | None = None
