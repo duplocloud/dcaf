@@ -356,9 +356,7 @@ class TestConvertResponse:
     def test_tool_calls_with_json_string_arguments(self):
         mock_resp = MagicMock()
         mock_resp.content = None
-        mock_resp.tool_calls = [
-            {"function": {"name": "my_tool", "arguments": '{"key": "value"}'}}
-        ]
+        mock_resp.tool_calls = [{"function": {"name": "my_tool", "arguments": '{"key": "value"}'}}]
         mock_resp.input_tokens = None
         mock_resp.output_tokens = None
         mock_resp.total_tokens = None
@@ -369,9 +367,7 @@ class TestConvertResponse:
     def test_tool_calls_with_dict_arguments(self):
         mock_resp = MagicMock()
         mock_resp.content = None
-        mock_resp.tool_calls = [
-            {"name": "my_tool", "input": {"key": "value"}}
-        ]
+        mock_resp.tool_calls = [{"name": "my_tool", "input": {"key": "value"}}]
         mock_resp.input_tokens = None
         mock_resp.output_tokens = None
         mock_resp.total_tokens = None
@@ -402,11 +398,13 @@ class TestBuildMessages:
         assert messages[0].role == "user"
 
     def test_multiple_messages(self):
-        messages = LLM._build_messages([
-            {"role": "user", "content": "Hello"},
-            {"role": "assistant", "content": "Hi there"},
-            {"role": "user", "content": "Thanks"},
-        ])
+        messages = LLM._build_messages(
+            [
+                {"role": "user", "content": "Hello"},
+                {"role": "assistant", "content": "Hi there"},
+                {"role": "user", "content": "Thanks"},
+            ]
+        )
         assert len(messages) == 3
 
 
