@@ -1131,59 +1131,9 @@ class Agent:
     ) -> ServerStreamEvent | None:
         """Convert internal stream event to server stream event."""
         from .application.dto.responses import StreamEvent as CoreStreamEvent
-        from .application.dto.responses import StreamEventType
 
         if isinstance(internal_event, CoreStreamEvent):
-            if internal_event.event_type == StreamEventType.TEXT_DELTA:
-                text = internal_event.data.get("text", "")
-                return TextDeltaEvent(text=text)
-            elif internal_event.event_type in (
-                StreamEventType.REASONING_STARTED,
-                StreamEventType.REASONING_COMPLETED,
-            ):
-                key = (
-                    "reasoning_started"
-                    if internal_event.event_type == StreamEventType.REASONING_STARTED
-                    else "reasoning_completed"
-                )
-                return self._system_update(key, {})
-            elif internal_event.event_type == StreamEventType.TOOL_USE_START:
-                # Accumulate tool calls for later
-                tool_call_id = internal_event.data.get("tool_call_id", "")
-                tool_name = internal_event.data.get("tool_name", "")
-                pending_tool_calls.append(
-                    SchemaToolCall(
-                        id=tool_call_id,
-                        name=tool_name,
-                        input={},
-                        tool_description="",
-                        input_description={},
-                    )
-                )
-                return self._system_update("tool_call_started", {"tool_name": tool_name})
-            elif internal_event.event_type == StreamEventType.TOOL_USE_END:
-                tool_name = internal_event.data.get("tool_name", "")
-                return self._system_update("tool_call_completed", {"tool_name": tool_name})
-            elif internal_event.event_type == StreamEventType.TOOL_CALLS:
-                # Tool calls requiring approval (from RunPausedEvent)
-                tool_calls_data = internal_event.data.get("tool_calls", [])
-                schema_tool_calls = []
-                for tc in tool_calls_data:
-                    tc_data = tc if isinstance(tc, dict) else tc.to_dict()
-                    schema_tool_calls.append(
-                        SchemaToolCall(
-                            id=tc_data.get("id", ""),
-                            name=tc_data.get("name", ""),
-                            input=tc_data.get("input", {}),
-                            tool_description=tc_data.get("tool_description", ""),
-                            input_description=tc_data.get("input_description", {}),
-                        )
-                    )
-                if schema_tool_calls:
-                    return ToolCallsEvent(tool_calls=schema_tool_calls)
-                return None
-            elif internal_event.event_type == StreamEventType.ERROR:
-                return ErrorEvent(error=internal_event.data.get("message", "Unknown error"))
+            return self._convert_core_stream_event(internal_event, pending_tool_calls)
 
         # Handle dict events from mock/Bedrock
         if isinstance(internal_event, dict):
@@ -1195,6 +1145,74 @@ class Agent:
                     return TextDeltaEvent(text=delta.get("text", ""))
 
             # message_start and message_stop don't need to be forwarded
+
+        return None
+
+    def _convert_core_stream_event(
+        self,
+        internal_event: Any,
+        pending_tool_calls: list[SchemaToolCall],
+    ) -> ServerStreamEvent | None:
+        """Convert a CoreStreamEvent to a server stream event."""
+        from .application.dto.responses import StreamEventType
+
+        if internal_event.event_type == StreamEventType.TEXT_DELTA:
+            return TextDeltaEvent(text=internal_event.data.get("text", ""))
+
+        if internal_event.event_type in (
+            StreamEventType.REASONING_STARTED,
+            StreamEventType.REASONING_COMPLETED,
+        ):
+            key = (
+                "reasoning_started"
+                if internal_event.event_type == StreamEventType.REASONING_STARTED
+                else "reasoning_completed"
+            )
+            return self._system_update(key, {})
+
+        if internal_event.event_type == StreamEventType.TOOL_USE_START:
+            tool_call_id = internal_event.data.get("tool_call_id", "")
+            tool_name = internal_event.data.get("tool_name", "")
+            tool_args = internal_event.data.get("tool_args", {})
+            pending_tool_calls.append(
+                SchemaToolCall(
+                    id=tool_call_id,
+                    name=tool_name,
+                    input=tool_args,
+                    tool_description="",
+                    input_description={},
+                )
+            )
+            return self._system_update("tool_call_started", {"tool_name": tool_name})
+
+        if internal_event.event_type == StreamEventType.TOOL_USE_END:
+            tool_name = internal_event.data.get("tool_name", "")
+            tool_call_id = internal_event.data.get("tool_call_id", "")
+            # Remove from pending — this tool executed without requiring approval
+            if tool_call_id:
+                pending_tool_calls[:] = [tc for tc in pending_tool_calls if tc.id != tool_call_id]
+            return self._system_update("tool_call_completed", {"tool_name": tool_name})
+
+        if internal_event.event_type == StreamEventType.TOOL_CALLS:
+            # Tool calls requiring approval (from RunPausedEvent)
+            tool_calls_data = internal_event.data.get("tool_calls", [])
+            schema_tool_calls = [
+                SchemaToolCall(
+                    id=tc_data.get("id", ""),
+                    name=tc_data.get("name", ""),
+                    input=tc_data.get("input", {}),
+                    tool_description=tc_data.get("tool_description", ""),
+                    input_description=tc_data.get("input_description", {}),
+                )
+                for tc in tool_calls_data
+                for tc_data in (tc if isinstance(tc, dict) else tc.to_dict(),)
+            ]
+            if schema_tool_calls:
+                return ToolCallsEvent(tool_calls=schema_tool_calls)
+            return None
+
+        if internal_event.event_type == StreamEventType.ERROR:
+            return ErrorEvent(error=internal_event.data.get("error", "Unknown error"))
 
         return None
 

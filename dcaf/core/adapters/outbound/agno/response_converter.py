@@ -151,18 +151,23 @@ class AgnoResponseConverter:
             return StreamEvent.error(str(error_msg))
 
         elif event_type in ("ToolCallStartedEvent", "ToolCallStarted"):
-            tool_name = getattr(agno_event, "tool_name", "")
-            tool_id = getattr(agno_event, "tool_call_id", "")
+            tool_exec = getattr(agno_event, "tool", None)
+            tool_name = getattr(tool_exec, "tool_name", "") or "" if tool_exec else ""
+            tool_id = getattr(tool_exec, "tool_call_id", "") or "" if tool_exec else ""
+            tool_args = getattr(tool_exec, "tool_args", {}) or {} if tool_exec else {}
             return StreamEvent.tool_use_start(
                 tool_call_id=tool_id,
                 tool_name=tool_name,
+                tool_args=tool_args,
             )
 
         elif event_type in ("ToolCallCompletedEvent", "ToolCallCompleted"):
-            tool_name = getattr(agno_event, "tool_name", "")
+            tool_exec = getattr(agno_event, "tool", None)
+            tool_name = getattr(tool_exec, "tool_name", "") or "" if tool_exec else ""
+            tool_id = getattr(tool_exec, "tool_call_id", "") or "" if tool_exec else ""
             return StreamEvent(
                 event_type=StreamEventType.TOOL_USE_END,
-                data={"tool_name": tool_name},
+                data={"tool_name": tool_name, "tool_call_id": tool_id},
                 index=0,
             )
 

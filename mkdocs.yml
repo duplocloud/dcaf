@@ -117,6 +117,7 @@ nav:
   
   - Core:
     - Overview: core/index.md
+    - LLM Layer: core/llm-layer.md
     - Server: core/server.md
     - Channel Routing: api-reference/channel-routing.md
     - A2A (Agent-to-Agent): core/a2a.md
