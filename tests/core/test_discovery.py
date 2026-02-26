@@ -218,3 +218,23 @@ class TestDiscoveryEvent:
         parsed = json.loads(json_str)
         assert parsed["type"] == "discovery"
         assert parsed["discovery"]["nodes"][0]["properties"]["name"] == "worker-1"
+
+
+class TestAgentDiscoveryPassthrough:
+    def test_convert_stream_event_passes_through_server_events(self):
+        """DiscoveryEvent (Pydantic) should pass through _convert_stream_event unchanged."""
+        from dcaf.core.agent import Agent
+        from dcaf.core.schemas.events import DiscoveryEvent
+        from dcaf.core.schemas.events import StreamEvent as ServerStreamEvent
+
+        agent = Agent(tools=[])
+        event = DiscoveryEvent(
+            discovery=DiscoveryPayload(
+                nodes=[DiscoveryNode(id="n1", labels=["Service"], properties={"name": "api"})],
+                edges=[],
+            )
+        )
+        pending: list = []
+        result = agent._convert_stream_event(event, pending)
+        assert result is event
+        assert isinstance(result, ServerStreamEvent)

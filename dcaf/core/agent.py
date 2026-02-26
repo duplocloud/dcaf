@@ -1076,6 +1076,10 @@ class Agent:
         from .application.dto.responses import StreamEvent as CoreStreamEvent
         from .application.dto.responses import StreamEventType
 
+        # Pass through server-level Pydantic events (e.g., DiscoveryEvent)
+        if isinstance(internal_event, ServerStreamEvent):
+            return internal_event
+
         if isinstance(internal_event, CoreStreamEvent):
             if internal_event.event_type == StreamEventType.TEXT_DELTA:
                 text = internal_event.data.get("text", "")
