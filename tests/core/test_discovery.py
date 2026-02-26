@@ -220,6 +220,65 @@ class TestDiscoveryEvent:
         assert parsed["discovery"]["nodes"][0]["properties"]["name"] == "worker-1"
 
 
+class TestNeo4jResultParser:
+    def test_parse_simple_node_results(self):
+        """Parse a result from MATCH (n:Service) RETURN n."""
+        from dcaf.core.discovery import neo4j_result_to_discovery
+
+        neo4j_data = [
+            {"n": {"name": "web-api", "status": "running"}},
+            {"n": {"name": "postgres", "engine": "PostgreSQL 15"}},
+        ]
+        payload = neo4j_result_to_discovery(neo4j_data)
+        assert len(payload.nodes) == 2
+        assert payload.nodes[0].properties["name"] == "web-api"
+        assert payload.nodes[1].properties["name"] == "postgres"
+
+    def test_nodes_get_deterministic_ids(self):
+        """Same data should produce the same ID."""
+        from dcaf.core.discovery import neo4j_result_to_discovery
+
+        neo4j_data = [{"n": {"name": "web-api"}}]
+        payload1 = neo4j_result_to_discovery(neo4j_data)
+        payload2 = neo4j_result_to_discovery(neo4j_data)
+        assert payload1.nodes[0].id == payload2.nodes[0].id
+
+    def test_empty_result_returns_empty_payload(self):
+        from dcaf.core.discovery import neo4j_result_to_discovery
+
+        payload = neo4j_result_to_discovery([])
+        assert payload.nodes == []
+        assert payload.edges == []
+
+    def test_string_result_returns_empty_payload(self):
+        """If result is a plain string (e.g., error), return empty."""
+        from dcaf.core.discovery import neo4j_result_to_discovery
+
+        payload = neo4j_result_to_discovery("No results found")
+        assert payload.nodes == []
+        assert payload.edges == []
+
+    def test_nodes_use_name_property_for_label_if_no_labels(self):
+        """When neo4j labels are lost in .data(), use column name as label."""
+        from dcaf.core.discovery import neo4j_result_to_discovery
+
+        neo4j_data = [{"n": {"name": "web-api"}}]
+        payload = neo4j_result_to_discovery(neo4j_data)
+        assert len(payload.nodes[0].labels) >= 1
+
+    def test_deduplicates_nodes(self):
+        """Same node appearing in multiple rows should be deduplicated."""
+        from dcaf.core.discovery import neo4j_result_to_discovery
+
+        neo4j_data = [
+            {"n": {"name": "web-api"}, "m": {"name": "postgres"}},
+            {"n": {"name": "web-api"}, "m": {"name": "redis"}},
+        ]
+        payload = neo4j_result_to_discovery(neo4j_data)
+        names = [n.properties.get("name") for n in payload.nodes]
+        assert len(set(names)) == len(names)  # No duplicates
+
+
 class TestAgentDiscoveryPassthrough:
     def test_convert_stream_event_passes_through_server_events(self):
         """DiscoveryEvent (Pydantic) should pass through _convert_stream_event unchanged."""
