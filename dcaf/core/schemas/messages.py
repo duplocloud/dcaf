@@ -1,67 +1,43 @@
 from datetime import UTC, datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl
+from pydantic import BaseModel, ConfigDict, Field
 
+# Re-export shared wire-format types from the canonical public module so that
+# isinstance() checks work correctly regardless of which namespace the caller
+# imports from.  dcaf.schemas is the dependency-free source of truth; dcaf.core
+# is allowed to import from it (no contract violation).
+from ...schemas.messages import (
+    Approval,
+    Command,
+    ExecutedApproval,
+    ExecutedCommand,
+    ExecutedToolCall,
+    FileObject,
+    ToolCall,
+    URLConfig,
+)
 
-class FileObject(BaseModel):
-    file_path: str
-    file_content: str
-    refers_persistent_file: str | None = None  # From main: reference to persistent file storage
-
-
-class Command(BaseModel):
-    command: str
-    execute: bool = False
-    rejection_reason: str | None = None
-    files: list[FileObject] | None = None
-
-
-class ExecutedCommand(BaseModel):
-    command: str
-    output: str
-
-
-class ToolCall(BaseModel):
-    id: str
-    name: str
-    input: dict[str, Any]
-    execute: bool = False
-    tool_description: str
-    input_description: dict[str, Any]
-    intent: str | None = None
-    rejection_reason: str | None = None
-
-
-class ExecutedToolCall(BaseModel):
-    id: str
-    name: str
-    input: dict[str, Any]
-    output: str | dict
-
-
-class Approval(BaseModel):
-    id: str
-    type: str
-    name: str
-    input: dict[str, Any]
-    execute: bool = False
-    rejection_reason: str | None = None
-    description: str = ""
-    intent: str | None = None
-
-
-class ExecutedApproval(BaseModel):
-    id: str
-    type: str
-    name: str
-    input: dict[str, Any]
-    output: str
-
-
-class URLConfig(BaseModel):
-    url: HttpUrl
-    description: str
+__all__ = [
+    "Approval",
+    "Command",
+    "ExecutedApproval",
+    "ExecutedCommand",
+    "ExecutedToolCall",
+    "FileObject",
+    "SkillDefinitionSchema",
+    "ToolCall",
+    "URLConfig",
+    "PlatformContext",
+    "AmbientContext",
+    "Data",
+    "User",
+    "Agent",
+    "Message",
+    "UserMessage",
+    "AgentMessage",
+    "Messages",
+]
 
 
 class SkillDefinitionSchema(BaseModel):

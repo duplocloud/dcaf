@@ -1,6 +1,5 @@
 """Tests for the unified approvals data models and processing."""
 
-import asyncio
 from unittest.mock import AsyncMock, MagicMock
 
 from dcaf.core.adapters.inbound.server_adapter import ServerAdapter
@@ -418,7 +417,7 @@ def _make_mock_agent_for_invoke(tool_name: str, tool_result: str, llm_response: 
 
 
 class TestInvokeWithApprovals:
-    def test_invoke_processes_approvals(self):
+    async def test_invoke_processes_approvals(self):
         agent, tool = _make_mock_agent_for_invoke("list_pods", "pod1\npod2", "Here are your pods.")
         adapter = ServerAdapter(agent)
 
@@ -442,12 +441,12 @@ class TestInvokeWithApprovals:
             ]
         }
 
-        result = asyncio.get_event_loop().run_until_complete(adapter.invoke(messages))
+        result = await adapter.invoke(messages)
 
         tool.execute.assert_called_once()
         assert len(result.data.executed_approvals) == 1
 
-    def test_invoke_stream_emits_executed_approvals_event(self):
+    async def test_invoke_stream_emits_executed_approvals_event(self):
         agent, tool = _make_mock_agent_for_invoke("list_pods", "pod1", "Here are your pods.")
         adapter = ServerAdapter(agent)
 
@@ -471,13 +470,7 @@ class TestInvokeWithApprovals:
             ]
         }
 
-        async def collect():
-            events = []
-            async for event in adapter.invoke_stream(messages):
-                events.append(event)
-            return events
-
-        events = asyncio.get_event_loop().run_until_complete(collect())
+        events = [event async for event in adapter.invoke_stream(messages)]
 
         event_types = [e.type for e in events]
         assert "executed_approvals" in event_types
