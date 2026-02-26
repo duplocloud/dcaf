@@ -15,8 +15,11 @@ Example:
 """
 
 import logging
+import os
+import shutil
 import subprocess
-from collections.abc import AsyncIterator
+import tempfile
+from collections.abc import AsyncIterator, Callable
 from typing import Any, cast
 
 from ....schemas.events import (
@@ -29,8 +32,12 @@ from ....schemas.events import (
 )
 from ....schemas.messages import AgentMessage, ExecutedApproval, ExecutedCommand, ExecutedToolCall
 from ...agent import Agent
+from ...schemas.events import ApprovalsEvent, ToolCallsEvent
+from ...schemas.messages import Approval
 
 logger = logging.getLogger(__name__)
+
+ExecutorFn = Callable[[str, list[dict[str, Any]] | None, dict[str, Any] | None], str]
 
 
 class ServerAdapter:
@@ -48,6 +55,13 @@ class ServerAdapter:
 
     Args:
         agent: The Core Agent instance to wrap
+        execute_cmd: Optional custom command executor. When provided, replaces the
+            built-in subprocess implementation for all command execution paths.
+            Signature: ``(command: str, files: list[dict] | None, context: dict | None) -> str``
+
+            Use this for domain-specific execution: kubeconfig injection, sandboxing,
+            timeouts, environment setup. ``context`` carries the full platform_context
+            including ``thread_id`` if sent by the client.
 
     Example:
         from dcaf.core import Agent
@@ -67,10 +81,26 @@ class ServerAdapter:
         # Create and run the app
         app = create_chat_app(adapter)
         uvicorn.run(app, host="0.0.0.0", port=8000)
+
+        # Custom executor with kubeconfig injection
+        import os, subprocess
+
+        def k8s_executor(command, files, context):
+            env = os.environ.copy()
+            env["KUBECONFIG"] = (context or {}).get("kubeconfig_path", "")
+            result = subprocess.run(command, shell=True, env=env, capture_output=True, text=True)
+            return result.stdout
+
+        adapter = ServerAdapter(agent, execute_cmd=k8s_executor)
     """
 
-    def __init__(self, agent: Agent):
+    def __init__(
+        self,
+        agent: Agent,
+        execute_cmd: ExecutorFn | None = None,
+    ) -> None:
         self.agent = agent
+        self._cmd_executor = execute_cmd
 
     async def invoke(self, messages: dict[str, list[dict[str, Any]]]) -> AgentMessage:
         """
@@ -101,7 +131,7 @@ class ServerAdapter:
         executed_tool_calls = self._process_approved_tool_calls(messages_list, context)
 
         # Process legacy command approvals
-        executed_commands = self._process_approved_commands(messages_list)
+        executed_commands = self._process_approved_commands(messages_list, context)
 
         # Process unified approvals
         executed_approvals = self._process_approvals(messages_list, context)
@@ -174,7 +204,7 @@ class ServerAdapter:
             yield ExecutedToolCallsEvent(executed_tool_calls=executed_tool_calls)
 
         # Process legacy command approvals
-        executed_commands = self._process_approved_commands(messages_list)
+        executed_commands = self._process_approved_commands(messages_list, context)
         if executed_commands:
             yield ExecutedCommandsEvent(executed_cmds=executed_commands)
 
@@ -202,6 +232,23 @@ class ServerAdapter:
                 # Echo top-level request fields in DoneEvent for client correlation
                 if isinstance(event, DoneEvent) and request_fields:
                     event.meta_data["request_context"] = request_fields
+
+                # Gap 1: translate ToolCallsEvent → ApprovalsEvent for unified approval clients
+                # ApprovalsEvent is emitted first; ToolCallsEvent follows for backward compat
+                if isinstance(event, ToolCallsEvent) and event.tool_calls:
+                    approvals = [
+                        Approval(
+                            id=tc.id,
+                            type="tool_call",
+                            name=tc.name,
+                            input=tc.input,
+                            description=tc.tool_description,
+                            intent=tc.intent,
+                        )
+                        for tc in event.tool_calls
+                    ]
+                    yield ApprovalsEvent(approvals=approvals)  # type: ignore[misc]
+
                 yield event  # type: ignore[misc]
 
         except Exception as e:
@@ -360,10 +407,48 @@ class ServerAdapter:
 
         return f"Tool '{tool_name}' not found"
 
-    def _execute_cmd(self, command: str) -> str:
-        """Execute a shell command and return combined stdout/stderr."""
+    def _execute_cmd(
+        self,
+        command: str,
+        files: list[dict[str, Any]] | None = None,
+        context: dict[str, Any] | None = None,
+    ) -> str:
+        """Execute a shell command. If a custom executor was provided at construction,
+        it is called instead of the built-in subprocess implementation.
+
+        If files are provided (in the default path), they are written to a temporary
+        directory which is used as the working directory for the command. The directory
+        is always cleaned up after execution, even on error.
+        """
+        if self._cmd_executor is not None:
+            return self._cmd_executor(command, files, context)
+
+        work_dir: str | None = None
         try:
-            result = subprocess.run(command, shell=True, capture_output=True, text=True)  # noqa: S602
+            if files:
+                work_dir = tempfile.mkdtemp()
+                written_names: set[str] = set()
+                for f in files:
+                    # Use basename only — never allow path traversal.
+                    # The `or "file"` guard handles the empty-string case
+                    # (f.get default only fires when the key is absent).
+                    safe_name = os.path.basename(f.get("file_path", "") or "file")
+                    if safe_name in written_names:
+                        logger.warning(
+                            "Duplicate filename '%s' in files list; overwriting previous content",
+                            safe_name,
+                        )
+                    written_names.add(safe_name)
+                    with open(os.path.join(work_dir, safe_name), "w") as fh:
+                        fh.write(f.get("file_content", ""))
+
+            result = subprocess.run(  # noqa: S602
+                command,
+                shell=True,
+                capture_output=True,
+                text=True,
+                cwd=work_dir,
+            )
             output = result.stdout
             if result.stderr:
                 output = (
@@ -375,10 +460,14 @@ class ServerAdapter:
         except Exception as e:
             logger.error("Error executing command: %s", e)
             return f"Error executing command: {e}"
+        finally:
+            if work_dir:
+                shutil.rmtree(work_dir, ignore_errors=True)
 
     def _process_approved_commands(
         self,
         messages_list: list[dict[str, Any]],
+        context: dict[str, Any] | None = None,
     ) -> list[ExecutedCommand]:
         """
         Process approved/rejected commands from the legacy cmds field.
@@ -396,9 +485,10 @@ class ServerAdapter:
 
         for cmd in cmds:
             command = cmd.get("command", "")
+            files = cmd.get("files") or None  # list[dict] | None
             if cmd.get("execute", False):
                 logger.info("Executing approved command: %s", command)
-                output = self._execute_cmd(command)
+                output = self._execute_cmd(command, files=files, context=context)
                 executed.append(ExecutedCommand(command=command, output=output))
             elif cmd.get("rejection_reason"):
                 executed.append(
@@ -439,7 +529,9 @@ class ServerAdapter:
 
             if approval.get("execute", False):
                 if approval_type == "command":
-                    result = self._execute_cmd(tool_input.get("command", name))
+                    result = self._execute_cmd(
+                        tool_input.get("command", name), files=None, context=platform_context
+                    )
                 else:
                     result = self._execute_tool(name, tool_input, platform_context)
                 executed.append(
