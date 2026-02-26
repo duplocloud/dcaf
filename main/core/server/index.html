@@ -15,7 +15,7 @@
         <link rel="canonical" href="https://duplocloud.github.io/dcaf/main/core/server/">
       
       
-        <link rel="prev" href="../">
+        <link rel="prev" href="../llm-layer/">
       
       
         <link rel="next" href="../../api-reference/channel-routing/">
@@ -507,6 +507,8 @@
       
         
       
+        
+      
     
     
     
@@ -562,6 +564,34 @@
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
             
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../llm-layer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    LLM Layer
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
               
             
               
@@ -3685,12 +3715,32 @@
 <td>Text token(s) from the LLM</td>
 </tr>
 <tr>
+<td><code>intermittent_update</code></td>
+<td>Inline status message (e.g. <code>"Calling tool: neo4j_query"</code>, <code>"Thinking..."</code>)</td>
+</tr>
+<tr>
 <td><code>tool_calls</code></td>
-<td>Tool calls requiring approval</td>
+<td>Tool calls pending approval — contains populated <code>id</code>, <code>name</code>, and <code>input</code> fields</td>
+</tr>
+<tr>
+<td><code>approvals</code></td>
+<td>Unified approval requests (companion to <code>tool_calls</code>); use this event to drive approval UI</td>
+</tr>
+<tr>
+<td><code>commands</code></td>
+<td>Shell commands pending approval</td>
 </tr>
 <tr>
 <td><code>executed_tool_calls</code></td>
-<td>Results from executed tools</td>
+<td>Tool call results injected <em>before</em> the LLM call — only present when the client sends back approved <code>tool_calls</code> with <code>"execute": true</code> in a follow-up request</td>
+</tr>
+<tr>
+<td><code>executed_commands</code></td>
+<td>Shell command results injected <em>before</em> the LLM call — only present when approved <code>cmds</code> are sent back</td>
+</tr>
+<tr>
+<td><code>executed_approvals</code></td>
+<td>Results of unified approval execution — only present when approved <code>approvals</code> are sent back</td>
 </tr>
 <tr>
 <td><code>done</code></td>
@@ -3702,6 +3752,13 @@
 </tr>
 </tbody>
 </table>
+<div class="admonition note">
+<p class="admonition-title"><code>executed_*</code> events require a round-trip</p>
+<p><code>executed_tool_calls</code>, <code>executed_commands</code>, and <code>executed_approvals</code> are <strong>not</strong> emitted when the agent
+executes tools automatically. They are emitted at the <em>start</em> of the next request when the client sends
+back an approved <code>tool_calls</code>, <code>cmds</code>, or <code>approvals</code> array. A first-turn request will never contain
+these events.</p>
+</div>
 <h3 id="handling-streams-in-python">Handling Streams in Python<a class="headerlink" href="#handling-streams-in-python" title="Permanent link">&para;</a></h3>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">httpx</span>
 </span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>
