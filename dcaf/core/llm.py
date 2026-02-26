@@ -342,42 +342,42 @@ class LLM:
         return agno_messages
 
     @staticmethod
+    def _extract_text(content: Any) -> str | None:
+        """Extract plain text from a ModelResponse content value."""
+        if isinstance(content, str):
+            return content
+        if not isinstance(content, list):
+            return None
+        parts: list[str] = []
+        for block in content:
+            if isinstance(block, str):
+                parts.append(block)
+            elif isinstance(block, dict) and "text" in block:
+                parts.append(block["text"])
+            elif hasattr(block, "text"):
+                parts.append(str(block.text))
+        return " ".join(parts) if parts else None
+
+    @staticmethod
+    def _normalize_tc(tc: dict[str, Any]) -> dict[str, Any]:
+        """Normalize a raw tool-call dict to {name, input}."""
+        import contextlib
+        import json
+
+        name = tc.get("function", {}).get("name", tc.get("name", ""))
+        arguments = tc.get("function", {}).get("arguments", tc.get("input", {}))
+        if isinstance(arguments, str):
+            with contextlib.suppress(json.JSONDecodeError, ValueError):
+                arguments = json.loads(arguments)
+        return {"name": name, "input": arguments}
+
+    @staticmethod
     def _convert_response(model_response: ModelResponse) -> LLMResponse:
         """Convert Agno ModelResponse to LLMResponse."""
-        # Extract text content
-        text = None
-        content = model_response.content
-        if isinstance(content, str):
-            text = content
-        elif isinstance(content, list):
-            text_parts = []
-            for block in content:
-                if isinstance(block, str):
-                    text_parts.append(block)
-                elif isinstance(block, dict) and "text" in block:
-                    text_parts.append(block["text"])
-                elif hasattr(block, "text"):
-                    text_parts.append(str(block.text))
-            if text_parts:
-                text = " ".join(text_parts)
+        text = LLM._extract_text(model_response.content)
 
-        # Extract tool calls — normalize to [{name, input}, ...]
-        tool_calls: list[dict[str, Any]] = []
-        for tc in model_response.tool_calls or []:
-            name = tc.get("function", {}).get("name", tc.get("name", ""))
-            arguments = tc.get("function", {}).get("arguments", tc.get("input", {}))
+        tool_calls = [LLM._normalize_tc(tc) for tc in model_response.tool_calls or []]
 
-            # Arguments may be a JSON string
-            if isinstance(arguments, str):
-                import contextlib
-                import json
-
-                with contextlib.suppress(json.JSONDecodeError, ValueError):
-                    arguments = json.loads(arguments)
-
-            tool_calls.append({"name": name, "input": arguments})
-
-        # Extract usage metrics
         usage: dict[str, int] = {}
         if model_response.input_tokens is not None:
             usage["input_tokens"] = model_response.input_tokens
@@ -397,6 +397,30 @@ class LLM:
 # =============================================================================
 # Factory function
 # =============================================================================
+
+
+def _provider_env_kwargs(provider: str) -> dict[str, Any]:
+    """Return provider-specific kwargs sourced from environment variables."""
+    _mappings: dict[str, list[tuple[str, str]]] = {
+        "bedrock": [
+            (EnvVars.AWS_PROFILE, "aws_profile"),
+            (EnvVars.AWS_REGION, "aws_region"),
+            (EnvVars.AWS_ACCESS_KEY_ID, "aws_access_key"),
+            (EnvVars.AWS_SECRET_ACCESS_KEY, "aws_secret_key"),
+        ],
+        "anthropic": [(EnvVars.ANTHROPIC_API_KEY, "api_key")],
+        "openai": [(EnvVars.OPENAI_API_KEY, "api_key")],
+        "azure": [(EnvVars.AZURE_OPENAI_API_KEY, "api_key")],
+        "google": [
+            (EnvVars.GOOGLE_PROJECT_ID, "google_project_id"),
+            (EnvVars.GOOGLE_MODEL_LOCATION, "google_location"),
+        ],
+    }
+    return {
+        kwarg: value
+        for env_var, kwarg in _mappings.get(provider, [])
+        if (value := get_env(env_var)) is not None
+    }
 
 
 def create_llm(
@@ -437,10 +461,9 @@ def create_llm(
         model or get_env(EnvVars.MODEL) or PROVIDER_MODEL_DEFAULTS.get(resolved_provider, "")
     )
 
-    # Build kwargs from environment, then apply overrides
-    kwargs: dict[str, Any] = {}
+    # Start from provider-specific env vars, then layer in generic ones
+    kwargs: dict[str, Any] = _provider_env_kwargs(resolved_provider)
 
-    # Temperature and max_tokens
     if "temperature" not in overrides:
         temp = get_env(EnvVars.TEMPERATURE, cast=float)
         if temp is not None:
@@ -449,31 +472,6 @@ def create_llm(
         max_tok = get_env(EnvVars.MAX_TOKENS, cast=int)
         if max_tok is not None:
             kwargs["max_tokens"] = max_tok
-
-    # Provider-specific env vars
-    if resolved_provider == "bedrock":
-        if profile := get_env(EnvVars.AWS_PROFILE):
-            kwargs.setdefault("aws_profile", profile)
-        if region := get_env(EnvVars.AWS_REGION):
-            kwargs.setdefault("aws_region", region)
-        if access_key := get_env(EnvVars.AWS_ACCESS_KEY_ID):
-            kwargs.setdefault("aws_access_key", access_key)
-        if secret_key := get_env(EnvVars.AWS_SECRET_ACCESS_KEY):
-            kwargs.setdefault("aws_secret_key", secret_key)
-    elif resolved_provider == "anthropic":
-        if api_key := get_env(EnvVars.ANTHROPIC_API_KEY):
-            kwargs.setdefault("api_key", api_key)
-    elif resolved_provider == "openai":
-        if api_key := get_env(EnvVars.OPENAI_API_KEY):
-            kwargs.setdefault("api_key", api_key)
-    elif resolved_provider == "azure":
-        if api_key := get_env(EnvVars.AZURE_OPENAI_API_KEY):
-            kwargs.setdefault("api_key", api_key)
-    elif resolved_provider == "google":
-        if project_id := get_env(EnvVars.GOOGLE_PROJECT_ID):
-            kwargs.setdefault("google_project_id", project_id)
-        if location := get_env(EnvVars.GOOGLE_MODEL_LOCATION):
-            kwargs.setdefault("google_location", location)
 
     # Apply explicit overrides last
     kwargs.update(overrides)
