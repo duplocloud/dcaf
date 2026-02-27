@@ -386,6 +386,31 @@ class TestDiscoveryToolHook:
         assert len(payloads) == 0
 
 
+class TestStreamDiscoveryEmission:
+    def test_emit_pending_discovery_returns_discovery_events(self):
+        from dcaf.core.adapters.outbound.agno.adapter import AgnoAdapter
+
+        reset_discovery_queue()
+        emit_discovery(
+            nodes=[{"id": "n1", "labels": ["Service"], "properties": {"name": "web-api"}}],
+            edges=[],
+        )
+
+        adapter = AgnoAdapter(model_id="test", provider="bedrock")
+        events = adapter._emit_pending_discovery()
+        assert len(events) == 1
+        assert events[0].type == "discovery"
+        assert events[0].discovery.nodes[0].id == "n1"
+
+    def test_emit_pending_discovery_returns_nothing_when_empty(self):
+        from dcaf.core.adapters.outbound.agno.adapter import AgnoAdapter
+
+        reset_discovery_queue()
+        adapter = AgnoAdapter(model_id="test", provider="bedrock")
+        events = adapter._emit_pending_discovery()
+        assert events == []
+
+
 class TestAgentDiscoveryPassthrough:
     def test_convert_stream_event_passes_through_server_events(self):
         """DiscoveryEvent (Pydantic) should pass through _convert_stream_event unchanged."""

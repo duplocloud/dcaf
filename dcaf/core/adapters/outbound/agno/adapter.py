@@ -428,6 +428,11 @@ class AgnoAdapter:
                 if stream_event:
                     yield stream_event
 
+                    # After tool completion, emit any pending discovery events
+                    if stream_event.event_type == StreamEventType.TOOL_USE_END:
+                        for discovery_event in self._emit_pending_discovery():
+                            yield discovery_event
+
                     # Dispatch to new event subscription system
                     if event_registry and stream_event:
                         new_event = self._convert_to_new_event(stream_event)
@@ -978,6 +983,24 @@ class AgnoAdapter:
             return result
 
         return discovery_hook
+
+    def _emit_pending_discovery(self) -> list[Any]:
+        """
+        Drain the discovery queue and return DiscoveryEvents.
+
+        Called after TOOL_USE_END events in the streaming pipeline.
+        """
+        from ....discovery import drain_discovery_queue
+        from ....schemas.events import DiscoveryEvent
+
+        payloads = drain_discovery_queue()
+        events = []
+        for payload in payloads:
+            events.append(DiscoveryEvent(discovery=payload))
+            logger.info(
+                f"Discovery: Emitting {len(payload.nodes)} nodes, {len(payload.edges)} edges"
+            )
+        return events
 
     # =========================================================================
     # Tracing Support
