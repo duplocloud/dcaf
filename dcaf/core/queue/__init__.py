@@ -28,8 +28,15 @@ Usage (worker side)
 
 Subject naming
 --------------
-- ``dcaf.jobs.in.<agent_name>``  — job requests (publisher: dcaf server)
-- ``dcaf.jobs.out.<job_id>``     — job events  (publisher: agent worker)
+Subjects embed the agent name so each agent has a fully isolated channel
+within the shared NATS streams:
+
+- ``dcaf.jobs.in.<agent_name>.start``    — job request  (publisher: dcaf server)
+- ``dcaf.jobs.in.<agent_name>.answers``  — answers to a paused job (iac-ai-agent)
+- ``dcaf.jobs.out.<agent_name>.<job_id>`` — job event   (publisher: agent worker)
+
+HelpDesk subscribes to ``dcaf.jobs.out.<agent_name>.>`` to receive only one
+agent's events and SSE them to the browser.
 
 Stream names
 ------------

@@ -16,18 +16,33 @@ JOBS_IN_STREAM = "DCAF_JOBS_IN"
 #: Jobs-out stream — published by agent workers, consumed by dcaf server.
 JOBS_OUT_STREAM = "DCAF_JOBS_OUT"
 
+# Subject patterns that cover ALL agents (used when creating the streams).
+# Each agent filters with its own prefix on a durable consumer.
 JOBS_IN_SUBJECT_PATTERN = "dcaf.jobs.in.>"
 JOBS_OUT_SUBJECT_PATTERN = "dcaf.jobs.out.>"
 
 
 def jobs_in_subject(agent_name: str) -> str:
-    """Return the per-agent input subject: ``dcaf.jobs.in.<agent_name>``."""
-    return f"dcaf.jobs.in.{agent_name}"
+    """Return the per-agent IN subject for generic job submission.
+
+    Pattern: ``dcaf.jobs.in.<agent_name>.start``
+
+    Workers subscribe to ``dcaf.jobs.in.<agent_name>.>`` to receive all
+    message types (start, answers, checkpoint.*) for their agent only.
+    """
+    return f"dcaf.jobs.in.{agent_name}.start"
 
 
-def jobs_out_subject(job_id: str) -> str:
-    """Return the per-job output subject: ``dcaf.jobs.out.<job_id>``."""
-    return f"dcaf.jobs.out.{job_id}"
+def jobs_out_subject(agent_name: str, job_id: str) -> str:
+    """Return the per-job OUT subject.
+
+    Pattern: ``dcaf.jobs.out.<agent_name>.<job_id>``
+
+    The agent name in the subject allows the HelpDesk to subscribe with
+    ``dcaf.jobs.out.<agent_name>.>`` and receive only that agent's events,
+    never mixing events from different agents.
+    """
+    return f"dcaf.jobs.out.{agent_name}.{job_id}"
 
 
 # ─── NatsJobQueue ─────────────────────────────────────────────────────────────
@@ -123,7 +138,10 @@ class NatsJobQueue(JobQueue):
     # ── enqueue ───────────────────────────────────────────────────────────────
 
     async def enqueue(self, request: JobRequest) -> str:
-        """Publish request to DCAF_JOBS_IN and record status as queued."""
+        """Publish request to DCAF_JOBS_IN and record status as queued.
+
+        Subject: ``dcaf.jobs.in.<agent_name>.start``
+        """
         subject = jobs_in_subject(request.agent_name)
         payload = request.model_dump_json().encode()
         await self._js.publish(subject, payload)  # type: ignore[union-attr]
@@ -148,15 +166,23 @@ class NatsJobQueue(JobQueue):
     # ── background listener ───────────────────────────────────────────────────
 
     async def _listen_events(self) -> None:
-        """Subscribe to dcaf.jobs.out.> and buffer events in memory."""
+        """Subscribe to this agent's out subjects and buffer events in memory.
+
+        Uses the agent-scoped subject ``dcaf.jobs.out.<agent_name>.>`` so the
+        listener never sees events from other agents sharing the same NATS server.
+        The durable consumer name is also agent-scoped to avoid conflicts.
+        """
         import nats.errors
 
-        # Durable consumer so dcaf server can resume after restart
+        # Filter to this agent's events only: dcaf.jobs.out.{agent_name}.>
+        agent_out_subject = f"dcaf.jobs.out.{self._agent_name}.>"
+        durable_name = f"dcaf-server-{self._agent_name}"
+
         sub = await self._js.subscribe(  # type: ignore[union-attr]
-            JOBS_OUT_SUBJECT_PATTERN,
-            durable="dcaf-server",
+            agent_out_subject,
+            durable=durable_name,
         )
-        logger.info("NatsJobQueue listening on %s", JOBS_OUT_SUBJECT_PATTERN)
+        logger.info("NatsJobQueue listening on %s (durable=%s)", agent_out_subject, durable_name)
         while True:
             try:
                 msg = await sub.next_msg(timeout=1.0)
