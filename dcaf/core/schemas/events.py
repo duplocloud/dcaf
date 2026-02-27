@@ -5,7 +5,6 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 from ..discovery import DiscoveryPayload
-
 from .messages import (
     Approval,
     Command,
