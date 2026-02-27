@@ -657,6 +657,12 @@ class AgnoAdapter:
         # Resolve skills from platform context
         agno_skills = await self._resolve_skills(platform_context)
 
+        # Check if neo4j tools are present and build discovery hook
+        tool_hooks = None
+        if self._has_neo4j_tools(tools):
+            tool_hooks = [self._build_discovery_tool_hook()]
+            logger.info("Discovery: Neo4j tools detected, installing discovery tool hook")
+
         logger.info(
             f"Agno: Creating agent with {len(agno_tools)} tools "
             f"(stream={stream}, tool_limit={self._tool_call_limit}, "
@@ -672,6 +678,7 @@ class AgnoAdapter:
             tool_call_limit=self._tool_call_limit,
             skills=agno_skills,
             telemetry=False,
+            tool_hooks=tool_hooks,
         )
 
         return agent
@@ -930,6 +937,47 @@ class AgnoAdapter:
             True if this is a DCAF MCPTool instance
         """
         return isinstance(obj, MCPToolLike)
+
+    # =========================================================================
+    # Discovery (Neo4j graph data)
+    # =========================================================================
+
+    # Neo4j tool function names that produce graph data
+    _NEO4J_DISCOVERY_TOOLS = {"run_cypher_query"}
+
+    def _has_neo4j_tools(self, tools: list[Any]) -> bool:
+        """Check if any tool in the list is a Neo4j toolkit."""
+        try:
+            from agno.tools.neo4j import Neo4jTools
+        except ImportError:
+            return False
+        return any(isinstance(t, Neo4jTools) for t in tools)
+
+    def _build_discovery_tool_hook(self) -> Any:
+        """
+        Build an Agno tool_hook that captures Neo4j results for discovery.
+
+        Returns a hook function compatible with Agno's tool_hooks parameter.
+        The hook intercepts run_cypher_query results, converts them to
+        DiscoveryPayload, and queues them for the streaming pipeline.
+        """
+        from ....discovery import emit_discovery, neo4j_result_to_discovery
+
+        def discovery_hook(function_name: str, func: Any, args: dict[str, Any]) -> Any:
+            result = func(**args)
+            if function_name in self._NEO4J_DISCOVERY_TOOLS:
+                try:
+                    payload = neo4j_result_to_discovery(result)
+                    if payload.nodes or payload.edges:
+                        emit_discovery(
+                            nodes=[n.model_dump() for n in payload.nodes],
+                            edges=[e.model_dump() for e in payload.edges],
+                        )
+                except Exception as e:
+                    logger.warning(f"Discovery parsing failed for {function_name}: {e}")
+            return result
+
+        return discovery_hook
 
     # =========================================================================
     # Tracing Support

@@ -279,6 +279,113 @@ class TestNeo4jResultParser:
         assert len(set(names)) == len(names)  # No duplicates
 
 
+class TestNeo4jToolDetection:
+    def test_has_neo4j_tools_returns_true_for_neo4j_instance(self):
+        """When a real Neo4jTools instance is passed, detection returns True."""
+        from unittest.mock import MagicMock, patch
+
+        from dcaf.core.adapters.outbound.agno.adapter import AgnoAdapter
+
+        adapter = AgnoAdapter(model_id="test", provider="bedrock")
+
+        # Create a mock Neo4jTools class and instance
+        mock_neo4j_cls = type("Neo4jTools", (), {})
+        mock_instance = mock_neo4j_cls()
+
+        # Patch the import inside _has_neo4j_tools so it finds our mock class
+        mock_module = MagicMock()
+        mock_module.Neo4jTools = mock_neo4j_cls
+
+        with patch.dict("sys.modules", {"agno.tools.neo4j": mock_module}):
+            assert adapter._has_neo4j_tools([mock_instance]) is True
+
+    def test_has_neo4j_tools_returns_false_for_other_toolkits(self):
+        from agno.tools.toolkit import Toolkit as AgnoToolkit
+
+        from dcaf.core.adapters.outbound.agno.adapter import AgnoAdapter
+
+        class FakeDuckDbTools(AgnoToolkit):
+            def __init__(self) -> None:
+                super().__init__(name="duckdb_tools")
+
+        adapter = AgnoAdapter(model_id="test", provider="bedrock")
+        assert adapter._has_neo4j_tools([FakeDuckDbTools()]) is False
+
+    def test_has_neo4j_tools_returns_false_for_empty_list(self):
+        from dcaf.core.adapters.outbound.agno.adapter import AgnoAdapter
+
+        adapter = AgnoAdapter(model_id="test", provider="bedrock")
+        assert adapter._has_neo4j_tools([]) is False
+
+    def test_has_neo4j_tools_returns_false_when_neo4j_not_installed(self):
+        """When agno.tools.neo4j cannot be imported, returns False."""
+        from unittest.mock import patch
+
+        from dcaf.core.adapters.outbound.agno.adapter import AgnoAdapter
+
+        adapter = AgnoAdapter(model_id="test", provider="bedrock")
+
+        # Ensure the import fails (which is the real state in this env)
+        with patch.dict("sys.modules", {"agno.tools.neo4j": None}):
+            assert adapter._has_neo4j_tools([object()]) is False
+
+
+class TestDiscoveryToolHook:
+    def setup_method(self) -> None:
+        reset_discovery_queue()
+
+    def test_discovery_hook_captures_neo4j_result(self):
+        from dcaf.core.adapters.outbound.agno.adapter import AgnoAdapter
+
+        adapter = AgnoAdapter(model_id="test", provider="bedrock")
+        hook = adapter._build_discovery_tool_hook()
+
+        def fake_run_cypher_query(**kwargs):  # type: ignore[no-untyped-def]
+            return [{"n": {"name": "web-api", "status": "running"}}]
+
+        result = hook(
+            function_name="run_cypher_query",
+            func=fake_run_cypher_query,
+            args={"query": "MATCH (n) RETURN n"},
+        )
+
+        assert result == [{"n": {"name": "web-api", "status": "running"}}]
+        payloads = drain_discovery_queue()
+        assert len(payloads) == 1
+        assert payloads[0].nodes[0].properties["name"] == "web-api"
+
+    def test_discovery_hook_ignores_non_neo4j_tools(self):
+        from dcaf.core.adapters.outbound.agno.adapter import AgnoAdapter
+
+        adapter = AgnoAdapter(model_id="test", provider="bedrock")
+        hook = adapter._build_discovery_tool_hook()
+
+        def fake_other_tool(**kwargs):  # type: ignore[no-untyped-def]
+            return "some result"
+
+        result = hook(function_name="list_files", func=fake_other_tool, args={})
+        assert result == "some result"
+        payloads = drain_discovery_queue()
+        assert len(payloads) == 0
+
+    def test_discovery_hook_handles_tool_error_gracefully(self):
+        import pytest
+
+        from dcaf.core.adapters.outbound.agno.adapter import AgnoAdapter
+
+        adapter = AgnoAdapter(model_id="test", provider="bedrock")
+        hook = adapter._build_discovery_tool_hook()
+
+        def failing_tool(**kwargs):  # type: ignore[no-untyped-def]
+            raise ConnectionError("neo4j down")
+
+        with pytest.raises(ConnectionError):
+            hook(function_name="run_cypher_query", func=failing_tool, args={})
+
+        payloads = drain_discovery_queue()
+        assert len(payloads) == 0
+
+
 class TestAgentDiscoveryPassthrough:
     def test_convert_stream_event_passes_through_server_events(self):
         """DiscoveryEvent (Pydantic) should pass through _convert_stream_event unchanged."""
