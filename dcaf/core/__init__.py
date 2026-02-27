@@ -137,6 +137,14 @@ from .system_events import (
 # Tool decorator (v2 copy for complete separation)
 from .tools import tool
 
+# Async job queue (optional — requires nats-py: pip install dcaf[queue])
+from .queue import JobEvent, JobQueue, JobRequest, JobStatus, create_queue_router
+
+try:
+    from .queue import NatsJobQueue
+except ImportError:
+    pass  # nats-py not installed; NatsJobQueue unavailable
+
 __all__ = [
     # Simple API
     "emit_update",
@@ -220,4 +228,11 @@ __all__ = [
     "MESSAGE_START",
     "MESSAGE_END",
     "ERROR",
+    # Async job queue
+    "JobQueue",
+    "JobRequest",
+    "JobStatus",
+    "JobEvent",
+    "NatsJobQueue",
+    "create_queue_router",
 ]
