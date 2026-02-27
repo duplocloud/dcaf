@@ -93,9 +93,16 @@ class ServerAdapter:
         messages_list = messages.get("messages", [])
         platform_context = self._extract_platform_context(messages_list)
 
+        # Extract mentions from user message
+        mentions = self._extract_mentions(messages_list)
+
         # Merge top-level request fields into context (platform_context takes precedence)
         request_fields: dict[str, Any] = messages.get("_request_fields", {})  # type: ignore[assignment]
         context = {**request_fields, **platform_context} if request_fields else platform_context
+
+        # Add mentions to context for programmatic access in tools
+        if mentions:
+            context["mentions"] = mentions
 
         # Check for approved tool calls that need to be processed
         executed_tool_calls = self._process_approved_tool_calls(messages_list, context)
@@ -111,6 +118,9 @@ class ServerAdapter:
         self._inject_execution_results(
             core_messages, executed_tool_calls, executed_commands, executed_approvals
         )
+
+        # Inject mention details for LLM context
+        self._inject_mentions(core_messages, mentions)
 
         if not core_messages:
             return AgentMessage(content="No messages provided.")
@@ -164,9 +174,16 @@ class ServerAdapter:
         messages_list = messages.get("messages", [])
         platform_context = self._extract_platform_context(messages_list)
 
+        # Extract mentions from user message
+        mentions = self._extract_mentions(messages_list)
+
         # Merge top-level request fields into context (platform_context takes precedence)
         request_fields: dict[str, Any] = messages.get("_request_fields", {})  # type: ignore[assignment]
         context = {**request_fields, **platform_context} if request_fields else platform_context
+
+        # Add mentions to context for programmatic access in tools
+        if mentions:
+            context["mentions"] = mentions
 
         # Execute any approved tool calls before streaming
         executed_tool_calls = self._process_approved_tool_calls(messages_list, context)
@@ -188,6 +205,9 @@ class ServerAdapter:
         self._inject_execution_results(
             core_messages, executed_tool_calls, executed_commands, executed_approvals
         )
+
+        # Inject mention details for LLM context
+        self._inject_mentions(core_messages, mentions)
 
         if not core_messages:
             yield ErrorEvent(error="No messages provided")
@@ -287,6 +307,55 @@ class ServerAdapter:
                         return result if isinstance(result, dict) else {}
                     return platform_context if isinstance(platform_context, dict) else {}
         return {}
+
+    def _extract_mentions(self, messages_list: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """
+        Extract mentions from the latest user message.
+
+        Mentions are graph nodes that the user @mentioned in the chat input.
+        The UI sends them as a top-level 'mentions' field on the user message.
+        """
+        for msg in reversed(messages_list):
+            if msg.get("role") == "user":
+                mentions = msg.get("mentions", [])
+                if mentions and isinstance(mentions, list):
+                    return cast(list[dict[str, Any]], mentions)
+        return []
+
+    def _inject_mentions(
+        self,
+        core_messages: list[dict[str, Any]],
+        mentions: list[dict[str, Any]],
+    ) -> None:
+        """
+        Inject mention details into the conversation for LLM context.
+
+        Appends structured node information to the last user message
+        so the LLM can reason about the referenced nodes.
+        """
+        if not mentions:
+            return
+
+        parts = []
+        for mention in mentions:
+            labels = mention.get("labels", [])
+            label = labels[0] if labels else "Node"
+            props = mention.get("properties", {})
+            name = props.get("name", mention.get("nodeId", "unknown"))
+            # Format properties excluding name (already shown)
+            other_props = {k: v for k, v in props.items() if k != "name"}
+            prop_str = ", ".join(f"{k}={v}" for k, v in other_props.items())
+            if prop_str:
+                parts.append(f'- {label} "{name}": {prop_str}')
+            else:
+                parts.append(f'- {label} "{name}"')
+
+        mention_text = "Referenced nodes:\n" + "\n".join(parts)
+
+        if core_messages and core_messages[-1]["role"] == "user":
+            core_messages[-1]["content"] += "\n\n" + mention_text
+        else:
+            core_messages.append({"role": "user", "content": mention_text})
 
     def _process_approved_tool_calls(
         self,

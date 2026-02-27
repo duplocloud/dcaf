@@ -429,3 +429,106 @@ class TestAgentDiscoveryPassthrough:
         result = agent._convert_stream_event(event, pending)
         assert result is event
         assert isinstance(result, ServerStreamEvent)
+
+
+class TestMentionsExtraction:
+    def _make_adapter(self):
+        """Create a ServerAdapter with a minimal mock agent."""
+        from unittest.mock import AsyncMock, MagicMock
+
+        from dcaf.core.adapters.inbound.server_adapter import ServerAdapter
+
+        mock_agent = MagicMock()
+        mock_agent.run_stream = AsyncMock(return_value=iter([]))
+        mock_agent.tools = []
+        return ServerAdapter(mock_agent)
+
+    def test_extract_mentions_from_user_message(self):
+        adapter = self._make_adapter()
+        messages = [
+            {
+                "role": "user",
+                "content": "tell me about @Service:web-api",
+                "mentions": [
+                    {
+                        "nodeId": "n1",
+                        "labels": ["Service"],
+                        "properties": {"name": "web-api", "status": "running"},
+                    }
+                ],
+            }
+        ]
+        mentions = adapter._extract_mentions(messages)
+        assert len(mentions) == 1
+        assert mentions[0]["nodeId"] == "n1"
+        assert mentions[0]["labels"] == ["Service"]
+
+    def test_extract_mentions_returns_empty_when_no_mentions(self):
+        adapter = self._make_adapter()
+        messages = [{"role": "user", "content": "hello"}]
+        mentions = adapter._extract_mentions(messages)
+        assert mentions == []
+
+    def test_extract_mentions_from_latest_user_message(self):
+        adapter = self._make_adapter()
+        messages = [
+            {
+                "role": "user",
+                "content": "old message",
+                "mentions": [{"nodeId": "old", "labels": ["X"], "properties": {}}],
+            },
+            {"role": "assistant", "content": "response"},
+            {
+                "role": "user",
+                "content": "new message",
+                "mentions": [{"nodeId": "new", "labels": ["Y"], "properties": {}}],
+            },
+        ]
+        mentions = adapter._extract_mentions(messages)
+        assert len(mentions) == 1
+        assert mentions[0]["nodeId"] == "new"
+
+    def test_inject_mentions_appends_to_last_user_message(self):
+        adapter = self._make_adapter()
+        core_messages = [{"role": "user", "content": "tell me about @Service:web-api"}]
+        mentions = [
+            {
+                "nodeId": "n1",
+                "labels": ["Service"],
+                "properties": {"name": "web-api", "status": "running", "replicas": 3},
+            }
+        ]
+        adapter._inject_mentions(core_messages, mentions)
+        content = core_messages[0]["content"]
+        assert "Referenced nodes:" in content
+        assert "Service" in content
+        assert "web-api" in content
+
+    def test_inject_mentions_noop_when_empty(self):
+        adapter = self._make_adapter()
+        core_messages = [{"role": "user", "content": "hello"}]
+        adapter._inject_mentions(core_messages, [])
+        assert core_messages[0]["content"] == "hello"
+
+    def test_mentions_added_to_platform_context(self):
+        adapter = self._make_adapter()
+        messages = [
+            {
+                "role": "user",
+                "content": "tell me about @Service:web-api",
+                "platform_context": {"tenant_id": "t1"},
+                "mentions": [
+                    {
+                        "nodeId": "n1",
+                        "labels": ["Service"],
+                        "properties": {"name": "web-api"},
+                    }
+                ],
+            }
+        ]
+        context = adapter._extract_platform_context(messages)
+        mentions = adapter._extract_mentions(messages)
+        context["mentions"] = mentions
+        assert context["tenant_id"] == "t1"
+        assert len(context["mentions"]) == 1
+        assert context["mentions"][0]["nodeId"] == "n1"
