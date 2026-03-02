@@ -8,60 +8,63 @@ or :func:`dcaf.core.create_app`.  When a client sends a request with
 :class:`~dcaf.core.queue.models.JobRequest` to NATS and returns
 ``{"job_id": "...", "status": "queued"}`` immediately.
 
-The worker then subscribes to ``dcaf.jobs.in.<agent_name>``, runs the job,
-and publishes :class:`~dcaf.core.queue.models.JobEvent` messages to
-``dcaf.jobs.out.<job_id>``.  The server's background listener buffers
-these events so clients can poll ``GET /api/jobs/{job_id}/events``.
+Workers subscribe to ``dcaf.jobs.in.<agent_name>.start`` via
+:meth:`~dcaf.core.queue.NatsJobQueue.subscribe_jobs`, run the job, and emit
+progress via :meth:`~dcaf.core.queue.NatsJobQueue.emit_event`.  The events are
+buffered in memory and served by the HTTP queue router.
 
 Usage (worker side)
 -------------------
 ::
 
-    from dcaf.core.queue.nats_js import NatsJobQueue, jobs_in_subject, jobs_out_subject
+    from dcaf.core.queue.nats_js import NatsJobQueue
 
     queue = NatsJobQueue(nats_url=..., agent_name="my-agent")
     await queue.connect()
 
-    # Subscribe and process jobs
-    async for request in worker.subscribe():
+    async def handle(request, handle):
         ...
+        await handle.ack()
+
+    await queue.subscribe_jobs(handle, stop_event=stop)
 
 Subject naming
 --------------
 Subjects embed the agent name so each agent has a fully isolated channel
-within the shared NATS streams:
+within the shared NATS stream:
 
-- ``dcaf.jobs.in.<agent_name>.start``    — job request  (publisher: dcaf server)
-- ``dcaf.jobs.in.<agent_name>.answers``  — answers to a paused job (iac-ai-agent)
-- ``dcaf.jobs.out.<agent_name>.<job_id>`` — job event   (publisher: agent worker)
-
-HelpDesk subscribes to ``dcaf.jobs.out.<agent_name>.>`` to receive only one
-agent's events and SSE them to the browser.
+- ``dcaf.jobs.in.<agent_name>.start`` — job request (publisher: dcaf server)
 
 Stream names
 ------------
-- ``DCAF_JOBS_IN``  — work queue, retention=WORK_QUEUE
-- ``DCAF_JOBS_OUT`` — event log,  retention=LIMITS (7-day TTL)
+- ``DCAF_JOBS_IN`` — work queue, retention=WORK_QUEUE (acked messages removed)
+
+Events
+------
+Workers emit events via :meth:`~NatsJobQueue.emit_event`.  Events are buffered
+in memory and exposed over HTTP via the queue router
+(``GET /api/jobs/{job_id}/events`` and ``GET /api/jobs/{job_id}/events/stream``).
 """
 
-from .interface import JobQueue
+from .interface import JobMessageHandle, JobQueue, JobRequestHandler
 from .models import JobEvent, JobRequest, JobStatus
 from .router import create_queue_router
 
 __all__ = [
     "JobQueue",
+    "JobMessageHandle",
+    "JobRequestHandler",
     "JobRequest",
     "JobStatus",
     "JobEvent",
     "NatsJobQueue",
     "jobs_in_subject",
-    "jobs_out_subject",
     "create_queue_router",
 ]
 
 # NatsJobQueue is an optional dependency (requires nats-py).
 # Import lazily so that dcaf can be imported without nats-py installed.
 try:
-    from .nats_js import NatsJobQueue, jobs_in_subject, jobs_out_subject
+    from .nats_js import NatsJobQueue, jobs_in_subject
 except ImportError:
     pass  # nats-py not installed; use `pip install dcaf[queue]`
