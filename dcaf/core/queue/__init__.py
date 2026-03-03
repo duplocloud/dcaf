@@ -59,12 +59,13 @@ __all__ = [
     "JobEvent",
     "NatsJobQueue",
     "jobs_in_subject",
+    "jobs_out_subject",
     "create_queue_router",
 ]
 
 # NatsJobQueue is an optional dependency (requires nats-py).
 # Import lazily so that dcaf can be imported without nats-py installed.
 try:
-    from .nats_js import NatsJobQueue, jobs_in_subject
+    from .nats_js import NatsJobQueue, jobs_in_subject, jobs_out_subject
 except ImportError:
     pass  # nats-py not installed; use `pip install dcaf[queue]`

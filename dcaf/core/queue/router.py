@@ -15,14 +15,6 @@ def create_queue_router(queue: JobQueue) -> Any:
 
     Endpoints
     ---------
-    GET /api/jobs/{job_id}
-        Return the current :class:`~dcaf.core.queue.models.JobStatus`.
-
-    GET /api/jobs/{job_id}/events?after=0
-        Return all :class:`~dcaf.core.queue.models.JobEvent` objects with
-        ``seq > after``.  Poll repeatedly with ``after`` set to the last
-        received seq to stream progress updates.
-
     GET /api/jobs/{job_id}/events/stream?after=0
         Stream events as Server-Sent Events (SSE).  The connection stays
         open until a terminal event (``done`` or ``error``) is delivered.
@@ -42,24 +34,6 @@ def create_queue_router(queue: JobQueue) -> Any:
     router = APIRouter(prefix="/api/jobs", tags=["jobs"])
 
     _TERMINAL_EVENTS = frozenset({"done", "error"})
-
-    @router.get("/{job_id}")
-    async def get_job_status(job_id: str) -> dict[str, Any]:
-        """Return the current status of a queued job."""
-        status = await queue.get_status(job_id)
-        if status is None:
-            raise HTTPException(status_code=404, detail="Job not found")
-        return status.model_dump(mode="json")
-
-    @router.get("/{job_id}/events")
-    async def get_job_events(job_id: str, after: int = 0) -> list[dict[str, Any]]:
-        """Return events for a job with seq > after.
-
-        Poll with ``?after=<last_seq>`` to retrieve only new events
-        since your last call.
-        """
-        events = await queue.get_events(job_id, after)
-        return [e.model_dump(mode="json") for e in events]
 
     @router.get("/{job_id}/events/stream")
     async def stream_job_events(
