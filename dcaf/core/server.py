@@ -405,7 +405,7 @@ def create_app(
         )
 
     @contextlib.asynccontextmanager
-    async def _lifespan(app: FastAPI) -> AsyncGenerator[None, None]:  # type: ignore[type-arg]
+    async def _lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         if queue_backend is not None:
             await queue_backend.connect()
         yield
@@ -594,7 +594,9 @@ def create_app(
         from .queue.router import create_queue_router
 
         app.include_router(create_queue_router(queue_backend))
-        logger.info("Job queue endpoints enabled: GET /api/jobs/{job_id}, GET /api/jobs/{job_id}/events")
+        logger.info(
+            "Job queue endpoints enabled: GET /api/jobs/{job_id}, GET /api/jobs/{job_id}/events"
+        )
 
     # Add any additional routers
     if additional_routers:

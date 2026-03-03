@@ -149,10 +149,10 @@ class NatsJobQueue(JobQueue):
         cfg = StreamConfig(
             name=JOBS_OUT_STREAM,
             subjects=[JOBS_OUT_SUBJECT_PATTERN],
-            retention=RetentionPolicy.LIMITS,    # keep until TTL / cap
+            retention=RetentionPolicy.LIMITS,  # keep until TTL / cap
             storage=StorageType.FILE,
-            max_age=7 * 24 * 3600,              # 7 days in seconds (nats-py converts to ns)
-            max_msgs_per_subject=10_000,         # cap per job subject
+            max_age=7 * 24 * 3600,  # 7 days in seconds (nats-py converts to ns)
+            max_msgs_per_subject=10_000,  # cap per job subject
         )
         try:
             await self._js.stream_info(JOBS_OUT_STREAM)  # type: ignore[attr-defined]
@@ -186,9 +186,7 @@ class NatsJobQueue(JobQueue):
             await self._js.consumer_info(JOBS_IN_STREAM, durable)  # type: ignore[attr-defined]
         except nats.js.errors.NotFoundError:
             await self._js.add_consumer(JOBS_IN_STREAM, cfg)  # type: ignore[attr-defined]
-            logger.info(
-                "Created NATS consumer durable=%s filter=%s", durable, filter_subject
-            )
+            logger.info("Created NATS consumer durable=%s filter=%s", durable, filter_subject)
 
     # ── enqueue ───────────────────────────────────────────────────────────────
 
