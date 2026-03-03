@@ -46,7 +46,7 @@ Example - With custom routes:
 
 import inspect
 import logging
-from collections.abc import Callable, Iterator, Sequence
+from collections.abc import AsyncGenerator, Callable, Iterator, Sequence
 from typing import TYPE_CHECKING, Any, Union
 
 from .agent import Agent
@@ -405,7 +405,7 @@ def create_app(
         )
 
     @contextlib.asynccontextmanager
-    async def _lifespan(app: FastAPI):  # type: ignore[type-arg]
+    async def _lifespan(app: FastAPI) -> AsyncGenerator[None, None]:  # type: ignore[type-arg]
         if queue_backend is not None:
             await queue_backend.connect()
         yield

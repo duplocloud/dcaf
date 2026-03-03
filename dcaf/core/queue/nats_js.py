@@ -110,7 +110,7 @@ class NatsJobQueue(JobQueue):
         import nats  # optional dep — imported lazily
 
         self._nc = await nats.connect(self._url)
-        self._js = self._nc.jetstream()
+        self._js = self._nc.jetstream()  # type: ignore[attr-defined]
         await self._ensure_in_stream()
         await self._ensure_out_stream()
         logger.info("NatsJobQueue connected to %s", self._url)
@@ -371,7 +371,7 @@ class NatsJobQueue(JobQueue):
         if event.event_type == "status" and event.data and event.job_id in self._status:
             new_status = event.data.get("status")
             if new_status:
-                self._status[event.job_id].status = new_status  # type: ignore[assignment]
+                self._status[event.job_id].status = new_status
                 self._status[event.job_id].updated_at = event.timestamp
                 if new_status == "failed":
                     self._status[event.job_id].error = event.data.get("error")

@@ -2,7 +2,8 @@
 
 import asyncio
 from abc import ABC, abstractmethod
-from typing import Any, Awaitable, Callable, Optional, Type
+from collections.abc import Awaitable, Callable
+from typing import Any
 
 from pydantic import BaseModel
 
@@ -76,7 +77,7 @@ class JobQueue(ABC):
     async def subscribe_jobs(
         self,
         handler: JobRequestHandler,
-        stop_event: Optional[asyncio.Event] = None,
+        stop_event: asyncio.Event | None = None,
     ) -> None:
         """Pull jobs from the queue and invoke *handler* for each one.
 
@@ -112,9 +113,9 @@ class JobQueue(ABC):
         self,
         subject: str,
         durable: str,
-        model_class: Type[BaseModel],
+        model_class: type[BaseModel],
         handler: Callable[[Any, "JobMessageHandle"], Awaitable[None]],
-        stop_event: Optional[asyncio.Event] = None,
+        stop_event: asyncio.Event | None = None,
     ) -> None:
         """Durable pull consumer for any Pydantic message type.
 

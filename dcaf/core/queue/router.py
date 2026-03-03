@@ -38,8 +38,8 @@ def create_queue_router(queue: JobQueue) -> Any:
     @router.get("/{job_id}/events/stream")
     async def stream_job_events(
         job_id: str,
+        request: Request,
         after: int = Query(0, ge=0),
-        request: Request = ...,
     ) -> StreamingResponse:
         """Stream job events as Server-Sent Events (SSE).
 
@@ -60,7 +60,9 @@ def create_queue_router(queue: JobQueue) -> Any:
         if last_event_id.isdigit():
             after = max(after, int(last_event_id))
 
-        async def event_generator():
+        from collections.abc import AsyncGenerator
+
+        async def event_generator() -> AsyncGenerator[str, None]:
             cursor = after
             while True:
                 events = await queue.get_events(job_id, cursor)

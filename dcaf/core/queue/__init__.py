@@ -46,6 +46,8 @@ in memory and exposed over HTTP via the queue router
 (``GET /api/jobs/{job_id}/events`` and ``GET /api/jobs/{job_id}/events/stream``).
 """
 
+import contextlib
+
 from .interface import JobMessageHandle, JobQueue, JobRequestHandler
 from .models import JobEvent, JobRequest, JobStatus
 from .router import create_queue_router
@@ -65,7 +67,5 @@ __all__ = [
 
 # NatsJobQueue is an optional dependency (requires nats-py).
 # Import lazily so that dcaf can be imported without nats-py installed.
-try:
-    from .nats_js import NatsJobQueue, jobs_in_subject, jobs_out_subject
-except ImportError:
-    pass  # nats-py not installed; use `pip install dcaf[queue]`
+with contextlib.suppress(ImportError):
+    from .nats_js import NatsJobQueue, jobs_in_subject, jobs_out_subject  # noqa: F401
