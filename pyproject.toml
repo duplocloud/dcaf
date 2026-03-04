@@ -152,7 +152,7 @@ max-complexity = 10
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]  # Allow unused imports in __init__.py
-"tests/*" = ["ARG001", "S101", "S105", "S106", "S108", "PLR0913"]  # test-specific relaxations
+"tests/*" = ["ARG001", "ARG002", "S101", "S105", "S106", "S108", "PLR0913"]  # test-specific relaxations
 
 # Legacy files with known complexity/style issues — suppress until refactored
 "dcaf/agent_server.py" = ["C901", "PLR0912", "PLR0915"]
