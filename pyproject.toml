@@ -76,9 +76,14 @@ mcp = [
     "fastmcp>=2.0",
 ]
 
+# Async job queue (NATS JetStream)
+queue = [
+    "nats-py>=2.9.0",
+]
+
 # Complete installation (all optional features)
 all = [
-    "dcaf[docs,dev,mcp]",
+    "dcaf[docs,dev,mcp,queue]",
 ]
 
 [project.urls]
@@ -162,6 +167,9 @@ max-complexity = 10
 "examples/*.py" = ["S311", "S602", "S603"]
 "main.py" = ["S104"]
 "scripts/*.py" = ["C901", "F841", "S603"]
+
+# Queue module — nats-py uses dynamic attribute access patterns
+"dcaf/core/queue/nats_js.py" = ["C901", "PLR0912", "PLR0913"]
 
 # Core files with pre-existing issues in functions not introduced by feature/skills
 "dcaf/core/adapters/outbound/agno/adapter.py" = ["C901", "PLR0912", "PLR0913"]

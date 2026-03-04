@@ -37,6 +37,7 @@ With Interceptors:
 For advanced usage, see the domain, application, and adapters submodules.
 """
 
+import contextlib
 from importlib.metadata import version as _pkg_version
 
 __version__ = _pkg_version("dcaf")
@@ -112,6 +113,9 @@ from .primitives import (
     from_agent_response,
 )
 
+# Async job queue (optional — requires nats-py: pip install dcaf[queue])
+from .queue import JobEvent, JobQueue, JobRequest, JobStatus, create_queue_router
+
 # Simple API (what most users need)
 # Stream event types (for type checking in streaming)
 # NOTE: Using v2 schemas from core/schemas/ (not v1 dcaf/schemas/)
@@ -136,6 +140,9 @@ from .system_events import (
 
 # Tool decorator (v2 copy for complete separation)
 from .tools import tool
+
+with contextlib.suppress(ImportError):
+    from .queue import NatsJobQueue  # noqa: F401
 
 __all__ = [
     # Simple API
@@ -220,4 +227,11 @@ __all__ = [
     "MESSAGE_START",
     "MESSAGE_END",
     "ERROR",
+    # Async job queue
+    "JobQueue",
+    "JobRequest",
+    "JobStatus",
+    "JobEvent",
+    "NatsJobQueue",
+    "create_queue_router",
 ]
