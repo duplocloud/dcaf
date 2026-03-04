@@ -170,7 +170,8 @@ max-complexity = 10
 "dcaf/core/adapters/outbound/agno/response_converter.py" = ["C901", "PLR0911", "PLR0912"]
 "dcaf/core/agent.py" = ["C901", "PLR0911", "PLR0913"]
 "dcaf/core/config.py" = ["C901", "PLR0911", "PLR0912", "S105"]
-"dcaf/core/domain/value_objects/platform_context.py" = ["C901"]
+"dcaf/core/domain/value_objects/platform_context.py" = ["C901", "PLR0912"]
+"dcaf/core/models.py" = ["C901"]
 "dcaf/core/server.py" = ["C901", "PLR0912", "PLR0913", "PLR0915", "S104"]
 
 [tool.ruff.lint.isort]
