@@ -740,5 +740,110 @@ class TestNativeAgnoToolkitPassthrough:
         assert agno_tools[0] is toolkit  # Native toolkit first, passed through directly
 
 
+# =============================================================================
+# Test: AgnoResponseConverter stream events (tool name extraction)
+# =============================================================================
+
+
+class TestAgnoResponseConverterStreamEvents:
+    """
+    Tests for AgnoResponseConverter.convert_stream_event() with ToolCallStartedEvent.
+
+    Regression tests for commit 2f50996: tool name must come from
+    agno_event.tool.tool_name (nested ToolExecution), NOT agno_event.tool_name
+    (which doesn't exist on ToolCallStartedEvent).
+    """
+
+    @pytest.fixture
+    def converter(self):
+        from dcaf.core.adapters.outbound.agno.response_converter import AgnoResponseConverter
+
+        return AgnoResponseConverter()
+
+    def _make_event(self, tool_name="save_file", tool_call_id="tc-1", tool_args=None):
+        """Create a fake ToolCallStartedEvent with the correct class name."""
+        from types import SimpleNamespace
+
+        tool_exec = SimpleNamespace(
+            tool_name=tool_name,
+            tool_call_id=tool_call_id,
+            tool_args=tool_args or {},
+        )
+        ToolCallStartedEvent = type("ToolCallStartedEvent", (), {})
+        event = ToolCallStartedEvent()
+        event.tool = tool_exec
+        return event
+
+    def test_tool_name_extracted_from_nested_tool_exec(self, converter):
+        """REGRESSION: tool_name comes from agno_event.tool.tool_name, not agno_event.tool_name."""
+        from dcaf.core.application.dto.responses import StreamEventType
+
+        event = self._make_event(tool_name="kubectl")
+        result = converter.convert_stream_event(event)
+
+        assert result is not None
+        assert result.event_type == StreamEventType.TOOL_USE_START
+        assert result.data["tool_name"] == "kubectl", (
+            f"Expected 'kubectl', got {repr(result.data['tool_name'])}. "
+            "Did the code regress to reading top-level tool_name instead of tool.tool_name?"
+        )
+
+    def test_tool_name_none_falls_back_to_empty_string(self, converter):
+        """Edge case: ToolExecution.tool_name=None should produce '' (not crash)."""
+        event = self._make_event(tool_name=None)
+        result = converter.convert_stream_event(event)
+
+        assert result is not None
+        assert result.data["tool_name"] == ""
+
+    def test_tool_exec_none_falls_back_to_empty_string(self, converter):
+        """Edge case: ToolCallStartedEvent.tool=None should produce '' (not crash)."""
+        ToolCallStartedEvent = type("ToolCallStartedEvent", (), {})
+        event = ToolCallStartedEvent()
+        event.tool = None
+
+        result = converter.convert_stream_event(event)
+
+        assert result is not None
+        assert result.data["tool_name"] == ""
+
+    def test_tool_call_id_and_args_extracted(self, converter):
+        """Verify all fields (tool_name, tool_call_id, tool_args) are extracted."""
+        event = self._make_event(
+            tool_name="kubectl",
+            tool_call_id="tc-abc",
+            tool_args={"command": "get pods", "namespace": "default"},
+        )
+        result = converter.convert_stream_event(event)
+
+        assert result is not None
+        assert result.data["tool_name"] == "kubectl"
+        assert result.data["tool_call_id"] == "tc-abc"
+        assert result.data["tool_args"] == {"command": "get pods", "namespace": "default"}
+
+    def test_full_pipeline_produces_correct_system_event_text(self, converter):
+        """
+        Full pipeline regression: ToolCallStartedEvent → StreamEvent → IntermittentUpdateEvent text.
+
+        Simulates what agent.py does after convert_stream_event returns TOOL_USE_START.
+        The system event text must be 'Calling tool: save_file', not 'Calling tool: '.
+        """
+        from dcaf.core.system_events import TOOL_STARTED
+
+        event = self._make_event(tool_name="save_file")
+        stream_event = converter.convert_stream_event(event)
+
+        assert stream_event is not None
+        tool_name = stream_event.data.get("tool_name", "")
+
+        # Simulate agent.py: _system_update("tool_call_started", {"tool_name": tool_name})
+        text = TOOL_STARTED.format({"tool_name": tool_name})
+
+        assert text == "Calling tool: save_file", (
+            f"Expected 'Calling tool: save_file', got {repr(text)}. "
+            "This means IntermittentUpdateEvent would show blank tool name to the user."
+        )
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
