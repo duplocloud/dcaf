@@ -88,6 +88,24 @@ class NatsJobQueue(JobQueue):
     served over HTTP by the queue router (``GET /api/jobs/{job_id}/events``
     and the SSE stream).
 
+    Co-location requirement
+    -----------------------
+    The in-memory event buffer (``self._events``, ``self._status``) is
+    the read path for the SSE endpoint.  This works **only** when the
+    worker and the HTTP server share the **same** ``NatsJobQueue`` instance
+    — i.e. the worker runs as a background ``asyncio`` task inside the
+    same process.  The recommended wiring is::
+
+        queue = NatsJobQueue(nats_url="nats://...", agent_name="my-agent")
+        app = create_app(agent, queue_nats_url=..., queue_agent_name=...)
+
+        # In application startup (e.g. lifespan):
+        await queue.connect()
+        asyncio.create_task(queue.subscribe_jobs(my_handler))
+
+    If a worker runs out-of-process, ``emit_event`` updates that process's
+    dict, not the server's, and the SSE endpoint will return stale data.
+
     Notes
     -----
     The in-memory event buffer is lost on process restart.  For production

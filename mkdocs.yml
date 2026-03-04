@@ -158,6 +158,7 @@ nav:
     - Emitting Events: guides/emitting-events.md
     - System Events: guides/system-events.md
     - Event Subscriptions: guides/event-subscriptions.md
+    - Async Job Queue: guides/async-job-queue.md
     - Documentation Versioning: guides/versioning.md
   
   - Architecture:

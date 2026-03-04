@@ -449,7 +449,7 @@ def create_app(
             job = JobRequest(
                 agent_name=queue_agent_name or "default",
                 messages=raw_body["messages"],
-                request_fields=request_fields,
+                request_fields={k: v for k, v in request_fields.items() if k != "queue"},
             )
             job_id = await queue_backend.enqueue(job)
             return {"job_id": job_id, "status": "queued"}

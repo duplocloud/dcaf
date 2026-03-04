@@ -69,7 +69,7 @@ def create_queue_router(queue: JobQueue) -> Any:
                 for evt in events:
                     data_str = json.dumps(evt.model_dump(mode="json"))
                     yield f"id: {evt.seq}\ndata: {data_str}\n\n"
-                    cursor = evt.seq
+                    cursor = evt.seq + 1
                     if evt.event_type in _TERMINAL_EVENTS:
                         return
 
