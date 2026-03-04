@@ -12,27 +12,31 @@
         <meta name="author" content="DuploCloud">
       
       
-        <link rel="canonical" href="https://duplocloud.github.io/dcaf/main/A2A_INVESTIGATION_REPORT/">
+        <link rel="canonical" href="https://duplocloud.github.io/dcaf/main/guides/async-job-queue/">
       
       
+        <link rel="prev" href="../event-subscriptions/">
+      
+      
+        <link rel="next" href="../versioning/">
       
       
         
       
       
-      <link rel="icon" href="../assets/logo.svg">
+      <link rel="icon" href="../../assets/logo.svg">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.4">
     
     
       
-        <title>A2A Integration Investigation Report - DCAF Documentation</title>
+        <title>Async Job Queue - DCAF Documentation</title>
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
       
         
-        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
       
       
 
@@ -51,7 +55,7 @@
       
     
     
-    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -76,7 +80,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#a2a-integration-investigation-report" class="md-skip">
+        <a href="#async-job-queue-nats-jetstream" class="md-skip">
           Skip to content
         </a>
       
@@ -96,9 +100,9 @@
 
 <header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href=".." title="DCAF Documentation" class="md-header__button md-logo" aria-label="DCAF Documentation" data-md-component="logo">
+    <a href="../.." title="DCAF Documentation" class="md-header__button md-logo" aria-label="DCAF Documentation" data-md-component="logo">
       
-  <img src="../assets/logo.svg" alt="logo">
+  <img src="../../assets/logo.svg" alt="logo">
 
     </a>
     <label class="md-header__button md-icon" for="__drawer">
@@ -115,7 +119,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              A2A Integration Investigation Report
+              Async Job Queue
             
           </span>
         </div>
@@ -227,7 +231,7 @@
   
   
     <li class="md-tabs__item">
-      <a href=".." class="md-tabs__link">
+      <a href="../.." class="md-tabs__link">
         
   
   
@@ -246,7 +250,7 @@
   
   
     <li class="md-tabs__item">
-      <a href="../getting-started/" class="md-tabs__link">
+      <a href="../../getting-started/" class="md-tabs__link">
         
   
   
@@ -267,7 +271,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../core/" class="md-tabs__link">
+        <a href="../../core/" class="md-tabs__link">
           
   
   
@@ -289,7 +293,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../api-reference/" class="md-tabs__link">
+        <a href="../../api-reference/" class="md-tabs__link">
           
   
   
@@ -307,11 +311,13 @@
   
   
   
+    
+  
   
     
     
-      <li class="md-tabs__item">
-        <a href="../guides/custom-agents/" class="md-tabs__link">
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../custom-agents/" class="md-tabs__link">
           
   
   
@@ -333,7 +339,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../architecture/" class="md-tabs__link">
+        <a href="../../architecture/" class="md-tabs__link">
           
   
   
@@ -353,7 +359,7 @@
   
   
     <li class="md-tabs__item">
-      <a href="../examples/examples/" class="md-tabs__link">
+      <a href="../../examples/examples/" class="md-tabs__link">
         
   
   
@@ -394,9 +400,9 @@
 
 <nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href=".." title="DCAF Documentation" class="md-nav__button md-logo" aria-label="DCAF Documentation" data-md-component="logo">
+    <a href="../.." title="DCAF Documentation" class="md-nav__button md-logo" aria-label="DCAF Documentation" data-md-component="logo">
       
-  <img src="../assets/logo.svg" alt="logo">
+  <img src="../../assets/logo.svg" alt="logo">
 
     </a>
     DCAF Documentation
@@ -423,7 +429,7 @@
   
   
     <li class="md-nav__item">
-      <a href=".." class="md-nav__link">
+      <a href="../.." class="md-nav__link">
         
   
   
@@ -450,7 +456,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../getting-started/" class="md-nav__link">
+      <a href="../../getting-started/" class="md-nav__link">
         
   
   
@@ -520,7 +526,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../core/" class="md-nav__link ">
+            <a href="../../core/" class="md-nav__link ">
               
   
   
@@ -564,7 +570,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../core/llm-layer/" class="md-nav__link">
+      <a href="../../core/llm-layer/" class="md-nav__link">
         
   
   
@@ -592,7 +598,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../core/server/" class="md-nav__link">
+      <a href="../../core/server/" class="md-nav__link">
         
   
   
@@ -620,7 +626,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../api-reference/channel-routing/" class="md-nav__link">
+      <a href="../../api-reference/channel-routing/" class="md-nav__link">
         
   
   
@@ -648,7 +654,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../core/a2a/" class="md-nav__link">
+      <a href="../../core/a2a/" class="md-nav__link">
         
   
   
@@ -676,7 +682,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../core/helpdesk-protocol/" class="md-nav__link">
+      <a href="../../core/helpdesk-protocol/" class="md-nav__link">
         
   
   
@@ -704,7 +710,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../core/domain/" class="md-nav__link">
+      <a href="../../core/domain/" class="md-nav__link">
         
   
   
@@ -732,7 +738,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../core/application/" class="md-nav__link">
+      <a href="../../core/application/" class="md-nav__link">
         
   
   
@@ -760,7 +766,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../core/adapters/" class="md-nav__link">
+      <a href="../../core/adapters/" class="md-nav__link">
         
   
   
@@ -788,7 +794,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../core/testing/" class="md-nav__link">
+      <a href="../../core/testing/" class="md-nav__link">
         
   
   
@@ -864,7 +870,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../api-reference/" class="md-nav__link ">
+            <a href="../../api-reference/" class="md-nav__link ">
               
   
   
@@ -908,7 +914,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../api-reference/llm/" class="md-nav__link">
+      <a href="../../api-reference/llm/" class="md-nav__link">
         
   
   
@@ -936,7 +942,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../api-reference/tools/" class="md-nav__link">
+      <a href="../../api-reference/tools/" class="md-nav__link">
         
   
   
@@ -964,7 +970,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../api-reference/agents/" class="md-nav__link">
+      <a href="../../api-reference/agents/" class="md-nav__link">
         
   
   
@@ -992,7 +998,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../api-reference/agent-server/" class="md-nav__link">
+      <a href="../../api-reference/agent-server/" class="md-nav__link">
         
   
   
@@ -1020,7 +1026,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../api-reference/schemas/" class="md-nav__link">
+      <a href="../../api-reference/schemas/" class="md-nav__link">
         
   
   
@@ -1048,7 +1054,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../api-reference/channel-routing/" class="md-nav__link">
+      <a href="../../api-reference/channel-routing/" class="md-nav__link">
         
   
   
@@ -1076,7 +1082,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../api-reference/cli/" class="md-nav__link">
+      <a href="../../api-reference/cli/" class="md-nav__link">
         
   
   
@@ -1104,7 +1110,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../guides/creating-custom-agents/" class="md-nav__link">
+      <a href="../creating-custom-agents/" class="md-nav__link">
         
   
   
@@ -1136,8 +1142,10 @@
       
   
   
+    
   
   
+  
     
     
       
@@ -1187,21 +1195,22 @@
     
     
       
+        
+        
+      
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
         
           
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
-        
-          
-          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
             
   
   
@@ -1219,7 +1228,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_5">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1237,7 +1246,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../guides/custom-agents/" class="md-nav__link">
+      <a href="../custom-agents/" class="md-nav__link">
         
   
   
@@ -1265,7 +1274,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../guides/building-tools/" class="md-nav__link">
+      <a href="../building-tools/" class="md-nav__link">
         
   
   
@@ -1293,7 +1302,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../guides/agno-toolkits/" class="md-nav__link">
+      <a href="../agno-toolkits/" class="md-nav__link">
         
   
   
@@ -1321,7 +1330,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../guides/skills/" class="md-nav__link">
+      <a href="../skills/" class="md-nav__link">
         
   
   
@@ -1349,7 +1358,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../guides/mcp-tools/" class="md-nav__link">
+      <a href="../mcp-tools/" class="md-nav__link">
         
   
   
@@ -1377,7 +1386,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../guides/tracing-observability/" class="md-nav__link">
+      <a href="../tracing-observability/" class="md-nav__link">
         
   
   
@@ -1405,7 +1414,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../guides/environment-configuration/" class="md-nav__link">
+      <a href="../environment-configuration/" class="md-nav__link">
         
   
   
@@ -1433,7 +1442,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../guides/session-management/" class="md-nav__link">
+      <a href="../session-management/" class="md-nav__link">
         
   
   
@@ -1461,7 +1470,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../guides/interceptors/" class="md-nav__link">
+      <a href="../interceptors/" class="md-nav__link">
         
   
   
@@ -1489,7 +1498,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../guides/framework-adapters/" class="md-nav__link">
+      <a href="../framework-adapters/" class="md-nav__link">
         
   
   
@@ -1517,7 +1526,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../guides/migration/" class="md-nav__link">
+      <a href="../migration/" class="md-nav__link">
         
   
   
@@ -1545,7 +1554,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../guides/working-with-bedrock/" class="md-nav__link">
+      <a href="../working-with-bedrock/" class="md-nav__link">
         
   
   
@@ -1573,7 +1582,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../guides/working-with-gemini/" class="md-nav__link">
+      <a href="../working-with-gemini/" class="md-nav__link">
         
   
   
@@ -1601,7 +1610,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../guides/prompt-caching/" class="md-nav__link">
+      <a href="../prompt-caching/" class="md-nav__link">
         
   
   
@@ -1629,7 +1638,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../guides/message-protocol/" class="md-nav__link">
+      <a href="../message-protocol/" class="md-nav__link">
         
   
   
@@ -1657,7 +1666,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../guides/streaming/" class="md-nav__link">
+      <a href="../streaming/" class="md-nav__link">
         
   
   
@@ -1685,7 +1694,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../guides/emitting-events/" class="md-nav__link">
+      <a href="../emitting-events/" class="md-nav__link">
         
   
   
@@ -1713,7 +1722,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../guides/system-events/" class="md-nav__link">
+      <a href="../system-events/" class="md-nav__link">
         
   
   
@@ -1741,7 +1750,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../guides/event-subscriptions/" class="md-nav__link">
+      <a href="../event-subscriptions/" class="md-nav__link">
         
   
   
@@ -1766,10 +1775,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../guides/async-job-queue/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Async Job Queue
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -1785,6 +1821,159 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#when-to-use-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When to use it
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Requirements
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#enabling-the-queue" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Enabling the queue
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Enabling the queue">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#url-only-no-in-process-worker" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        URL-only (no in-process worker)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#shared-instance-in-process-worker-recommended" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Shared instance (in-process worker, recommended)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#wiring-a-worker-in-the-same-process" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Wiring a worker in the same process
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#submitting-a-job" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Submitting a job
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#streaming-events-sse" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Streaming events (SSE)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Streaming events (SSE)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#resuming-after-disconnect" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Resuming after disconnect
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#emitting-events-from-a-worker" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Emitting events from a worker
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#nats-streams-created-automatically" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NATS streams created automatically
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -1797,7 +1986,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../guides/versioning/" class="md-nav__link">
+      <a href="../versioning/" class="md-nav__link">
         
   
   
@@ -1894,7 +2083,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../architecture/" class="md-nav__link">
+      <a href="../../architecture/" class="md-nav__link">
         
   
   
@@ -1922,7 +2111,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../engineering-handoff/" class="md-nav__link">
+      <a href="../../engineering-handoff/" class="md-nav__link">
         
   
   
@@ -2024,7 +2213,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../adrs/000-template/" class="md-nav__link">
+      <a href="../../adrs/000-template/" class="md-nav__link">
         
   
   
@@ -2052,7 +2241,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../adrs/001-clean-architecture/" class="md-nav__link">
+      <a href="../../adrs/001-clean-architecture/" class="md-nav__link">
         
   
   
@@ -2080,7 +2269,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../adrs/002-ddd-tactical-patterns/" class="md-nav__link">
+      <a href="../../adrs/002-ddd-tactical-patterns/" class="md-nav__link">
         
   
   
@@ -2108,7 +2297,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../adrs/003-adapter-pattern-for-frameworks/" class="md-nav__link">
+      <a href="../../adrs/003-adapter-pattern-for-frameworks/" class="md-nav__link">
         
   
   
@@ -2136,7 +2325,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../adrs/004-approval-first-design/" class="md-nav__link">
+      <a href="../../adrs/004-approval-first-design/" class="md-nav__link">
         
   
   
@@ -2164,7 +2353,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../adrs/005-cohesive-provider-modules/" class="md-nav__link">
+      <a href="../../adrs/005-cohesive-provider-modules/" class="md-nav__link">
         
   
   
@@ -2192,7 +2381,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../adrs/006-strangler-fig-migration/" class="md-nav__link">
+      <a href="../../adrs/006-strangler-fig-migration/" class="md-nav__link">
         
   
   
@@ -2220,7 +2409,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../adrs/007-lowercase-chat-endpoints/" class="md-nav__link">
+      <a href="../../adrs/007-lowercase-chat-endpoints/" class="md-nav__link">
         
   
   
@@ -2248,7 +2437,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../adrs/008-skills-design-decisions/" class="md-nav__link">
+      <a href="../../adrs/008-skills-design-decisions/" class="md-nav__link">
         
   
   
@@ -2291,7 +2480,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../examples/examples/" class="md-nav__link">
+      <a href="../../examples/examples/" class="md-nav__link">
         
   
   
@@ -2338,10 +2527,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#executive-summary" class="md-nav__link">
+  <a href="#when-to-use-it" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Executive Summary
+        When to use it
       
     </span>
   </a>
@@ -2349,10 +2538,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#problem-description" class="md-nav__link">
+  <a href="#requirements" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Problem Description
+        Requirements
       
     </span>
   </a>
@@ -2360,22 +2549,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#root-cause-analysis" class="md-nav__link">
+  <a href="#enabling-the-queue" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Root Cause Analysis
+        Enabling the queue
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Root Cause Analysis">
+    <nav class="md-nav" aria-label="Enabling the queue">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#primary-issue-httpx-client-configuration" class="md-nav__link">
+  <a href="#url-only-no-in-process-worker" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Primary Issue: httpx Client Configuration
+        URL-only (no in-process worker)
       
     </span>
   </a>
@@ -2383,10 +2572,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#secondary-issue-localhost-resolution" class="md-nav__link">
+  <a href="#shared-instance-in-process-worker-recommended" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Secondary Issue: localhost Resolution
+        Shared instance (in-process worker, recommended)
       
     </span>
   </a>
@@ -2399,33 +2588,44 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#solution-implemented" class="md-nav__link">
+  <a href="#wiring-a-worker-in-the-same-process" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Solution Implemented
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Solution Implemented">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#changed-files" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Changed Files
+        Wiring a worker in the same process
       
     </span>
   </a>
   
 </li>
-        
-          <li class="md-nav__item">
-  <a href="#code-changes" class="md-nav__link">
+      
+        <li class="md-nav__item">
+  <a href="#submitting-a-job" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Code Changes
+        Submitting a job
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#streaming-events-sse" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Streaming events (SSE)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Streaming events (SSE)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#resuming-after-disconnect" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Resuming after disconnect
       
     </span>
   </a>
@@ -2438,127 +2638,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#verification" class="md-nav__link">
+  <a href="#emitting-events-from-a-worker" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Verification
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Verification">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#test-results" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Test Results
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#integration-testing" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Integration Testing
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#usage-examples" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Usage Examples
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Usage Examples">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#basic-usage" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Basic Usage
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#orchestration-pattern" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Orchestration Pattern
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#testing-instructions" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Testing Instructions
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Testing Instructions">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#quick-test" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Quick Test
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#run-test-suite" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Run Test Suite
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#dependencies" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Dependencies
+        Emitting events from a worker
       
     </span>
   </a>
@@ -2566,82 +2649,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#documentation" class="md-nav__link">
+  <a href="#nats-streams-created-automatically" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Documentation
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#impact-assessment" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Impact Assessment
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#recommendations" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Recommendations
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#additional-notes" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Additional Notes
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Additional Notes">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#why-trust_envfalse" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Why trust_env=False?
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#localhost-vs-127001" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Localhost vs 127.0.0.1
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#conclusion" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Conclusion
+        NATS streams created automatically
       
     </span>
   </a>
@@ -2666,6 +2677,46 @@
   
 
 
+  <nav class="md-path" aria-label="Navigation" >
+    <ol class="md-path__list">
+      
+        
+  
+  
+    <li class="md-path__item">
+      <a href="../.." class="md-path__link">
+        
+  <span class="md-ellipsis">
+    Home
+  </span>
+
+      </a>
+    </li>
+  
+
+      
+      
+        
+  
+  
+    
+    
+      <li class="md-path__item">
+        <a href="../custom-agents/" class="md-path__link">
+          
+  <span class="md-ellipsis">
+    Guides
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ol>
+  </nav>
+
               
               <article class="md-content__inner md-typeset">
                 
@@ -2676,161 +2727,174 @@
   
 
 
-<h1 id="a2a-integration-investigation-report">A2A Integration Investigation Report<a class="headerlink" href="#a2a-integration-investigation-report" title="Permanent link">&para;</a></h1>
-<p><strong>Date:</strong> January 9, 2026<br />
-<strong>Issue:</strong> A2A integration not working<br />
-<strong>Status:</strong> ✅ FIXED</p>
-<h2 id="executive-summary">Executive Summary<a class="headerlink" href="#executive-summary" title="Permanent link">&para;</a></h2>
-<p>The A2A (Agent-to-Agent) integration in DCAF was not functioning due to an httpx client configuration issue. The problem has been identified and fixed. All A2A features are now working correctly.</p>
-<h2 id="problem-description">Problem Description<a class="headerlink" href="#problem-description" title="Permanent link">&para;</a></h2>
-<p>Users reported that the A2A integration wasn't working. When attempting to connect to remote agents using <code>RemoteAgent</code>, the connection would fail with 404 errors.</p>
-<h2 id="root-cause-analysis">Root Cause Analysis<a class="headerlink" href="#root-cause-analysis" title="Permanent link">&para;</a></h2>
-<h3 id="primary-issue-httpx-client-configuration">Primary Issue: httpx Client Configuration<a class="headerlink" href="#primary-issue-httpx-client-configuration" title="Permanent link">&para;</a></h3>
-<p>The httpx HTTP client was configured with <code>trust_env=True</code> (the default), which caused it to respect environment variables and proxy settings. This led to malformed HTTP requests where:</p>
-<ol>
-<li>The full URL (including scheme and host) was being URL-encoded and sent as the path</li>
-<li>Instead of sending <code>GET /.well-known/agent.json</code>, it was sending <code>GET http%3A//localhost%3A8001/.well-known/agent.json</code></li>
-<li>FastAPI couldn't match this to the registered route, resulting in 404 errors</li>
-</ol>
-<h3 id="secondary-issue-localhost-resolution">Secondary Issue: localhost Resolution<a class="headerlink" href="#secondary-issue-localhost-resolution" title="Permanent link">&para;</a></h3>
-<p>When using <code>localhost</code> in URLs, httpx exhibited unusual behavior in some environments, further compounding the routing issues.</p>
-<h2 id="solution-implemented">Solution Implemented<a class="headerlink" href="#solution-implemented" title="Permanent link">&para;</a></h2>
-<h3 id="changed-files">Changed Files<a class="headerlink" href="#changed-files" title="Permanent link">&para;</a></h3>
-<ol>
-<li><strong><code>dcaf/core/a2a/adapters/agno.py</code></strong></li>
-<li>Added <code>trust_env=False</code> to httpx.Client initialization</li>
-<li>Added URL normalization (localhost → 127.0.0.1) in all HTTP methods</li>
-<li>Restored original URL in agent card for display purposes</li>
-</ol>
-<h3 id="code-changes">Code Changes<a class="headerlink" href="#code-changes" title="Permanent link">&para;</a></h3>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># Before</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="bp">self</span><span class="o">.</span><span class="n">_http_client</span> <span class="o">=</span> <span class="n">httpx</span><span class="o">.</span><span class="n">Client</span><span class="p">(</span><span class="n">timeout</span><span class="o">=</span><span class="mf">60.0</span><span class="p">)</span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="c1"># After  </span>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="bp">self</span><span class="o">.</span><span class="n">_http_client</span> <span class="o">=</span> <span class="n">httpx</span><span class="o">.</span><span class="n">Client</span><span class="p">(</span><span class="n">timeout</span><span class="o">=</span><span class="mf">60.0</span><span class="p">,</span> <span class="n">trust_env</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<h1 id="async-job-queue-nats-jetstream">Async Job Queue (NATS JetStream)<a class="headerlink" href="#async-job-queue-nats-jetstream" title="Permanent link">&para;</a></h1>
+<p>The async job queue lets a DCAF server accept requests immediately (returning a
+<code>job_id</code>) and execute them in the background while clients stream progress via
+Server-Sent Events.</p>
+<hr />
+<h2 id="when-to-use-it">When to use it<a class="headerlink" href="#when-to-use-it" title="Permanent link">&para;</a></h2>
+<p>Long-running agent tasks (e.g. IaC runs, data pipelines) that take more than a
+few seconds to complete should use the queue.  Synchronous <code>/api/chat</code> blocks
+until the agent finishes and is unsuitable for tasks over ~30 s.</p>
+<hr />
+<h2 id="requirements">Requirements<a class="headerlink" href="#requirements" title="Permanent link">&para;</a></h2>
+<p>Install the NATS extra:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pip<span class="w"> </span>install<span class="w"> </span>dcaf<span class="o">[</span>queue<span class="o">]</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="c1"># or, with all extras:</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>pip<span class="w"> </span>install<span class="w"> </span>dcaf<span class="o">[</span>all<span class="o">]</span>
 </span></code></pre></div>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># URL normalization in all methods</span>
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="n">normalized_url</span> <span class="o">=</span> <span class="n">url</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;localhost&quot;</span><span class="p">,</span> <span class="s2">&quot;127.0.0.1&quot;</span><span class="p">)</span>
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">agent_card_url</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">normalized_url</span><span class="si">}</span><span class="s2">/.well-known/agent.json&quot;</span>
+<p>A running NATS server with JetStream enabled:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>docker<span class="w"> </span>run<span class="w"> </span>-p<span class="w"> </span><span class="m">4222</span>:4222<span class="w"> </span>nats:2.10<span class="w"> </span>-js
 </span></code></pre></div>
-<h2 id="verification">Verification<a class="headerlink" href="#verification" title="Permanent link">&para;</a></h2>
-<h3 id="test-results">Test Results<a class="headerlink" href="#test-results" title="Permanent link">&para;</a></h3>
-<p>Created comprehensive test suite in <code>tests/test_a2a_integration.py</code>:</p>
-<ul>
-<li>✅ <code>test_generate_agent_card</code> - Agent card generation</li>
-<li>✅ <code>test_agent_card_endpoint</code> - Agent card HTTP endpoint</li>
-<li>✅ <code>test_task_send_endpoint</code> - Task execution</li>
-<li>✅ <code>test_task_with_approval_needed</code> - Approval workflow</li>
-<li>✅ <code>test_remote_agent_as_tool</code> - Tool conversion</li>
-<li>✅ <code>test_a2a_routes_are_registered</code> - Route registration</li>
-<li>✅ <code>test_a2a_routes_not_registered_when_disabled</code> - Route opt-out</li>
-</ul>
-<p>All 7 tests pass successfully.</p>
-<h3 id="integration-testing">Integration Testing<a class="headerlink" href="#integration-testing" title="Permanent link">&para;</a></h3>
-<p>Verified end-to-end workflow:</p>
-<ol>
-<li>✅ Start an A2A-enabled agent</li>
-<li>✅ Connect with RemoteAgent client</li>
-<li>✅ Fetch agent card</li>
-<li>✅ Send tasks and receive responses</li>
-<li>✅ Convert RemoteAgent to tool for orchestration</li>
-</ol>
-<h2 id="usage-examples">Usage Examples<a class="headerlink" href="#usage-examples" title="Permanent link">&para;</a></h2>
-<h3 id="basic-usage">Basic Usage<a class="headerlink" href="#basic-usage" title="Permanent link">&para;</a></h3>
+<hr />
+<h2 id="enabling-the-queue">Enabling the queue<a class="headerlink" href="#enabling-the-queue" title="Permanent link">&para;</a></h2>
+<p>There are two ways to attach a queue, depending on whether you need a
+background worker in the same process.</p>
+<h3 id="url-only-no-in-process-worker">URL-only (no in-process worker)<a class="headerlink" href="#url-only-no-in-process-worker" title="Permanent link">&para;</a></h3>
+<p>Pass <code>queue_nats_url</code> when you only need the server to enqueue jobs and expose
+the SSE endpoint, and workers run out-of-process:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">dcaf.core</span><span class="w"> </span><span class="kn">import</span> <span class="n">Agent</span><span class="p">,</span> <span class="n">serve</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">dcaf.core.a2a</span><span class="w"> </span><span class="kn">import</span> <span class="n">RemoteAgent</span>
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="c1"># Server side</span>
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="n">agent</span> <span class="o">=</span> <span class="n">Agent</span><span class="p">(</span>
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="n">name</span><span class="o">=</span><span class="s2">&quot;k8s-assistant&quot;</span><span class="p">,</span>
-</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>    <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Kubernetes helper&quot;</span><span class="p">,</span>
-</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>    <span class="n">tools</span><span class="o">=</span><span class="p">[</span><span class="n">list_pods</span><span class="p">,</span> <span class="n">delete_pod</span><span class="p">],</span>
-</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="p">)</span>
-</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="n">serve</span><span class="p">(</span><span class="n">agent</span><span class="p">,</span> <span class="n">port</span><span class="o">=</span><span class="mi">8001</span><span class="p">,</span> <span class="n">a2a</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>
-</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="c1"># Client side</span>
-</span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="n">k8s</span> <span class="o">=</span> <span class="n">RemoteAgent</span><span class="p">(</span><span class="n">url</span><span class="o">=</span><span class="s2">&quot;http://localhost:8001&quot;</span><span class="p">)</span>
-</span><span id="__span-2-14"><a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="n">result</span> <span class="o">=</span> <span class="n">k8s</span><span class="o">.</span><span class="n">send</span><span class="p">(</span><span class="s2">&quot;List pods&quot;</span><span class="p">)</span>
-</span><span id="__span-2-15"><a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a><span class="nb">print</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">text</span><span class="p">)</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">agent</span> <span class="o">=</span> <span class="n">Agent</span><span class="p">(</span><span class="n">tools</span><span class="o">=</span><span class="p">[</span><span class="o">...</span><span class="p">])</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="n">serve</span><span class="p">(</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="n">agent</span><span class="p">,</span>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>    <span class="n">port</span><span class="o">=</span><span class="mi">8000</span><span class="p">,</span>
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>    <span class="n">queue_nats_url</span><span class="o">=</span><span class="s2">&quot;nats://localhost:4222&quot;</span><span class="p">,</span>
+</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>    <span class="n">queue_agent_name</span><span class="o">=</span><span class="s2">&quot;my-agent&quot;</span><span class="p">,</span>
+</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="p">)</span>
 </span></code></pre></div>
-<h3 id="orchestration-pattern">Orchestration Pattern<a class="headerlink" href="#orchestration-pattern" title="Permanent link">&para;</a></h3>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">dcaf.core</span><span class="w"> </span><span class="kn">import</span> <span class="n">Agent</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">dcaf.core.a2a</span><span class="w"> </span><span class="kn">import</span> <span class="n">RemoteAgent</span>
+<h3 id="shared-instance-in-process-worker-recommended">Shared instance (in-process worker, recommended)<a class="headerlink" href="#shared-instance-in-process-worker-recommended" title="Permanent link">&para;</a></h3>
+<p>Pass a <code>NatsJobQueue</code> instance via <code>queue=</code> so the HTTP server and the background
+worker share the same in-memory event buffer:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">dcaf.core</span><span class="w"> </span><span class="kn">import</span> <span class="n">Agent</span><span class="p">,</span> <span class="n">create_app</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">dcaf.core.queue.nats_js</span><span class="w"> </span><span class="kn">import</span> <span class="n">NatsJobQueue</span>
 </span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="c1"># Connect to specialist agents</span>
-</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="n">k8s</span> <span class="o">=</span> <span class="n">RemoteAgent</span><span class="p">(</span><span class="n">url</span><span class="o">=</span><span class="s2">&quot;http://k8s-agent:8001&quot;</span><span class="p">)</span>
-</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="n">aws</span> <span class="o">=</span> <span class="n">RemoteAgent</span><span class="p">(</span><span class="n">url</span><span class="o">=</span><span class="s2">&quot;http://aws-agent:8002&quot;</span><span class="p">)</span>
-</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>
-</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="c1"># Create orchestrator</span>
-</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="n">orchestrator</span> <span class="o">=</span> <span class="n">Agent</span><span class="p">(</span>
-</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>    <span class="n">tools</span><span class="o">=</span><span class="p">[</span><span class="n">k8s</span><span class="o">.</span><span class="n">as_tool</span><span class="p">(),</span> <span class="n">aws</span><span class="o">.</span><span class="n">as_tool</span><span class="p">()],</span>
-</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>    <span class="n">system</span><span class="o">=</span><span class="s2">&quot;Route requests to specialist agents&quot;</span>
-</span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="p">)</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="n">queue</span> <span class="o">=</span> <span class="n">NatsJobQueue</span><span class="p">(</span><span class="n">nats_url</span><span class="o">=</span><span class="s2">&quot;nats://localhost:4222&quot;</span><span class="p">,</span> <span class="n">agent_name</span><span class="o">=</span><span class="s2">&quot;my-agent&quot;</span><span class="p">)</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="n">agent</span> <span class="o">=</span> <span class="n">Agent</span><span class="p">(</span><span class="n">tools</span><span class="o">=</span><span class="p">[</span><span class="o">...</span><span class="p">])</span>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="n">app</span> <span class="o">=</span> <span class="n">create_app</span><span class="p">(</span><span class="n">agent</span><span class="p">,</span> <span class="n">queue</span><span class="o">=</span><span class="n">queue</span><span class="p">)</span>
 </span></code></pre></div>
-<h2 id="testing-instructions">Testing Instructions<a class="headerlink" href="#testing-instructions" title="Permanent link">&para;</a></h2>
-<h3 id="quick-test">Quick Test<a class="headerlink" href="#quick-test" title="Permanent link">&para;</a></h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># In the project directory</span>
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>python<span class="w"> </span>examples/a2a_example.py<span class="w"> </span>k8s
-</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="c1"># In another terminal</span>
-</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>python<span class="w"> </span>examples/a2a_example.py<span class="w"> </span>client
+<p>See <a href="#wiring-a-worker-in-the-same-process">Wiring a worker in the same process</a>
+for the full lifespan example.</p>
+<hr />
+<h2 id="wiring-a-worker-in-the-same-process">Wiring a worker in the same process<a class="headerlink" href="#wiring-a-worker-in-the-same-process" title="Permanent link">&para;</a></h2>
+<p>The SSE endpoint reads from an <strong>in-memory buffer</strong> that is only populated when
+the worker and HTTP server share the <strong>same</strong> <code>NatsJobQueue</code> instance.  Pass
+the instance directly to <code>create_app()</code> using the <code>queue=</code> parameter:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">asyncio</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="kn">import</span><span class="w"> </span><span class="nn">contextlib</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="kn">from</span><span class="w"> </span><span class="nn">dcaf.core</span><span class="w"> </span><span class="kn">import</span> <span class="n">Agent</span><span class="p">,</span> <span class="n">create_app</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="kn">from</span><span class="w"> </span><span class="nn">dcaf.core.queue.nats_js</span><span class="w"> </span><span class="kn">import</span> <span class="n">NatsJobQueue</span>
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="kn">from</span><span class="w"> </span><span class="nn">dcaf.core.queue.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">JobRequest</span><span class="p">,</span> <span class="n">JobMessageHandle</span>
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>
+</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>
+</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">my_handler</span><span class="p">(</span><span class="n">job</span><span class="p">:</span> <span class="n">JobRequest</span><span class="p">,</span> <span class="n">handle</span><span class="p">:</span> <span class="n">JobMessageHandle</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>    <span class="k">await</span> <span class="n">handle</span><span class="o">.</span><span class="n">ack</span><span class="p">()</span>
+</span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>    <span class="c1"># ... run agent logic, emit events via queue.emit_event(...)</span>
+</span><span id="__span-4-12"><a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>
+</span><span id="__span-4-13"><a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>
+</span><span id="__span-4-14"><a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a><span class="nd">@contextlib</span><span class="o">.</span><span class="n">asynccontextmanager</span>
+</span><span id="__span-4-15"><a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">lifespan</span><span class="p">(</span><span class="n">app</span><span class="p">):</span>
+</span><span id="__span-4-16"><a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a>    <span class="k">await</span> <span class="n">queue</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span>
+</span><span id="__span-4-17"><a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a>    <span class="n">task</span> <span class="o">=</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">create_task</span><span class="p">(</span><span class="n">queue</span><span class="o">.</span><span class="n">subscribe_jobs</span><span class="p">(</span><span class="n">my_handler</span><span class="p">))</span>
+</span><span id="__span-4-18"><a id="__codelineno-4-18" name="__codelineno-4-18" href="#__codelineno-4-18"></a>    <span class="k">yield</span>
+</span><span id="__span-4-19"><a id="__codelineno-4-19" name="__codelineno-4-19" href="#__codelineno-4-19"></a>    <span class="n">task</span><span class="o">.</span><span class="n">cancel</span><span class="p">()</span>
+</span><span id="__span-4-20"><a id="__codelineno-4-20" name="__codelineno-4-20" href="#__codelineno-4-20"></a>    <span class="k">await</span> <span class="n">queue</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+</span><span id="__span-4-21"><a id="__codelineno-4-21" name="__codelineno-4-21" href="#__codelineno-4-21"></a>
+</span><span id="__span-4-22"><a id="__codelineno-4-22" name="__codelineno-4-22" href="#__codelineno-4-22"></a>
+</span><span id="__span-4-23"><a id="__codelineno-4-23" name="__codelineno-4-23" href="#__codelineno-4-23"></a><span class="c1"># One instance shared between the HTTP server and the background worker.</span>
+</span><span id="__span-4-24"><a id="__codelineno-4-24" name="__codelineno-4-24" href="#__codelineno-4-24"></a><span class="n">queue</span> <span class="o">=</span> <span class="n">NatsJobQueue</span><span class="p">(</span><span class="n">nats_url</span><span class="o">=</span><span class="s2">&quot;nats://localhost:4222&quot;</span><span class="p">,</span> <span class="n">agent_name</span><span class="o">=</span><span class="s2">&quot;my-agent&quot;</span><span class="p">)</span>
+</span><span id="__span-4-25"><a id="__codelineno-4-25" name="__codelineno-4-25" href="#__codelineno-4-25"></a><span class="n">agent</span> <span class="o">=</span> <span class="n">Agent</span><span class="p">(</span><span class="n">tools</span><span class="o">=</span><span class="p">[</span><span class="o">...</span><span class="p">])</span>
+</span><span id="__span-4-26"><a id="__codelineno-4-26" name="__codelineno-4-26" href="#__codelineno-4-26"></a><span class="n">app</span> <span class="o">=</span> <span class="n">create_app</span><span class="p">(</span><span class="n">agent</span><span class="p">,</span> <span class="n">queue</span><span class="o">=</span><span class="n">queue</span><span class="p">)</span>   <span class="c1"># same instance — not queue_nats_url</span>
+</span><span id="__span-4-27"><a id="__codelineno-4-27" name="__codelineno-4-27" href="#__codelineno-4-27"></a><span class="n">app</span><span class="o">.</span><span class="n">router</span><span class="o">.</span><span class="n">lifespan_context</span> <span class="o">=</span> <span class="n">lifespan</span>
 </span></code></pre></div>
-<h3 id="run-test-suite">Run Test Suite<a class="headerlink" href="#run-test-suite" title="Permanent link">&para;</a></h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>python<span class="w"> </span>-m<span class="w"> </span>pytest<span class="w"> </span>tests/test_a2a_integration.py<span class="w"> </span>-v
+<blockquote>
+<p><strong>Important</strong>: passing <code>queue_nats_url=</code> instead of <code>queue=</code> creates a second
+internal instance.  That instance's <code>_events</code> buffer will never be populated
+by the worker, so the SSE endpoint will always return empty.  Always use
+<code>queue=</code> when wiring a background worker in the same process.</p>
+<p>For multi-process deployments replace the in-memory buffer with a persistent
+backend (e.g. NATS KV, Redis).</p>
+</blockquote>
+<hr />
+<h2 id="submitting-a-job">Submitting a job<a class="headerlink" href="#submitting-a-job" title="Permanent link">&para;</a></h2>
+<p>Add <code>"queue": true</code> to any <code>/api/chat</code> request body:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>curl<span class="w"> </span>-s<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>http://localhost:8000/api/chat<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">&quot;Content-Type: application/json&quot;</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">  </span>-d<span class="w"> </span><span class="s1">&#39;{</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="s1">    &quot;queue&quot;: true,</span>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="s1">    &quot;messages&quot;: [{&quot;role&quot;: &quot;user&quot;, &quot;content&quot;: &quot;Run my long task&quot;}]</span>
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="s1">  }&#39;</span>
 </span></code></pre></div>
-<h2 id="dependencies">Dependencies<a class="headerlink" href="#dependencies" title="Permanent link">&para;</a></h2>
-<p>Ensure these are installed:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>uv<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>-r<span class="w"> </span>requirements.txt
+<p>Response:</p>
+<div class="language-json highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="p">{</span><span class="nt">&quot;job_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;550e8400-e29b-41d4-a716-446655440000&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;status&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;queued&quot;</span><span class="p">}</span>
 </span></code></pre></div>
-<p>Required packages:
-- <code>httpx</code> - HTTP client for A2A communication
-- <code>aioboto3</code> - Async AWS Bedrock support</p>
-<h2 id="documentation">Documentation<a class="headerlink" href="#documentation" title="Permanent link">&para;</a></h2>
-<ul>
-<li><strong>API Documentation:</strong> <code>docs/core/a2a.md</code></li>
-<li><strong>Implementation Summary:</strong> <code>A2A_IMPLEMENTATION_SUMMARY.md</code></li>
-<li><strong>Fix Summary:</strong> <code>A2A_FIX_SUMMARY.md</code></li>
-<li><strong>Examples:</strong> <code>examples/a2a_example.py</code></li>
-</ul>
-<h2 id="impact-assessment">Impact Assessment<a class="headerlink" href="#impact-assessment" title="Permanent link">&para;</a></h2>
-<ul>
-<li><strong>Breaking Changes:</strong> None</li>
-<li><strong>API Changes:</strong> None (internal fix only)</li>
-<li><strong>Performance:</strong> No significant impact</li>
-<li><strong>Reliability:</strong> Significantly improved</li>
-</ul>
-<h2 id="recommendations">Recommendations<a class="headerlink" href="#recommendations" title="Permanent link">&para;</a></h2>
-<ol>
-<li>✅ Keep <code>trust_env=False</code> in httpx client configuration</li>
-<li>✅ Use URL normalization for localhost</li>
-<li>✅ Add integration tests to CI/CD pipeline</li>
-<li>✅ Document the httpx configuration requirement</li>
-</ol>
-<h2 id="additional-notes">Additional Notes<a class="headerlink" href="#additional-notes" title="Permanent link">&para;</a></h2>
-<h3 id="why-trust_envfalse">Why trust_env=False?<a class="headerlink" href="#why-trust_envfalse" title="Permanent link">&para;</a></h3>
-<p>Setting <code>trust_env=False</code> prevents httpx from reading:
-- HTTP_PROXY / HTTPS_PROXY environment variables
-- NO_PROXY settings
-- ~/.netrc files
-- System trust store</p>
-<p>This is appropriate for A2A communication which is typically:
-- Local or internal network communication
-- Not requiring system-wide proxy settings
-- Direct agent-to-agent connections</p>
-<h3 id="localhost-vs-127001">Localhost vs 127.0.0.1<a class="headerlink" href="#localhost-vs-127001" title="Permanent link">&para;</a></h3>
-<p>While both should work identically, using 127.0.0.1 explicitly:
-- Avoids IPv6 resolution issues
-- Bypasses potential DNS lookups
-- Provides more consistent behavior across environments</p>
-<h2 id="conclusion">Conclusion<a class="headerlink" href="#conclusion" title="Permanent link">&para;</a></h2>
-<p>The A2A integration is now fully functional. All features work as documented:</p>
-<ul>
-<li>✅ Agent discovery via agent cards</li>
-<li>✅ Task execution (sync and async)</li>
-<li>✅ RemoteAgent client</li>
-<li>✅ Tool conversion for orchestration</li>
-<li>✅ Multi-agent patterns (peer-to-peer and orchestration)</li>
-</ul>
-<p>The fix is minimal, focused, and has no breaking changes to the public API.</p>
+<hr />
+<h2 id="streaming-events-sse">Streaming events (SSE)<a class="headerlink" href="#streaming-events-sse" title="Permanent link">&para;</a></h2>
+<p>Open an SSE connection using the <code>job_id</code> from the submit response:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>curl<span class="w"> </span>-N<span class="w"> </span>http://localhost:8000/api/jobs/550e8400-e29b-41d4-a716-446655440000/events/stream
+</span></code></pre></div>
+<p>Each event is a JSON object on a <code>data:</code> line:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>id: 0
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>data: {&quot;job_id&quot;: &quot;550e...&quot;, &quot;event_type&quot;: &quot;status&quot;, &quot;data&quot;: {&quot;status&quot;: &quot;running&quot;}, &quot;seq&quot;: 0}
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>id: 1
+</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>data: {&quot;job_id&quot;: &quot;550e...&quot;, &quot;event_type&quot;: &quot;log&quot;, &quot;data&quot;: {&quot;message&quot;: &quot;Step 1 done&quot;}, &quot;seq&quot;: 1}
+</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>
+</span><span id="__span-8-7"><a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a>id: 2
+</span><span id="__span-8-8"><a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>data: {&quot;job_id&quot;: &quot;550e...&quot;, &quot;event_type&quot;: &quot;done&quot;, &quot;data&quot;: {}, &quot;seq&quot;: 2}
+</span></code></pre></div>
+<p>The stream closes automatically after a terminal event (<code>done</code> or <code>error</code>).</p>
+<h3 id="resuming-after-disconnect">Resuming after disconnect<a class="headerlink" href="#resuming-after-disconnect" title="Permanent link">&para;</a></h3>
+<p>Pass <code>?after=N</code> (or send a <code>Last-Event-ID</code> header) to skip events already
+received:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>curl<span class="w"> </span>-N<span class="w"> </span><span class="s2">&quot;http://localhost:8000/api/jobs/&lt;job_id&gt;/events/stream?after=5&quot;</span>
+</span></code></pre></div>
+<hr />
+<h2 id="emitting-events-from-a-worker">Emitting events from a worker<a class="headerlink" href="#emitting-events-from-a-worker" title="Permanent link">&para;</a></h2>
+<p>Call <code>queue.emit_event()</code> inside your handler to push progress to clients:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">dcaf.core.queue.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">JobEvent</span>
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>
+</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="k">await</span> <span class="n">queue</span><span class="o">.</span><span class="n">emit_event</span><span class="p">(</span><span class="n">JobEvent</span><span class="p">(</span>
+</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>    <span class="n">job_id</span><span class="o">=</span><span class="n">job</span><span class="o">.</span><span class="n">job_id</span><span class="p">,</span>
+</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>    <span class="n">event_type</span><span class="o">=</span><span class="s2">&quot;log&quot;</span><span class="p">,</span>
+</span><span id="__span-10-6"><a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>    <span class="n">data</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;message&quot;</span><span class="p">:</span> <span class="s2">&quot;Cloning repository…&quot;</span><span class="p">},</span>
+</span><span id="__span-10-7"><a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="p">))</span>
+</span><span id="__span-10-8"><a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>
+</span><span id="__span-10-9"><a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a><span class="k">await</span> <span class="n">queue</span><span class="o">.</span><span class="n">emit_event</span><span class="p">(</span><span class="n">JobEvent</span><span class="p">(</span>
+</span><span id="__span-10-10"><a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a>    <span class="n">job_id</span><span class="o">=</span><span class="n">job</span><span class="o">.</span><span class="n">job_id</span><span class="p">,</span>
+</span><span id="__span-10-11"><a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a>    <span class="n">event_type</span><span class="o">=</span><span class="s2">&quot;done&quot;</span><span class="p">,</span>
+</span><span id="__span-10-12"><a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a>    <span class="n">data</span><span class="o">=</span><span class="p">{},</span>
+</span><span id="__span-10-13"><a id="__codelineno-10-13" name="__codelineno-10-13" href="#__codelineno-10-13"></a><span class="p">))</span>
+</span></code></pre></div>
+<hr />
+<h2 id="nats-streams-created-automatically">NATS streams created automatically<a class="headerlink" href="#nats-streams-created-automatically" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Stream</th>
+<th>Retention</th>
+<th>Subject pattern</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>DCAF_JOBS_IN</code></td>
+<td>WORK_QUEUE</td>
+<td><code>dcaf.jobs.in.&gt;</code></td>
+<td>Deliver jobs to workers</td>
+</tr>
+<tr>
+<td><code>DCAF_JOBS_OUT</code></td>
+<td>LIMITS (7 days)</td>
+<td><code>dcaf.jobs.out.&gt;</code></td>
+<td>Persist emitted events</td>
+</tr>
+</tbody>
+</table>
+<p>Both streams are created on first <code>queue.connect()</code> if they do not already exist.</p>
 
 
 
@@ -2919,10 +2983,10 @@
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.tabs.sticky", "navigation.sections", "navigation.expand", "navigation.path", "navigation.top", "navigation.indexes", "search.suggest", "search.highlight", "search.share", "content.code.copy", "content.code.annotate", "content.tabs.link", "toc.follow"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"default": "latest", "provider": "mike"}}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.tabs.sticky", "navigation.sections", "navigation.expand", "navigation.path", "navigation.top", "navigation.indexes", "search.suggest", "search.highlight", "search.share", "content.code.copy", "content.code.annotate", "content.tabs.link", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"default": "latest", "provider": "mike"}}</script>
     
     
-      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
       
     
   </body>
