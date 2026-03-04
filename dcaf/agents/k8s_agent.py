@@ -59,23 +59,7 @@ class K8sAgent(BaseCommandAgent):
         processed_messages: list[dict[str, Any]] = []
         executed_cmds_current_turn: list[dict[str, str]] = []
 
-        # Extract kubeconfig (latest in history) and write to temp file
-        kubeconfig_path: str | None = None
-        for m in reversed(messages.get("messages", [])):
-            if m.get("role") == "user":
-                kube_b64 = (m.get("platform_context") or {}).get("kubeconfig")
-                if kube_b64:
-                    try:
-                        tmp = tempfile.NamedTemporaryFile(delete=False)  # noqa: SIM115
-                        tmp.write(base64.b64decode(kube_b64))
-                        tmp.flush()
-                        os.chmod(tmp.name, 0o600)
-                        kubeconfig_path = tmp.name
-                    except Exception as e:  # Intentional catch-all: base64/file errors
-                        logger.warning("Failed to set up kubeconfig: %s", e)
-                    break
-
-        messages_list = messages.get("messages", [])
+        messages_list, kubeconfig_path = self._extract_kubeconfig_path(messages)
 
         for idx, msg in enumerate(messages_list):
             role = msg.get("role")
@@ -256,6 +240,39 @@ class K8sAgent(BaseCommandAgent):
             elif isinstance(item, dict):
                 cmds.append(item)
         return cmds
+
+    def _extract_kubeconfig_path(
+        self, messages: dict[str, list[dict[str, Any]]]
+    ) -> tuple[list[dict[str, Any]], str | None]:
+        """Extract kubeconfig path from the latest user message's platform_context.
+
+        Checks kubeconfig_path first (pre-populated by CredentialManager), then
+        falls back to base64-encoded kubeconfig for legacy callers.
+
+        Returns:
+            (messages_list, kubeconfig_path) — kubeconfig_path is None if unavailable.
+        """
+        messages_list = messages.get("messages", [])
+        kubeconfig_path: str | None = None
+
+        for m in reversed(messages_list):
+            if m.get("role") == "user":
+                ctx = m.get("platform_context") or {}
+                kubeconfig_path = ctx.get("kubeconfig_path")
+                if not kubeconfig_path:
+                    kube_b64 = ctx.get("kubeconfig")
+                    if kube_b64:
+                        try:
+                            tmp = tempfile.NamedTemporaryFile(delete=False)  # noqa: SIM115
+                            tmp.write(base64.b64decode(kube_b64))
+                            tmp.flush()
+                            os.chmod(tmp.name, 0o600)
+                            kubeconfig_path = tmp.name
+                        except Exception as e:  # Intentional catch-all: base64/file errors
+                            logger.warning("Failed to set up kubeconfig: %s", e)
+                break
+
+        return messages_list, kubeconfig_path
 
     # ------------------------------------------------------------------
     # Domain-specific prompts and schema
