@@ -58,6 +58,7 @@ if TYPE_CHECKING:
     from ..channel_routing import ChannelResponseRouter
     from .a2a.models import AgentCard
     from .primitives import AgentResult
+    from .queue.interface import JobQueue
     from .schemas.messages import AgentMessage
     from .session import Session
 
@@ -98,6 +99,7 @@ def serve(
     ws_ping_timeout: float | None = DEFAULT_WS_PING_TIMEOUT,
     queue_nats_url: str | None = None,
     queue_agent_name: str | None = None,
+    queue: "JobQueue | None" = None,
 ) -> None:
     """
     Start a REST server for the agent.
@@ -254,6 +256,7 @@ def serve(
         a2a_agent_card=a2a_agent_card,
         queue_nats_url=queue_nats_url,
         queue_agent_name=queue_agent_name,
+        queue=queue,
     )
 
     logger.info(f"Starting DCAF server at http://{host}:{port}")
@@ -307,6 +310,7 @@ def create_app(
     a2a_agent_card: "AgentCard | dict | None" = None,
     queue_nats_url: str | None = None,
     queue_agent_name: str | None = None,
+    queue: "JobQueue | None" = None,
 ) -> "FastAPI":
     """
     Create a FastAPI application for the agent without starting the server.
@@ -394,9 +398,13 @@ def create_app(
     # Create the appropriate adapter based on agent type
     adapter = _create_adapter(agent)
 
-    # Optionally create NATS job queue
-    queue_backend = None
-    if queue_nats_url:
+    # Optionally create NATS job queue.
+    # Prefer an externally-created instance (queue=) so the caller can share
+    # the same NatsJobQueue between the HTTP server and a background worker,
+    # which is required for the in-memory event buffer to stay consistent.
+    # Fall back to creating one from queue_nats_url when no instance is given.
+    queue_backend = queue
+    if queue_backend is None and queue_nats_url:
         from .queue.nats_js import NatsJobQueue
 
         queue_backend = NatsJobQueue(

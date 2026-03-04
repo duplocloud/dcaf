@@ -34,7 +34,13 @@ docker run -p 4222:4222 nats:2.10 -js
 
 ## Enabling the queue
 
-Pass `queue_nats_url` and `queue_agent_name` to `serve()` or `create_app()`:
+There are two ways to attach a queue, depending on whether you need a
+background worker in the same process.
+
+### URL-only (no in-process worker)
+
+Pass `queue_nats_url` when you only need the server to enqueue jobs and expose
+the SSE endpoint, and workers run out-of-process:
 
 ```python
 from dcaf.core import Agent, serve
@@ -49,26 +55,30 @@ serve(
 )
 ```
 
-`create_app()` variant (for programmatic control):
+### Shared instance (in-process worker, recommended)
+
+Pass a `NatsJobQueue` instance via `queue=` so the HTTP server and the background
+worker share the same in-memory event buffer:
 
 ```python
 from dcaf.core import Agent, create_app
+from dcaf.core.queue.nats_js import NatsJobQueue
 
+queue = NatsJobQueue(nats_url="nats://localhost:4222", agent_name="my-agent")
 agent = Agent(tools=[...])
-app = create_app(
-    agent,
-    queue_nats_url="nats://localhost:4222",
-    queue_agent_name="my-agent",
-)
+app = create_app(agent, queue=queue)
 ```
+
+See [Wiring a worker in the same process](#wiring-a-worker-in-the-same-process)
+for the full lifespan example.
 
 ---
 
 ## Wiring a worker in the same process
 
 The SSE endpoint reads from an **in-memory buffer** that is only populated when
-the worker and HTTP server share the same `NatsJobQueue` instance.  Wire them
-together using the FastAPI lifespan:
+the worker and HTTP server share the **same** `NatsJobQueue` instance.  Pass
+the instance directly to `create_app()` using the `queue=` parameter:
 
 ```python
 import asyncio
@@ -93,16 +103,20 @@ async def lifespan(app):
     await queue.close()
 
 
+# One instance shared between the HTTP server and the background worker.
 queue = NatsJobQueue(nats_url="nats://localhost:4222", agent_name="my-agent")
 agent = Agent(tools=[...])
-app = create_app(agent, queue_nats_url="nats://localhost:4222", queue_agent_name="my-agent")
+app = create_app(agent, queue=queue)   # same instance — not queue_nats_url
 app.router.lifespan_context = lifespan
 ```
 
-> **Important**: if the worker runs in a separate process, `emit_event` updates
-> that process's in-memory buffer, not the server's.  The SSE endpoint will
-> return stale data.  For multi-process deployments replace the in-memory buffer
-> with a persistent backend (e.g. NATS KV, Redis).
+> **Important**: passing `queue_nats_url=` instead of `queue=` creates a second
+> internal instance.  That instance's `_events` buffer will never be populated
+> by the worker, so the SSE endpoint will always return empty.  Always use
+> `queue=` when wiring a background worker in the same process.
+>
+> For multi-process deployments replace the in-memory buffer with a persistent
+> backend (e.g. NATS KV, Redis).
 
 ---
 
