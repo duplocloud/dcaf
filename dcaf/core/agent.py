@@ -1078,16 +1078,26 @@ class Agent:
                 ):
                     # Drain user-emitted events before each framework event
                     while user_events:
-                        yield user_events.popleft()
+                        evt = user_events.popleft()
+                        if isinstance(evt, IntermittentUpdateEvent):
+                            logger.info("YIELD user-emitted IntermittentUpdateEvent: %r", evt.text)
+                        yield evt
 
                     # Convert internal stream events to server stream events
                     server_event = self._convert_stream_event(event, pending_tool_calls)
                     if server_event:
+                        if isinstance(server_event, IntermittentUpdateEvent):
+                            logger.info(
+                                "YIELD framework IntermittentUpdateEvent: %r", server_event.text
+                            )
                         yield server_event
 
                 # Final drain after the runtime loop ends
                 while user_events:
-                    yield user_events.popleft()
+                    evt = user_events.popleft()
+                    if isinstance(evt, IntermittentUpdateEvent):
+                        logger.info("YIELD final-drain IntermittentUpdateEvent: %r", evt.text)
+                    yield evt
 
                 # If there are pending tool calls that need approval, yield them
                 if pending_tool_calls:
