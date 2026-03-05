@@ -1187,14 +1187,20 @@ class Agent:
             # Show "Loading skill: <name>" instead of "Calling tool: get_skill_instructions".
             if tool_name in _SKILL_ACCESS_TOOLS:
                 skill_name = tool_args.get("skill_name", tool_name)
-                logger.info("Skill accessed: %s (via %s) id=%s", skill_name, tool_name, tool_call_id)
+                logger.info(
+                    "Skill accessed: %s (via %s) id=%s", skill_name, tool_name, tool_call_id
+                )
             else:
-                logger.info("Tool call started: %s id=%s args=%r", tool_name, tool_call_id, tool_args)
+                logger.info(
+                    "Tool call started: %s id=%s args=%r", tool_name, tool_call_id, tool_args
+                )
 
             # Deduplicate: if Agno re-emits an event we already have, skip the UI update.
             if tool_call_id and any(tc.id == tool_call_id for tc in pending_tool_calls):
                 logger.warning(
-                    "Duplicate tool_call_id=%s for %s — skipping system event", tool_call_id, tool_name
+                    "Duplicate tool_call_id=%s for %s — skipping system event",
+                    tool_call_id,
+                    tool_name,
                 )
                 return None
 
