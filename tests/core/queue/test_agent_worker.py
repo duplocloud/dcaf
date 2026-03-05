@@ -11,7 +11,6 @@ import pytest
 from dcaf.core.queue.channel import AgentMessageHandle
 from dcaf.core.queue.worker import AgentWorker
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -121,9 +120,7 @@ async def test_resolve_message_type_reclassifies_task_as_answer() -> None:
     _init_worker(worker)
     handle = _make_handle()
 
-    await worker._dispatch(
-        {"type": "task", "thread_id": _InferringWorker.PAUSED_THREAD}, handle
-    )
+    await worker._dispatch({"type": "task", "thread_id": _InferringWorker.PAUSED_THREAD}, handle)
     await asyncio.sleep(0)
 
     assert worker.handled[0][0] == "answer"
