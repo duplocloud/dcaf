@@ -61,6 +61,9 @@ class PlatformContext:
     aws_credentials: dict[str, Any] | None = None
     aws_region: str | None = None
 
+    # Cloud provider credential scopes (wire format dicts)
+    scopes: list[dict[str, Any]] | None = None
+
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary, excluding None/empty values."""
         result: dict[str, Any] = {}
@@ -82,6 +85,8 @@ class PlatformContext:
             result["aws_credentials"] = self.aws_credentials
         if self.aws_region:
             result["aws_region"] = self.aws_region
+        if self.scopes:
+            result["scopes"] = self.scopes
         return result
 
     @classmethod
@@ -97,6 +102,7 @@ class PlatformContext:
             duplo_token=data.get("duplo_token"),
             aws_credentials=data.get("aws_credentials"),
             aws_region=data.get("aws_region"),
+            scopes=data.get("scopes"),
         )
 
     def get(self, key: str, default: Any = None) -> Any:
