@@ -1,7 +1,7 @@
 """Tests for scopes field on domain PlatformContext value object."""
+
 from dcaf.core.domain.value_objects.platform_context import PlatformContext
 from dcaf.core.domain.value_objects.scope import Scope
-
 
 WIRE_EKS = {
     "ProviderInfo": {"Type": "eks", "Name": "prod", "AccountId": "123456789"},
