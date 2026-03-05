@@ -134,17 +134,8 @@ class AgentChannel:
         await channel.emit(thread_id, "status", message="Running iac.plan_changes")
         await channel.emit(thread_id, "complete", data={"pr_url": "..."})
 
-    External system receiving events (HelpDesk → subscribe OUT)
-    ------------------------------------------------------------
-    ::
-
-        async def on_event(evt: AgentEvent) -> None:
-            print(evt.event_type, evt.message)
-
-        await channel.subscribe_out(thread_id, on_event)
-
-    Publishing tasks (HelpDesk → IN)
-    ---------------------------------
+    Publishing tasks (external system → IN)
+    ----------------------------------------
     ::
 
         await channel.publish({"type": "task", "thread_id": "t-1", "messages": [...]})
@@ -327,98 +318,6 @@ class AgentChannel:
             logger.warning(
                 "AgentChannel.emit: NATS OUT publish failed for thread_id=%s", thread_id
             )
-
-    # ── external system: subscribe to OUT events ──────────────────────────────
-
-    async def subscribe_out(
-        self,
-        thread_id: str,
-        handler: Callable[[AgentEvent], Awaitable[None]],
-        stop_event: asyncio.Event | None = None,
-    ) -> None:
-        """Subscribe to OUT events for a specific conversation thread.
-
-        Used by the external system (HelpDesk, simulator) to receive progress
-        events emitted by the agent worker.  Delivers all events from the
-        beginning of the thread (``DeliverPolicy.ALL``), so it is safe to call
-        after the task has already started.
-
-        *handler* is called with each :class:`AgentEvent` as it arrives.
-
-        The subscription runs until:
-        - *stop_event* is set, or
-        - a terminal event (``complete`` or ``error``) is received.
-
-        A unique durable consumer is created per call and deleted on exit, so
-        multiple simultaneous subscribers on the same thread are safe.
-
-        Example::
-
-            async def on_event(evt: AgentEvent) -> None:
-                print(evt.event_type, evt.message)
-                if evt.event_type == "question":
-                    # collect answer and publish back via channel.publish(...)
-
-            await channel.subscribe_out(thread_id, on_event)
-        """
-        import json
-        import uuid as _uuid
-
-        import nats.js.errors
-        from nats.js.api import AckPolicy, ConsumerConfig, DeliverPolicy
-
-        _TERMINAL = {"complete", "error"}
-
-        subject = channel_out_subject(self._agent_name, thread_id)
-        durable = f"out-{_uuid.uuid4().hex[:12]}"
-
-        cfg = ConsumerConfig(
-            durable_name=durable,
-            filter_subject=subject,
-            deliver_policy=DeliverPolicy.ALL,
-            ack_policy=AckPolicy.EXPLICIT,
-            ack_wait=30,
-            max_deliver=1,
-        )
-        await self._js.add_consumer(CHANNEL_OUT_STREAM, cfg)  # type: ignore[attr-defined]
-        sub = await self._js.pull_subscribe(  # type: ignore[attr-defined]
-            subject, durable=durable, stream=CHANNEL_OUT_STREAM
-        )
-        logger.info("AgentChannel.subscribe_out listening on %s (durable=%s)", subject, durable)
-
-        try:
-            while not (stop_event and stop_event.is_set()):
-                try:
-                    msgs = await sub.fetch(10, timeout=2.0)
-                except TimeoutError:
-                    continue
-                except Exception:
-                    logger.exception("AgentChannel.subscribe_out fetch failed durable=%s", durable)
-                    await asyncio.sleep(0.5)
-                    continue
-
-                for msg in msgs:
-                    if stop_event and stop_event.is_set():
-                        with contextlib.suppress(Exception):
-                            await msg.nak()
-                        continue
-                    try:
-                        raw = json.loads(msg.data.decode("utf-8"))
-                        evt = AgentEvent.model_validate(raw)
-                        await msg.ack()
-                        await handler(evt)
-                        if evt.event_type in _TERMINAL:
-                            return
-                    except Exception:
-                        logger.exception(
-                            "AgentChannel.subscribe_out handler failed durable=%s", durable
-                        )
-                        with contextlib.suppress(Exception):
-                            await msg.nak()
-        finally:
-            with contextlib.suppress(Exception):
-                await self._js.delete_consumer(CHANNEL_OUT_STREAM, durable)  # type: ignore[attr-defined]
-            logger.info("AgentChannel.subscribe_out exiting durable=%s", durable)
 
     # ── external system: publish task/answer/checkpoint to IN ────────────────
 

@@ -66,8 +66,6 @@ __all__ = [
     "AgentChannel",
     "AgentEvent",
     "AgentMessageHandle",
-    "CHANNEL_IN_STREAM",
-    "CHANNEL_OUT_STREAM",
     "channel_in_subject",
     "channel_out_subject",
 ]
@@ -77,8 +75,6 @@ __all__ = [
 with contextlib.suppress(ImportError):
     from .nats_js import NatsJobQueue, jobs_in_subject, jobs_out_subject  # noqa: F401
     from .channel import (  # noqa: F401
-        CHANNEL_IN_STREAM,
-        CHANNEL_OUT_STREAM,
         AgentChannel,
         AgentEvent,
         AgentMessageHandle,
