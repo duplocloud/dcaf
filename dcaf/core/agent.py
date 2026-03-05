@@ -97,6 +97,12 @@ RequestInterceptor = Callable[[LLMRequest], LLMRequest]
 # Type alias for response interceptors (for external use)
 ResponseInterceptor = Callable[[InterceptorLLMResponse], InterceptorLLMResponse]
 
+# Agno skill-access tool names — fired instead of regular tools when the agent
+# consults a skill.  The actual skill name is in tool_args["skill_name"].
+_SKILL_ACCESS_TOOLS: frozenset[str] = frozenset(
+    {"get_skill_instructions", "get_skill_reference", "get_skill_script"}
+)
+
 
 @dataclass
 class _PreparedRequest:
@@ -1183,6 +1189,11 @@ class Agent:
                     input_description={},
                 )
             )
+            # Skill access tools carry the real skill name in tool_args["skill_name"].
+            # Show "Loading skill: <name>" instead of "Calling tool: get_skill_instructions".
+            if tool_name in _SKILL_ACCESS_TOOLS:
+                skill_name = tool_args.get("skill_name", tool_name)
+                return self._system_update("skill_loaded", {"skill_name": skill_name})
             return self._system_update("tool_call_started", {"tool_name": tool_name})
 
         if internal_event.event_type == StreamEventType.TOOL_USE_END:
