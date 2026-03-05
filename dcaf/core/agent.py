@@ -1127,7 +1127,9 @@ class Agent:
         """Return an IntermittentUpdateEvent for a configured system event, or None."""
         se = self._system_event_lookup.get(key)
         if se:
-            return IntermittentUpdateEvent(text=se.format(data))
+            text = se.format(data)
+            logger.info("Emitting system event [%s]: %r", key, text)
+            return IntermittentUpdateEvent(text=text)
         return None
 
     def _convert_stream_event(
