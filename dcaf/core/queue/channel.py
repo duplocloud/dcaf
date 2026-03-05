@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import json
 import logging
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
@@ -275,8 +276,6 @@ class AgentChannel:
                         await msg.nak()
                     continue
                 try:
-                    import json
-
                     raw = json.loads(msg.data.decode("utf-8"))
                     await handler(raw, AgentMessageHandle(msg))
                 except Exception:
@@ -315,9 +314,7 @@ class AgentChannel:
         try:
             await self._js.publish(subject, evt.model_dump_json().encode())  # type: ignore[attr-defined]
         except Exception:
-            logger.warning(
-                "AgentChannel.emit: NATS OUT publish failed for thread_id=%s", thread_id
-            )
+            logger.warning("AgentChannel.emit: NATS OUT publish failed for thread_id=%s", thread_id)
 
     # ── external system: publish task/answer/checkpoint to IN ────────────────
 
@@ -327,8 +324,6 @@ class AgentChannel:
         Used by the external system (HelpDesk, simulator) to submit a task or
         follow-up message.  The ``thread_id`` field must be present in *body*.
         """
-        import json
-
         subject = channel_in_subject(self._agent_name)
         await self._js.publish(subject, json.dumps(body).encode())  # type: ignore[attr-defined]
         logger.debug("AgentChannel.publish → %s type=%s", subject, body.get("type"))

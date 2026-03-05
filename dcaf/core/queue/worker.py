@@ -196,8 +196,10 @@ class AgentWorker(ABC):
     }
 
     async def _dispatch(self, msg: dict, handle: AgentMessageHandle) -> None:
-        assert self._semaphore is not None
-        assert self._active_runs_lock is not None
+        if self._semaphore is None or self._active_runs_lock is None:
+            raise RuntimeError(
+                "AgentWorker._dispatch called before run() — semaphore not initialised"
+            )
 
         msg_type = msg.get("type", "")
         handler_name = self._HANDLER_NAMES.get(msg_type)
@@ -250,8 +252,8 @@ class AgentWorker(ABC):
         track_key: str,
     ) -> None:
         """Wrap a handler invocation: release semaphore and deregister on exit."""
-        assert self._semaphore is not None
-        assert self._active_runs_lock is not None
+        if self._semaphore is None or self._active_runs_lock is None:
+            raise RuntimeError("AgentWorker._run_handler called before run()")
         try:
             await handler(msg, handle)
         except asyncio.CancelledError:
@@ -283,14 +285,14 @@ class AgentWorker(ABC):
         self._shutdown_event = asyncio.Event()
 
         shutdown_event = self._shutdown_event
+        loop = asyncio.get_running_loop()
 
-        def _signal_handler(sig: int, frame: Any = None) -> None:
-            sig_name = signal.Signals(sig).name
-            self._log.info("Received %s — initiating graceful shutdown", sig_name)
+        def _signal_handler(sig: int) -> None:
+            self._log.info("Received %s — initiating graceful shutdown", signal.Signals(sig).name)
             shutdown_event.set()
 
         for sig in (signal.SIGTERM, signal.SIGINT):
-            signal.signal(sig, _signal_handler)
+            loop.add_signal_handler(sig, _signal_handler, sig)
 
         self._log.info("Connecting to NATS (agent=%s)...", self._agent_name)
         try:
@@ -322,7 +324,7 @@ class AgentWorker(ABC):
                     len(active_tasks),
                     self._shutdown_timeout,
                 )
-                done, pending = await asyncio.wait(active_tasks, timeout=self._shutdown_timeout)
+                _, pending = await asyncio.wait(active_tasks, timeout=self._shutdown_timeout)
                 if pending:
                     self._log.warning(
                         "Cancelling %d run(s) that did not finish in time", len(pending)
