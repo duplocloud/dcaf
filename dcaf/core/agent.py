@@ -1182,6 +1182,22 @@ class Agent:
             tool_call_id = internal_event.data.get("tool_call_id", "")
             tool_name = internal_event.data.get("tool_name", "")
             tool_args = internal_event.data.get("tool_args", {})
+
+            # Skill access tools carry the real skill name in tool_args["skill_name"].
+            # Show "Loading skill: <name>" instead of "Calling tool: get_skill_instructions".
+            if tool_name in _SKILL_ACCESS_TOOLS:
+                skill_name = tool_args.get("skill_name", tool_name)
+                logger.info("Skill accessed: %s (via %s) id=%s", skill_name, tool_name, tool_call_id)
+            else:
+                logger.info("Tool call started: %s id=%s args=%r", tool_name, tool_call_id, tool_args)
+
+            # Deduplicate: if Agno re-emits an event we already have, skip the UI update.
+            if tool_call_id and any(tc.id == tool_call_id for tc in pending_tool_calls):
+                logger.warning(
+                    "Duplicate tool_call_id=%s for %s — skipping system event", tool_call_id, tool_name
+                )
+                return None
+
             pending_tool_calls.append(
                 SchemaToolCall(
                     id=tool_call_id,
@@ -1191,13 +1207,10 @@ class Agent:
                     input_description={},
                 )
             )
-            # Skill access tools carry the real skill name in tool_args["skill_name"].
-            # Show "Loading skill: <name>" instead of "Calling tool: get_skill_instructions".
+
             if tool_name in _SKILL_ACCESS_TOOLS:
                 skill_name = tool_args.get("skill_name", tool_name)
-                logger.info("Skill accessed: %s (via %s) id=%s", skill_name, tool_name, tool_call_id)
                 return self._system_update("skill_loaded", {"skill_name": skill_name})
-            logger.info("Tool call started: %s id=%s args=%r", tool_name, tool_call_id, tool_args)
             return self._system_update("tool_call_started", {"tool_name": tool_name})
 
         if internal_event.event_type == StreamEventType.TOOL_USE_END:
