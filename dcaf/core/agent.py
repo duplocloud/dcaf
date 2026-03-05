@@ -1127,7 +1127,9 @@ class Agent:
         """Return an IntermittentUpdateEvent for a configured system event, or None."""
         se = self._system_event_lookup.get(key)
         if se:
-            return IntermittentUpdateEvent(text=se.format(data))
+            text = se.format(data)
+            logger.info("Emitting system event [%s]: %r", key, text)
+            return IntermittentUpdateEvent(text=text)
         return None
 
     def _convert_stream_event(
@@ -1193,7 +1195,9 @@ class Agent:
             # Show "Loading skill: <name>" instead of "Calling tool: get_skill_instructions".
             if tool_name in _SKILL_ACCESS_TOOLS:
                 skill_name = tool_args.get("skill_name", tool_name)
+                logger.info("Skill accessed: %s (via %s)", skill_name, tool_name)
                 return self._system_update("skill_loaded", {"skill_name": skill_name})
+            logger.info("Tool call started: %s args=%r", tool_name, tool_args)
             return self._system_update("tool_call_started", {"tool_name": tool_name})
 
         if internal_event.event_type == StreamEventType.TOOL_USE_END:
@@ -1202,6 +1206,7 @@ class Agent:
             # Remove from pending — this tool executed without requiring approval
             if tool_call_id:
                 pending_tool_calls[:] = [tc for tc in pending_tool_calls if tc.id != tool_call_id]
+            logger.info("Tool call completed: %s", tool_name)
             return self._system_update("tool_call_completed", {"tool_name": tool_name})
 
         if internal_event.event_type == StreamEventType.TOOL_CALLS:

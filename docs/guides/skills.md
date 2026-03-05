@@ -138,6 +138,25 @@ Once loaded, the agent gains three built-in tools:
 
 The agent's system prompt is also augmented with skill names and descriptions, so it can discover and use skills without being explicitly told about them.
 
+### UI Status Updates
+
+When the agent accesses a skill, the framework automatically emits a `"Loading skill: {skill_name}"` status message to the client UI via the `SKILL_LOADED` system event. This is enabled by default — users see the skill name rather than the internal Agno accessor tool name.
+
+To customise the message, use `.with_text()` or `.with_formatter()`:
+
+```python
+from dcaf.core import SKILL_LOADED
+
+agent = Agent(
+    tools=[...],
+    system_events=[
+        SKILL_LOADED.with_text("Consulting: {skill_name}"),
+    ],
+)
+```
+
+See [System Events](./system-events.md) for the full configuration reference.
+
 ---
 
 ## Platform Context Integration
