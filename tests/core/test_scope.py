@@ -1,4 +1,5 @@
 """Tests for the Scope value object."""
+
 import pytest
 
 from dcaf.core.domain.value_objects.scope import Scope
@@ -6,7 +7,9 @@ from dcaf.core.domain.value_objects.scope import Scope
 
 class TestScopeFactories:
     def test_eks_factory(self):
-        s = Scope.eks(name="prod", server="https://api.example.com", token="tok123", ca_cert="cert==")
+        s = Scope.eks(
+            name="prod", server="https://api.example.com", token="tok123", ca_cert="cert=="
+        )
         assert s.type == "eks"
         assert s.name == "prod"
         assert s.account_id == "https://api.example.com"
@@ -64,7 +67,10 @@ class TestScopeWireFormat:
         assert s.credential["base64certdata"] == "cert=="
 
     def test_from_dict_lowercases_type(self):
-        wire = {"ProviderInfo": {"Type": "EKS", "Name": "x", "AccountId": ""}, "Credential": {"Data": {}}}
+        wire = {
+            "ProviderInfo": {"Type": "EKS", "Name": "x", "AccountId": ""},
+            "Credential": {"Data": {}},
+        }
         assert Scope.from_dict(wire).type == "eks"
 
     def test_round_trip(self):

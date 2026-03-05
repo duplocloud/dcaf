@@ -11,7 +11,9 @@ def _make_agent() -> K8sAgent:
 
 
 def _user_message(platform_context: dict) -> dict:
-    return {"messages": [{"role": "user", "content": "list pods", "platform_context": platform_context}]}
+    return {
+        "messages": [{"role": "user", "content": "list pods", "platform_context": platform_context}]
+    }
 
 
 class TestK8sAgentKubeconfigExtraction:
@@ -30,6 +32,7 @@ class TestK8sAgentKubeconfigExtraction:
         _, kubeconfig_path = agent._extract_kubeconfig_path(msgs)
         assert kubeconfig_path is not None
         import os
+
         assert os.path.exists(kubeconfig_path)
         # clean up
         os.unlink(kubeconfig_path)
