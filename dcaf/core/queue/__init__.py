@@ -66,14 +66,14 @@ __all__ = [
     "AgentChannel",
     "AgentEvent",
     "AgentMessageHandle",
+    "AgentWorker",
     "channel_in_subject",
     "channel_out_subject",
 ]
 
-# NatsJobQueue / AgentChannel are optional dependencies (require nats-py).
+# NatsJobQueue / AgentChannel / AgentWorker are optional dependencies (require nats-py).
 # Import lazily so that dcaf can be imported without nats-py installed.
 with contextlib.suppress(ImportError):
-    from .nats_js import NatsJobQueue, jobs_in_subject, jobs_out_subject  # noqa: F401
     from .channel import (  # noqa: F401
         AgentChannel,
         AgentEvent,
@@ -81,3 +81,5 @@ with contextlib.suppress(ImportError):
         channel_in_subject,
         channel_out_subject,
     )
+    from .nats_js import NatsJobQueue, jobs_in_subject, jobs_out_subject  # noqa: F401
+    from .worker import AgentWorker  # noqa: F401
