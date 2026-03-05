@@ -199,3 +199,34 @@ class TestEnvVarsConstants:
 
         assert hasattr(EnvVars, "DEFAULT_TOOLKIT")
         assert EnvVars.DEFAULT_TOOLKIT == "DCAF_DEFAULT_TOOLKIT"
+
+
+# =============================================================================
+# IS_LOCAL flag and GOOGLE_APPLICATION_CREDENTIALS discoverability
+# =============================================================================
+
+
+class TestIsLocalFlag:
+    def test_is_local_env_var_defined(self):
+        from dcaf.core.config import EnvVars
+
+        assert hasattr(EnvVars, "IS_LOCAL")
+        assert EnvVars.IS_LOCAL == "DCAF_IS_LOCAL"
+
+    def test_is_local_in_config_when_set(self, monkeypatch):
+        monkeypatch.setenv("DCAF_IS_LOCAL", "true")
+        config = load_agent_config()
+        assert config.get("is_local") is True
+
+    def test_is_local_false_when_unset(self, monkeypatch):
+        monkeypatch.delenv("DCAF_IS_LOCAL", raising=False)
+        config = load_agent_config()
+        assert config.get("is_local") is False
+
+
+class TestGoogleApplicationCredentials:
+    def test_google_application_credentials_env_var_defined(self):
+        from dcaf.core.config import EnvVars
+
+        assert hasattr(EnvVars, "GOOGLE_APPLICATION_CREDENTIALS")
+        assert EnvVars.GOOGLE_APPLICATION_CREDENTIALS == "GOOGLE_APPLICATION_CREDENTIALS"

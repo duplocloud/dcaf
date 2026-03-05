@@ -34,6 +34,7 @@ dependencies = [
     "tk",
     "requests",
     "duplocloud-client",
+    "PyYAML>=6.0",                # kubeconfig generation in CredentialManager
     # LLM provider dependencies (all included by default)
     "agno==2.5.2",                # Agno SDK - skills support
     "aioboto3>=13.0.0",           # AWS Bedrock async support
@@ -63,6 +64,7 @@ dev = [
     "ruff==0.15.0",
     "mypy>=1.8.0",
     "types-requests>=2.31.0",
+    "types-PyYAML>=6.0",
     # Code health (CI)
     "radon>=6.0.0",
     "import-linter>=2.0",
@@ -155,7 +157,7 @@ max-complexity = 10
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]  # Allow unused imports in __init__.py
-"tests/*" = ["ARG001", "S101", "S105", "S106", "PLR0913"]  # test-specific relaxations
+"tests/*" = ["ARG001", "ARG002", "S101", "S105", "S106", "S108", "PLR0913"]  # test-specific relaxations
 
 # Legacy files with known complexity/style issues — suppress until refactored
 "dcaf/agent_server.py" = ["C901", "PLR0912", "PLR0915"]
@@ -178,7 +180,8 @@ max-complexity = 10
 "dcaf/core/adapters/outbound/agno/response_converter.py" = ["C901", "PLR0911", "PLR0912"]
 "dcaf/core/agent.py" = ["C901", "PLR0911", "PLR0913"]
 "dcaf/core/config.py" = ["C901", "PLR0911", "PLR0912", "S105"]
-"dcaf/core/domain/value_objects/platform_context.py" = ["C901"]
+"dcaf/core/domain/value_objects/platform_context.py" = ["C901", "PLR0912"]
+"dcaf/core/models.py" = ["C901"]
 "dcaf/core/server.py" = ["C901", "PLR0912", "PLR0913", "PLR0915", "S104"]
 
 [tool.ruff.lint.isort]

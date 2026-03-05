@@ -97,6 +97,12 @@ RequestInterceptor = Callable[[LLMRequest], LLMRequest]
 # Type alias for response interceptors (for external use)
 ResponseInterceptor = Callable[[InterceptorLLMResponse], InterceptorLLMResponse]
 
+# Agno skill-access tool names — fired instead of regular tools when the agent
+# consults a skill.  The actual skill name is in tool_args["skill_name"].
+_SKILL_ACCESS_TOOLS: frozenset[str] = frozenset(
+    {"get_skill_instructions", "get_skill_reference", "get_skill_script"}
+)
+
 
 @dataclass
 class _PreparedRequest:
@@ -1121,7 +1127,9 @@ class Agent:
         """Return an IntermittentUpdateEvent for a configured system event, or None."""
         se = self._system_event_lookup.get(key)
         if se:
-            return IntermittentUpdateEvent(text=se.format(data))
+            text = se.format(data)
+            logger.info("Emitting system event [%s]: %r", key, text)
+            return IntermittentUpdateEvent(text=text)
         return None
 
     def _convert_stream_event(
@@ -1174,6 +1182,28 @@ class Agent:
             tool_call_id = internal_event.data.get("tool_call_id", "")
             tool_name = internal_event.data.get("tool_name", "")
             tool_args = internal_event.data.get("tool_args", {})
+
+            # Skill access tools carry the real skill name in tool_args["skill_name"].
+            # Show "Loading skill: <name>" instead of "Calling tool: get_skill_instructions".
+            if tool_name in _SKILL_ACCESS_TOOLS:
+                skill_name = tool_args.get("skill_name", tool_name)
+                logger.info(
+                    "Skill accessed: %s (via %s) id=%s", skill_name, tool_name, tool_call_id
+                )
+            else:
+                logger.info(
+                    "Tool call started: %s id=%s args=%r", tool_name, tool_call_id, tool_args
+                )
+
+            # Deduplicate: if Agno re-emits an event we already have, skip the UI update.
+            if tool_call_id and any(tc.id == tool_call_id for tc in pending_tool_calls):
+                logger.warning(
+                    "Duplicate tool_call_id=%s for %s — skipping system event",
+                    tool_call_id,
+                    tool_name,
+                )
+                return None
+
             pending_tool_calls.append(
                 SchemaToolCall(
                     id=tool_call_id,
@@ -1183,6 +1213,10 @@ class Agent:
                     input_description={},
                 )
             )
+
+            if tool_name in _SKILL_ACCESS_TOOLS:
+                skill_name = tool_args.get("skill_name", tool_name)
+                return self._system_update("skill_loaded", {"skill_name": skill_name})
             return self._system_update("tool_call_started", {"tool_name": tool_name})
 
         if internal_event.event_type == StreamEventType.TOOL_USE_END:
@@ -1191,6 +1225,7 @@ class Agent:
             # Remove from pending — this tool executed without requiring approval
             if tool_call_id:
                 pending_tool_calls[:] = [tc for tc in pending_tool_calls if tc.id != tool_call_id]
+            logger.info("Tool call completed: %s", tool_name)
             return self._system_update("tool_call_completed", {"tool_name": tool_name})
 
         if internal_event.event_type == StreamEventType.TOOL_CALLS:

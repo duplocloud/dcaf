@@ -152,6 +152,10 @@ class AgnoResponseConverter:
 
         elif event_type in ("ToolCallStartedEvent", "ToolCallStarted"):
             tool_exec = getattr(agno_event, "tool", None)
+            logger.info(
+                f"ToolCallStartedEvent: tool_exec={repr(tool_exec)}, "
+                f"tool_name={repr(getattr(tool_exec, 'tool_name', '<missing>'))}"
+            )
             tool_name = getattr(tool_exec, "tool_name", "") or "" if tool_exec else ""
             tool_id = getattr(tool_exec, "tool_call_id", "") or "" if tool_exec else ""
             tool_args = getattr(tool_exec, "tool_args", {}) or {} if tool_exec else {}

@@ -740,5 +740,211 @@ class TestNativeAgnoToolkitPassthrough:
         assert agno_tools[0] is toolkit  # Native toolkit first, passed through directly
 
 
+# =============================================================================
+# Test: AgnoResponseConverter stream events (tool name extraction)
+# =============================================================================
+
+
+class TestAgnoResponseConverterStreamEvents:
+    """
+    Tests for AgnoResponseConverter.convert_stream_event() with ToolCallStartedEvent.
+
+    Regression tests for commit 2f50996: tool name must come from
+    agno_event.tool.tool_name (nested ToolExecution), NOT agno_event.tool_name
+    (which doesn't exist on ToolCallStartedEvent).
+    """
+
+    @pytest.fixture
+    def converter(self):
+        from dcaf.core.adapters.outbound.agno.response_converter import AgnoResponseConverter
+
+        return AgnoResponseConverter()
+
+    def _make_event(self, tool_name="save_file", tool_call_id="tc-1", tool_args=None):
+        """Create a fake ToolCallStartedEvent with the correct class name."""
+        from types import SimpleNamespace
+
+        tool_exec = SimpleNamespace(
+            tool_name=tool_name,
+            tool_call_id=tool_call_id,
+            tool_args=tool_args or {},
+        )
+        ToolCallStartedEvent = type("ToolCallStartedEvent", (), {})
+        event = ToolCallStartedEvent()
+        event.tool = tool_exec
+        return event
+
+    def test_tool_name_extracted_from_nested_tool_exec(self, converter):
+        """REGRESSION: tool_name comes from agno_event.tool.tool_name, not agno_event.tool_name."""
+        from dcaf.core.application.dto.responses import StreamEventType
+
+        event = self._make_event(tool_name="kubectl")
+        result = converter.convert_stream_event(event)
+
+        assert result is not None
+        assert result.event_type == StreamEventType.TOOL_USE_START
+        assert result.data["tool_name"] == "kubectl", (
+            f"Expected 'kubectl', got {repr(result.data['tool_name'])}. "
+            "Did the code regress to reading top-level tool_name instead of tool.tool_name?"
+        )
+
+    def test_tool_name_none_falls_back_to_empty_string(self, converter):
+        """Edge case: ToolExecution.tool_name=None should produce '' (not crash)."""
+        event = self._make_event(tool_name=None)
+        result = converter.convert_stream_event(event)
+
+        assert result is not None
+        assert result.data["tool_name"] == ""
+
+    def test_tool_exec_none_falls_back_to_empty_string(self, converter):
+        """Edge case: ToolCallStartedEvent.tool=None should produce '' (not crash)."""
+        ToolCallStartedEvent = type("ToolCallStartedEvent", (), {})
+        event = ToolCallStartedEvent()
+        event.tool = None
+
+        result = converter.convert_stream_event(event)
+
+        assert result is not None
+        assert result.data["tool_name"] == ""
+
+    def test_tool_call_id_and_args_extracted(self, converter):
+        """Verify all fields (tool_name, tool_call_id, tool_args) are extracted."""
+        event = self._make_event(
+            tool_name="kubectl",
+            tool_call_id="tc-abc",
+            tool_args={"command": "get pods", "namespace": "default"},
+        )
+        result = converter.convert_stream_event(event)
+
+        assert result is not None
+        assert result.data["tool_name"] == "kubectl"
+        assert result.data["tool_call_id"] == "tc-abc"
+        assert result.data["tool_args"] == {"command": "get pods", "namespace": "default"}
+
+    def test_full_pipeline_produces_correct_system_event_text(self, converter):
+        """
+        Full pipeline regression: ToolCallStartedEvent → StreamEvent → IntermittentUpdateEvent text.
+
+        Simulates what agent.py does after convert_stream_event returns TOOL_USE_START.
+        The system event text must be 'Calling tool: save_file', not 'Calling tool: '.
+        """
+        from dcaf.core.system_events import TOOL_STARTED
+
+        event = self._make_event(tool_name="save_file")
+        stream_event = converter.convert_stream_event(event)
+
+        assert stream_event is not None
+        tool_name = stream_event.data.get("tool_name", "")
+
+        # Simulate agent.py: _system_update("tool_call_started", {"tool_name": tool_name})
+        text = TOOL_STARTED.format({"tool_name": tool_name})
+
+        assert text == "Calling tool: save_file", (
+            f"Expected 'Calling tool: save_file', got {repr(text)}. "
+            "This means IntermittentUpdateEvent would show blank tool name to the user."
+        )
+
+
+# =============================================================================
+# Integration Test: Real Agno objects (no mocks) — local smoke test
+# =============================================================================
+
+
+class TestAgnoResponseConverterWithRealAgnoObjects:
+    """
+    Integration tests using the real Agno ToolCallStartedEvent and ToolExecution classes.
+
+    These tests verify that:
+    1. The class name matching ('ToolCallStartedEvent') works with the installed Agno version.
+    2. Attribute access (event.tool.tool_name) works on real Agno objects.
+
+    Run these locally to confirm the fix works end-to-end with actual Agno internals:
+        pytest tests/core/test_agno_adapter.py::TestAgnoResponseConverterWithRealAgnoObjects -v -s
+    The -s flag shows the INFO log output from response_converter.py.
+    """
+
+    @pytest.fixture
+    def converter(self):
+        from dcaf.core.adapters.outbound.agno.response_converter import AgnoResponseConverter
+
+        return AgnoResponseConverter()
+
+    def test_real_tool_call_started_event_extracts_tool_name(self, converter, caplog):
+        """
+        Use the real Agno ToolCallStartedEvent + ToolExecution to verify tool_name extraction.
+
+        This is the definitive local smoke test — no mocks, real Agno objects.
+        """
+        import logging
+
+        from agno.models.response import ToolExecution
+        from agno.run.agent import ToolCallStartedEvent
+
+        from dcaf.core.application.dto.responses import StreamEventType
+
+        tool_exec = ToolExecution(
+            tool_call_id="tc-real-1",
+            tool_name="kubectl",
+            tool_args={"command": "get pods"},
+        )
+        event = ToolCallStartedEvent(tool=tool_exec)
+
+        with caplog.at_level(
+            logging.INFO, logger="dcaf.core.adapters.outbound.agno.response_converter"
+        ):
+            result = converter.convert_stream_event(event)
+
+        assert result is not None, "convert_stream_event should return a StreamEvent"
+        assert result.event_type == StreamEventType.TOOL_USE_START
+        assert result.data["tool_name"] == "kubectl", (
+            f"Expected 'kubectl', got {repr(result.data['tool_name'])}.\nLog output: {caplog.text}"
+        )
+        assert result.data["tool_call_id"] == "tc-real-1"
+
+        # Verify the INFO log was emitted with the correct values
+        assert "ToolCallStartedEvent" in caplog.text
+        assert "kubectl" in caplog.text
+
+    def test_real_event_class_name_matches_handler(self, converter):
+        """Verify type(event).__name__ matches the string used in convert_stream_event."""
+        from agno.run.agent import ToolCallStartedEvent
+
+        event = ToolCallStartedEvent()
+        assert type(event).__name__ == "ToolCallStartedEvent", (
+            f"Class name mismatch: got '{type(event).__name__}'. "
+            "Update the event_type check in response_converter.py if Agno renamed this class."
+        )
+
+    def test_real_tool_execution_has_tool_name_attr(self):
+        """Verify ToolExecution.tool_name is accessible as expected."""
+        from agno.models.response import ToolExecution
+
+        tool_exec = ToolExecution(tool_name="save_file")
+        assert tool_exec.tool_name == "save_file"
+
+    def test_full_pipeline_with_real_objects(self, converter):
+        """
+        Full pipeline: real ToolCallStartedEvent → convert_stream_event → system event text.
+        """
+        from agno.models.response import ToolExecution
+        from agno.run.agent import ToolCallStartedEvent
+
+        from dcaf.core.system_events import TOOL_STARTED
+
+        event = ToolCallStartedEvent(
+            tool=ToolExecution(tool_call_id="tc-2", tool_name="list_pods", tool_args={})
+        )
+        stream_event = converter.convert_stream_event(event)
+        assert stream_event is not None
+
+        tool_name = stream_event.data.get("tool_name", "")
+        text = TOOL_STARTED.format({"tool_name": tool_name})
+
+        assert text == "Calling tool: list_pods", (
+            f"Got: {repr(text)}\n"
+            "IntermittentUpdateEvent would show this to the user — should not be blank."
+        )
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

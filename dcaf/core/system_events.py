@@ -186,13 +186,31 @@ Example::
     TOOL_FAILED.with_formatter(lambda d: f"✗ {d['tool_name']}: {d.get('error', '')}")
 """
 
+SKILL_LOADED = SystemEvent("skill_loaded", "Loading skill: {skill_name}")
+"""Emitted when the agent begins accessing a skill.
+
+Skills are invoked via Agno's skill system (``get_skill_instructions``,
+``get_skill_reference``, ``get_skill_script``).  This event fires instead of
+``TOOL_STARTED`` for those calls, showing the skill name rather than the
+internal Agno accessor name.
+
+Available template variables:
+
+- ``{skill_name}`` — the name of the skill being loaded
+
+Example::
+
+    SKILL_LOADED.with_text("Consulting skill: {skill_name}...")
+    SKILL_LOADED.with_formatter(lambda d: f"Skill: {d['skill_name']}")
+"""
+
 # ---------------------------------------------------------------------------
 # Default set — enabled automatically unless the user overrides system_events
 # ---------------------------------------------------------------------------
 
-DEFAULT_SYSTEM_EVENTS: list[SystemEvent] = [THINKING, TOOL_STARTED]
+DEFAULT_SYSTEM_EVENTS: list[SystemEvent] = [THINKING, TOOL_STARTED, SKILL_LOADED]
 """The system events enabled by default in every ``Agent``.
 
-Currently: ``THINKING`` (reasoning started) and ``TOOL_STARTED`` (tool begins).
-All other constants are opt-in.
+Currently: ``THINKING`` (reasoning started), ``TOOL_STARTED`` (tool begins),
+and ``SKILL_LOADED`` (skill accessed).  All other constants are opt-in.
 """
