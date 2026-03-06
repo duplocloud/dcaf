@@ -1057,6 +1057,10 @@ class Agent:
 
             # Stream from the runtime
             pending_tool_calls: list[SchemaToolCall] = []
+            # Dedup IntermittentUpdateEvents by text across all yield paths.
+            # Prevents duplicate status messages when both the framework system
+            # event AND user code (emit_update) fire the same text.
+            seen_update_texts: set[str] = set()
 
             # Set up the user-emit queue so tool/handler code can push events
             # into the stream via dcaf.core.emit().
@@ -1078,16 +1082,20 @@ class Agent:
                 ):
                     # Drain user-emitted events before each framework event
                     while user_events:
-                        yield user_events.popleft()
+                        evt = user_events.popleft()
+                        if self._is_new_update(evt, seen_update_texts):
+                            yield evt
 
                     # Convert internal stream events to server stream events
                     server_event = self._convert_stream_event(event, pending_tool_calls)
-                    if server_event:
+                    if server_event and self._is_new_update(server_event, seen_update_texts):
                         yield server_event
 
                 # Final drain after the runtime loop ends
                 while user_events:
-                    yield user_events.popleft()
+                    evt = user_events.popleft()
+                    if self._is_new_update(evt, seen_update_texts):
+                        yield evt
 
                 # If there are pending tool calls that need approval, yield them
                 if pending_tool_calls:
@@ -1122,6 +1130,23 @@ class Agent:
                 conversation.add_assistant_message(content)
         conversation.add_user_message(prepared.current_message)
         return conversation, platform_context
+
+    def _is_new_update(self, event: Any, seen: set[str]) -> bool:
+        """Return True if this event should be yielded.
+
+        For IntermittentUpdateEvents, deduplicates by text within a single
+        run_stream call so the same status message is never sent twice —
+        whether it originates from the framework system event or from user
+        code calling emit_update().
+        """
+        if not isinstance(event, IntermittentUpdateEvent):
+            return True
+        if event.text in seen:
+            logger.info("DEDUP IntermittentUpdateEvent: %r", event.text)
+            return False
+        seen.add(event.text)
+        logger.info("YIELD IntermittentUpdateEvent: %r", event.text)
+        return True
 
     def _system_update(self, key: str, data: dict[str, Any]) -> IntermittentUpdateEvent | None:
         """Return an IntermittentUpdateEvent for a configured system event, or None."""
