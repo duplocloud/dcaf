@@ -36,7 +36,7 @@ import contextlib
 import logging
 import signal
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import Any, ClassVar
 
 from .channel import AgentChannel, AgentMessageHandle
 
@@ -188,7 +188,7 @@ class AgentWorker(ABC):
 
     # ── Internal dispatch ──────────────────────────────────────────────────────
 
-    _HANDLER_NAMES = {
+    _HANDLER_NAMES: ClassVar[dict[str, str]] = {
         "task": "handle_task",
         "answer": "handle_answer",
         "checkpoint_approve": "handle_checkpoint_approve",
@@ -228,20 +228,17 @@ class AgentWorker(ABC):
 
         handler = getattr(self, handler_name)
 
-        # Deduplicate concurrent task runs by thread_id
-        if msg_type == "task":
-            thread_id = msg.get("thread_id", "")
-            if thread_id:
-                async with self._active_runs_lock:
-                    if thread_id in self._active_runs:
-                        self._log.info("thread_id=%s already active — nak-ing duplicate", thread_id)
-                        await handle.nak()
-                        return
-
+        # Acquire semaphore first, then atomically check dedup and register —
+        # both inside the same lock to close the TOCTOU window.
         await self._semaphore.acquire()
         track_key = msg.get("thread_id") or str(id(msg))
-        task = asyncio.create_task(self._run_handler(handler, msg, handle, track_key))
         async with self._active_runs_lock:
+            if msg_type == "task" and track_key and track_key in self._active_runs:
+                self._semaphore.release()
+                self._log.info("thread_id=%s already active — nak-ing duplicate", track_key)
+                await handle.nak()
+                return
+            task = asyncio.create_task(self._run_handler(handler, msg, handle, track_key))
             self._active_runs[track_key] = task
 
     async def _run_handler(

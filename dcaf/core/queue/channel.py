@@ -33,8 +33,8 @@ import contextlib
 import json
 import logging
 from collections.abc import Awaitable, Callable
-from datetime import UTC, datetime
-from typing import Any
+from datetime import UTC, datetime, timedelta
+from typing import Any, Protocol, runtime_checkable
 
 from pydantic import BaseModel, Field
 
@@ -65,6 +65,20 @@ def channel_out_subject(agent_name: str, thread_id: str) -> str:
     return f"dcaf.channel.out.{agent_name}.{thread_id}"
 
 
+# ─── NATS message protocol ────────────────────────────────────────────────────
+
+
+@runtime_checkable
+class _NatsMsg(Protocol):
+    """Minimal structural type for a nats-py JetStream message."""
+
+    async def ack(self) -> None: ...
+
+    async def nak(self) -> None: ...
+
+    async def in_progress(self) -> None: ...
+
+
 # ─── Models ───────────────────────────────────────────────────────────────────
 
 
@@ -85,17 +99,17 @@ class AgentEvent(BaseModel):
 class AgentMessageHandle:
     """Wraps a raw NATS JetStream message for acknowledgement."""
 
-    def __init__(self, raw_msg: object) -> None:
+    def __init__(self, raw_msg: _NatsMsg) -> None:
         self._msg = raw_msg
 
     async def ack(self) -> None:
-        await self._msg.ack()  # type: ignore[attr-defined]
+        await self._msg.ack()
 
     async def nak(self) -> None:
-        await self._msg.nak()  # type: ignore[attr-defined]
+        await self._msg.nak()
 
     async def in_progress(self) -> None:
-        await self._msg.in_progress()  # type: ignore[attr-defined]
+        await self._msg.in_progress()
 
 
 # ─── AgentChannel ─────────────────────────────────────────────────────────────
@@ -186,7 +200,7 @@ class AgentChannel:
             subjects=[CHANNEL_IN_SUBJECT_PATTERN],
             retention=RetentionPolicy.WORK_QUEUE,
             storage=StorageType.FILE,
-            max_age=7 * 24 * 3600,
+            max_age=timedelta(days=7),
         )
         try:
             await self._js.stream_info(CHANNEL_IN_STREAM)  # type: ignore[attr-defined]
@@ -205,7 +219,7 @@ class AgentChannel:
             subjects=[CHANNEL_OUT_SUBJECT_PATTERN],
             retention=RetentionPolicy.LIMITS,
             storage=StorageType.FILE,
-            max_age=7 * 24 * 3600,
+            max_age=timedelta(days=7),
             max_msgs_per_subject=10_000,
         )
         try:
@@ -225,6 +239,9 @@ class AgentChannel:
             filter_subject=filter_subject,
             deliver_policy=DeliverPolicy.ALL,
             ack_policy=AckPolicy.EXPLICIT,
+            # 1-hour ack_wait: agent tasks are long-running (IaC pipelines can
+            # take many minutes). Heartbeat keep-alive (in_progress()) prevents
+            # redelivery during processing; this is the outer safety net.
             ack_wait=3600,
             max_deliver=3,
             max_ack_pending=100,
@@ -322,8 +339,14 @@ class AgentChannel:
         """Publish a raw dict to the IN stream.
 
         Used by the external system (HelpDesk, simulator) to submit a task or
-        follow-up message.  The ``thread_id`` field must be present in *body*.
+        follow-up message.
+
+        Raises:
+            ValueError: if ``thread_id`` is absent — messages without one are
+                unroutable on the OUT stream.
         """
+        if not body.get("thread_id"):
+            raise ValueError("publish() requires 'thread_id' in body")
         subject = channel_in_subject(self._agent_name)
         await self._js.publish(subject, json.dumps(body).encode())  # type: ignore[attr-defined]
         logger.debug("AgentChannel.publish → %s type=%s", subject, body.get("type"))
