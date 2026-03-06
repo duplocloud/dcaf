@@ -180,6 +180,12 @@ class CachingAwsBedrock(AwsBedrock):
             messages, compress_tool_results
         )
 
+        # Merge parallel tool call results into a single user message.
+        # Bedrock rejects consecutive user messages that each contain a single
+        # toolResult block when the preceding assistant turn had multiple toolUse
+        # blocks (parallel calls). All toolResult blocks must be in one message.
+        formatted_messages = self._merge_parallel_tool_results(formatted_messages)
+
         # If we have static/dynamic parts, build custom system message
         if self._static_system or self._dynamic_system:
             system_message = self._build_cached_system_message()
@@ -188,6 +194,50 @@ class CachingAwsBedrock(AwsBedrock):
             system_message = self._add_cache_checkpoint(system_message)
 
         return formatted_messages, system_message
+
+    @staticmethod
+    def _merge_parallel_tool_results(
+        messages: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        """Merge consecutive user messages containing only toolResult blocks into one.
+
+        Bedrock requires that when an assistant message contains multiple toolUse
+        blocks (parallel tool calls), all corresponding toolResult blocks must be
+        in a single subsequent user message.  Agno's base formatter emits one
+        user message per result; this method collapses them into one.
+        """
+        merged: list[dict[str, Any]] = []
+        i = 0
+        while i < len(messages):
+            msg = messages[i]
+            content = msg.get("content", [])
+            is_tool_result_msg = (
+                msg.get("role") == "user"
+                and isinstance(content, list)
+                and bool(content)
+                and all("toolResult" in block for block in content)
+            )
+            if is_tool_result_msg:
+                # Collect all consecutive tool-result-only user messages
+                combined: list[dict[str, Any]] = list(content)
+                while i + 1 < len(messages):
+                    nxt = messages[i + 1]
+                    nxt_content = nxt.get("content", [])
+                    if (
+                        nxt.get("role") == "user"
+                        and isinstance(nxt_content, list)
+                        and nxt_content
+                        and all("toolResult" in block for block in nxt_content)
+                    ):
+                        combined.extend(nxt_content)
+                        i += 1
+                    else:
+                        break
+                merged.append({"role": "user", "content": combined})
+            else:
+                merged.append(msg)
+            i += 1
+        return merged
 
     def _build_cached_system_message(self) -> list[dict[str, Any]] | None:
         """

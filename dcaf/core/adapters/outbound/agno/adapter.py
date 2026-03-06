@@ -103,11 +103,11 @@ class AgnoAdapter:
         - Parallel tool execution workaround
         - Metrics extraction and logging
 
-    Production Workarounds:
+    Production Notes:
         - Message history is filtered to remove tool-related messages
         - Strict user/assistant alternation is enforced
-        - Parallel tool calls are limited to prevent Bedrock bugs
-        - System prompt includes single-tool instruction
+        - Parallel tool call results are merged into a single user message
+          (required by Bedrock's ConverseStream API)
 
     Example:
         adapter = AgnoAdapter(
@@ -182,7 +182,7 @@ class AgnoAdapter:
             gcp_metadata_manager: Custom GCPMetadataManager instance for testing
 
             model_config: Configuration dict for model features (e.g., caching)
-            tool_call_limit: Max concurrent tool calls (default 1 to avoid bug)
+            tool_call_limit: Max concurrent tool calls per agent turn
             disable_history: If True, don't pass message history
             disable_tool_filtering: If True, skip tool message filtering
 
@@ -659,10 +659,6 @@ class AgnoAdapter:
         # Convert tools to Agno format and optionally prepend default toolkits
         agno_tools = self._prepare_tools_with_defaults(tools, platform_context)
 
-        # WORKAROUND: Prepend instruction to prevent parallel tool calls
-        # This is necessary because Agno has a bug handling multiple toolUse blocks
-        modified_prompt = self._get_modified_system_prompt(system_prompt)
-
         # Resolve skills from platform context
         agno_skills = await self._resolve_skills(platform_context)
 
@@ -675,7 +671,7 @@ class AgnoAdapter:
         # Create the agent
         agent = AgnoAgent(
             model=model,
-            instructions=modified_prompt,
+            instructions=system_prompt,
             tools=agno_tools if agno_tools else None,
             stream=stream,
             tool_call_limit=self._tool_call_limit,
@@ -757,28 +753,6 @@ class AgnoAdapter:
             logger.info(f"Default toolkit enabled: added {len(default_toolkits)} built-in toolkits")
 
         return agno_tools
-
-    def _get_modified_system_prompt(self, system_prompt: str | None) -> str:
-        """
-        Modify system prompt to include single-tool instruction.
-
-        This workaround prevents the model from requesting multiple tool calls
-        in a single response, which causes Bedrock validation errors.
-
-        Args:
-            system_prompt: Original system prompt
-
-        Returns:
-            Modified system prompt with single-tool instruction
-        """
-        single_tool_instruction = (
-            "IMPORTANT: You must call tools ONE AT A TIME. Never request multiple tool calls "
-            "in a single response. Wait for each tool result before calling the next tool.\n\n"
-        )
-
-        if system_prompt:
-            return single_tool_instruction + system_prompt
-        return single_tool_instruction
 
     # =========================================================================
     # Model Creation (delegated to ModelFactory)
