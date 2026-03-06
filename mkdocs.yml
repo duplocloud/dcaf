@@ -159,6 +159,7 @@ nav:
     - System Events: guides/system-events.md
     - Event Subscriptions: guides/event-subscriptions.md
     - Async Job Queue: guides/async-job-queue.md
+    - Agent Channel & Worker: guides/agent-channel.md
     - Documentation Versioning: guides/versioning.md
   
   - Architecture:
