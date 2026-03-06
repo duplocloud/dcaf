@@ -217,7 +217,7 @@ async def test_semaphore_limits_concurrency() -> None:
     )
     await asyncio.sleep(0.01)  # let dispatch2 reach the semaphore.acquire()
 
-    task1_release.set()   # unblock task-1 → semaphore released → task-2 runs
+    task1_release.set()  # unblock task-1 → semaphore released → task-2 runs
     await dispatch2
     await asyncio.sleep(0.02)  # let task-2 finish
 
