@@ -12,13 +12,13 @@
         <meta name="author" content="DuploCloud">
       
       
-        <link rel="canonical" href="https://duplocloud.github.io/dcaf/main/guides/async-job-queue/">
+        <link rel="canonical" href="https://duplocloud.github.io/dcaf/main/guides/agent-channel/">
       
       
-        <link rel="prev" href="../event-subscriptions/">
+        <link rel="prev" href="../async-job-queue/">
       
       
-        <link rel="next" href="../agent-channel/">
+        <link rel="next" href="../versioning/">
       
       
         
@@ -29,7 +29,7 @@
     
     
       
-        <title>Async Job Queue - DCAF Documentation</title>
+        <title>Agent Channel & Worker - DCAF Documentation</title>
       
     
     
@@ -80,7 +80,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#async-job-queue-nats-jetstream" class="md-skip">
+        <a href="#agent-channel-worker-nats-jetstream" class="md-skip">
           Skip to content
         </a>
       
@@ -119,7 +119,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Async Job Queue
+              Agent Channel & Worker
             
           </span>
         </div>
@@ -1777,6 +1777,34 @@
                 
   
   
+  
+  
+    <li class="md-nav__item">
+      <a href="../async-job-queue/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Async Job Queue
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
     
   
   
@@ -1796,7 +1824,7 @@
   <span class="md-ellipsis">
     
   
-    Async Job Queue
+    Agent Channel & Worker
   
 
     
@@ -1814,7 +1842,7 @@
   <span class="md-ellipsis">
     
   
-    Async Job Queue
+    Agent Channel & Worker
   
 
     
@@ -1840,10 +1868,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#when-to-use-it" class="md-nav__link">
+  <a href="#when-to-use-this" class="md-nav__link">
     <span class="md-ellipsis">
       
-        When to use it
+        When to use this
       
     </span>
   </a>
@@ -1862,22 +1890,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#enabling-the-queue" class="md-nav__link">
+  <a href="#stream-topology" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Enabling the queue
+        Stream topology
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Enabling the queue">
+    <nav class="md-nav" aria-label="Stream topology">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#url-only-no-in-process-worker" class="md-nav__link">
+  <a href="#subject-naming" class="md-nav__link">
     <span class="md-ellipsis">
       
-        URL-only (no in-process worker)
+        Subject naming
       
     </span>
   </a>
@@ -1885,10 +1913,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#shared-instance-in-process-worker-recommended" class="md-nav__link">
+  <a href="#in-message-types" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Shared instance (in-process worker, recommended)
+        IN message types
       
     </span>
   </a>
@@ -1901,44 +1929,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#wiring-a-worker-in-the-same-process" class="md-nav__link">
+  <a href="#subclassing-agentworker" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Wiring a worker in the same process
+        Subclassing AgentWorker
       
     </span>
   </a>
   
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#submitting-a-job" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Submitting a job
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#streaming-events-sse" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Streaming events (SSE)
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Streaming events (SSE)">
+    <nav class="md-nav" aria-label="Subclassing AgentWorker">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#resuming-after-disconnect" class="md-nav__link">
+  <a href="#optional-handlers" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Resuming after disconnect
+        Optional handlers
       
     </span>
   </a>
@@ -1951,10 +1957,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#emitting-events-from-a-worker" class="md-nav__link">
+  <a href="#type-inference" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Emitting events from a worker
+        Type inference
       
     </span>
   </a>
@@ -1962,10 +1968,65 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#nats-streams-created-automatically" class="md-nav__link">
+  <a href="#emitting-events" class="md-nav__link">
     <span class="md-ellipsis">
       
-        NATS streams created automatically
+        Emitting events
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#concurrency-and-deduplication" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Concurrency and deduplication
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#graceful-shutdown" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Graceful shutdown
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#heartbeat-keep-alive" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Heartbeat keep-alive
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#using-agentchannel-directly" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using AgentChannel directly
       
     </span>
   </a>
@@ -1976,34 +2037,6 @@
   
 </nav>
       
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../agent-channel/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Agent Channel & Worker
-  
-
-    
-  </span>
-  
-  
-
-      </a>
     </li>
   
 
@@ -2557,10 +2590,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#when-to-use-it" class="md-nav__link">
+  <a href="#when-to-use-this" class="md-nav__link">
     <span class="md-ellipsis">
       
-        When to use it
+        When to use this
       
     </span>
   </a>
@@ -2579,22 +2612,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#enabling-the-queue" class="md-nav__link">
+  <a href="#stream-topology" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Enabling the queue
+        Stream topology
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Enabling the queue">
+    <nav class="md-nav" aria-label="Stream topology">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#url-only-no-in-process-worker" class="md-nav__link">
+  <a href="#subject-naming" class="md-nav__link">
     <span class="md-ellipsis">
       
-        URL-only (no in-process worker)
+        Subject naming
       
     </span>
   </a>
@@ -2602,10 +2635,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#shared-instance-in-process-worker-recommended" class="md-nav__link">
+  <a href="#in-message-types" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Shared instance (in-process worker, recommended)
+        IN message types
       
     </span>
   </a>
@@ -2618,44 +2651,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#wiring-a-worker-in-the-same-process" class="md-nav__link">
+  <a href="#subclassing-agentworker" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Wiring a worker in the same process
+        Subclassing AgentWorker
       
     </span>
   </a>
   
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#submitting-a-job" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Submitting a job
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#streaming-events-sse" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Streaming events (SSE)
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Streaming events (SSE)">
+    <nav class="md-nav" aria-label="Subclassing AgentWorker">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#resuming-after-disconnect" class="md-nav__link">
+  <a href="#optional-handlers" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Resuming after disconnect
+        Optional handlers
       
     </span>
   </a>
@@ -2668,10 +2679,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#emitting-events-from-a-worker" class="md-nav__link">
+  <a href="#type-inference" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Emitting events from a worker
+        Type inference
       
     </span>
   </a>
@@ -2679,10 +2690,65 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#nats-streams-created-automatically" class="md-nav__link">
+  <a href="#emitting-events" class="md-nav__link">
     <span class="md-ellipsis">
       
-        NATS streams created automatically
+        Emitting events
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#concurrency-and-deduplication" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Concurrency and deduplication
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#graceful-shutdown" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Graceful shutdown
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#heartbeat-keep-alive" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Heartbeat keep-alive
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#using-agentchannel-directly" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using AgentChannel directly
       
     </span>
   </a>
@@ -2757,174 +2823,256 @@
   
 
 
-<h1 id="async-job-queue-nats-jetstream">Async Job Queue (NATS JetStream)<a class="headerlink" href="#async-job-queue-nats-jetstream" title="Permanent link">&para;</a></h1>
-<p>The async job queue lets a DCAF server accept requests immediately (returning a
-<code>job_id</code>) and execute them in the background while clients stream progress via
-Server-Sent Events.</p>
+<h1 id="agent-channel-worker-nats-jetstream">Agent Channel &amp; Worker (NATS JetStream)<a class="headerlink" href="#agent-channel-worker-nats-jetstream" title="Permanent link">&para;</a></h1>
+<p><code>AgentChannel</code> and <code>AgentWorker</code> provide a two-stream NATS JetStream backbone
+for agents that communicate with an external system (e.g. DuploCloud HelpDesk)
+without going through HTTP.  Neither side talks to the other directly — both
+communicate through persistent NATS streams.</p>
 <hr />
-<h2 id="when-to-use-it">When to use it<a class="headerlink" href="#when-to-use-it" title="Permanent link">&para;</a></h2>
-<p>Long-running agent tasks (e.g. IaC runs, data pipelines) that take more than a
-few seconds to complete should use the queue.  Synchronous <code>/api/chat</code> blocks
-until the agent finishes and is unsuitable for tasks over ~30 s.</p>
+<h2 id="when-to-use-this">When to use this<a class="headerlink" href="#when-to-use-this" title="Permanent link">&para;</a></h2>
+<p>Use <code>AgentChannel</code> / <code>AgentWorker</code> when:</p>
+<ul>
+<li>The external client (HelpDesk, CLI, UI) connects <strong>directly to NATS</strong> and is
+  not a Python process (e.g. a .NET service).</li>
+<li>Tasks are long-running and the client needs progress events in real time.</li>
+<li>You want concurrency control, graceful shutdown, and heartbeat keep-alive
+  without writing boilerplate.</li>
+</ul>
+<p>For same-process HTTP-fronted workers, see the
+<a href="../async-job-queue/">Async Job Queue guide</a> (<code>NatsJobQueue</code>) instead.</p>
 <hr />
 <h2 id="requirements">Requirements<a class="headerlink" href="#requirements" title="Permanent link">&para;</a></h2>
-<p>Install the NATS extra:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pip<span class="w"> </span>install<span class="w"> </span>dcaf<span class="o">[</span>queue<span class="o">]</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="c1"># or, with all extras:</span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>pip<span class="w"> </span>install<span class="w"> </span>dcaf<span class="o">[</span>all<span class="o">]</span>
 </span></code></pre></div>
 <p>A running NATS server with JetStream enabled:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>docker<span class="w"> </span>run<span class="w"> </span>-p<span class="w"> </span><span class="m">4222</span>:4222<span class="w"> </span>nats:2.10<span class="w"> </span>-js
 </span></code></pre></div>
 <hr />
-<h2 id="enabling-the-queue">Enabling the queue<a class="headerlink" href="#enabling-the-queue" title="Permanent link">&para;</a></h2>
-<p>There are two ways to attach a queue, depending on whether you need a
-background worker in the same process.</p>
-<h3 id="url-only-no-in-process-worker">URL-only (no in-process worker)<a class="headerlink" href="#url-only-no-in-process-worker" title="Permanent link">&para;</a></h3>
-<p>Pass <code>queue_nats_url</code> when you only need the server to enqueue jobs and expose
-the SSE endpoint, and workers run out-of-process:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">dcaf.core</span><span class="w"> </span><span class="kn">import</span> <span class="n">Agent</span><span class="p">,</span> <span class="n">serve</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">agent</span> <span class="o">=</span> <span class="n">Agent</span><span class="p">(</span><span class="n">tools</span><span class="o">=</span><span class="p">[</span><span class="o">...</span><span class="p">])</span>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="n">serve</span><span class="p">(</span>
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="n">agent</span><span class="p">,</span>
-</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>    <span class="n">port</span><span class="o">=</span><span class="mi">8000</span><span class="p">,</span>
-</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>    <span class="n">queue_nats_url</span><span class="o">=</span><span class="s2">&quot;nats://localhost:4222&quot;</span><span class="p">,</span>
-</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>    <span class="n">queue_agent_name</span><span class="o">=</span><span class="s2">&quot;my-agent&quot;</span><span class="p">,</span>
-</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="p">)</span>
+<h2 id="stream-topology">Stream topology<a class="headerlink" href="#stream-topology" title="Permanent link">&para;</a></h2>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>External system (HelpDesk / CLI)
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>  │  publishes task/answer/checkpoint messages
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>  ▼
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>DCAF_CHANNEL_IN   (dcaf.channel.in.&lt;agent_name&gt;)
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>  │  work-queue stream — messages removed after ack
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>  ▼
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>Agent worker  ←── subscribes here
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>  │  processes task, emits progress events
+</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>  ▼
+</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>DCAF_CHANNEL_OUT  (dcaf.channel.out.&lt;agent_name&gt;.&lt;thread_id&gt;)
+</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>  │  limits stream — retained 7 days, 10k msgs/subject
+</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>  ▼
+</span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>External system  ←── subscribes here (its own native NATS client)
 </span></code></pre></div>
-<h3 id="shared-instance-in-process-worker-recommended">Shared instance (in-process worker, recommended)<a class="headerlink" href="#shared-instance-in-process-worker-recommended" title="Permanent link">&para;</a></h3>
-<p>Pass a <code>NatsJobQueue</code> instance via <code>queue=</code> so the HTTP server and the background
-worker share the same in-memory event buffer:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">dcaf.core</span><span class="w"> </span><span class="kn">import</span> <span class="n">Agent</span><span class="p">,</span> <span class="n">create_app</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">dcaf.core.queue.nats_js</span><span class="w"> </span><span class="kn">import</span> <span class="n">NatsJobQueue</span>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="n">queue</span> <span class="o">=</span> <span class="n">NatsJobQueue</span><span class="p">(</span><span class="n">nats_url</span><span class="o">=</span><span class="s2">&quot;nats://localhost:4222&quot;</span><span class="p">,</span> <span class="n">agent_name</span><span class="o">=</span><span class="s2">&quot;my-agent&quot;</span><span class="p">)</span>
-</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="n">agent</span> <span class="o">=</span> <span class="n">Agent</span><span class="p">(</span><span class="n">tools</span><span class="o">=</span><span class="p">[</span><span class="o">...</span><span class="p">])</span>
-</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="n">app</span> <span class="o">=</span> <span class="n">create_app</span><span class="p">(</span><span class="n">agent</span><span class="p">,</span> <span class="n">queue</span><span class="o">=</span><span class="n">queue</span><span class="p">)</span>
-</span></code></pre></div>
-<p>See <a href="#wiring-a-worker-in-the-same-process">Wiring a worker in the same process</a>
-for the full lifespan example.</p>
-<hr />
-<h2 id="wiring-a-worker-in-the-same-process">Wiring a worker in the same process<a class="headerlink" href="#wiring-a-worker-in-the-same-process" title="Permanent link">&para;</a></h2>
-<p>The SSE endpoint reads from an <strong>in-memory buffer</strong> that is only populated when
-the worker and HTTP server share the <strong>same</strong> <code>NatsJobQueue</code> instance.  Pass
-the instance directly to <code>create_app()</code> using the <code>queue=</code> parameter:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">asyncio</span>
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="kn">import</span><span class="w"> </span><span class="nn">contextlib</span>
-</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
-</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="kn">from</span><span class="w"> </span><span class="nn">dcaf.core</span><span class="w"> </span><span class="kn">import</span> <span class="n">Agent</span><span class="p">,</span> <span class="n">create_app</span>
-</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="kn">from</span><span class="w"> </span><span class="nn">dcaf.core.queue.nats_js</span><span class="w"> </span><span class="kn">import</span> <span class="n">NatsJobQueue</span>
-</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="kn">from</span><span class="w"> </span><span class="nn">dcaf.core.queue.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">JobRequest</span><span class="p">,</span> <span class="n">JobMessageHandle</span>
-</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>
-</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>
-</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">my_handler</span><span class="p">(</span><span class="n">job</span><span class="p">:</span> <span class="n">JobRequest</span><span class="p">,</span> <span class="n">handle</span><span class="p">:</span> <span class="n">JobMessageHandle</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>    <span class="k">await</span> <span class="n">handle</span><span class="o">.</span><span class="n">ack</span><span class="p">()</span>
-</span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>    <span class="c1"># ... run agent logic, emit events via queue.emit_event(...)</span>
-</span><span id="__span-4-12"><a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>
-</span><span id="__span-4-13"><a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>
-</span><span id="__span-4-14"><a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a><span class="nd">@contextlib</span><span class="o">.</span><span class="n">asynccontextmanager</span>
-</span><span id="__span-4-15"><a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">lifespan</span><span class="p">(</span><span class="n">app</span><span class="p">):</span>
-</span><span id="__span-4-16"><a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a>    <span class="k">await</span> <span class="n">queue</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span>
-</span><span id="__span-4-17"><a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a>    <span class="n">task</span> <span class="o">=</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">create_task</span><span class="p">(</span><span class="n">queue</span><span class="o">.</span><span class="n">subscribe_jobs</span><span class="p">(</span><span class="n">my_handler</span><span class="p">))</span>
-</span><span id="__span-4-18"><a id="__codelineno-4-18" name="__codelineno-4-18" href="#__codelineno-4-18"></a>    <span class="k">yield</span>
-</span><span id="__span-4-19"><a id="__codelineno-4-19" name="__codelineno-4-19" href="#__codelineno-4-19"></a>    <span class="n">task</span><span class="o">.</span><span class="n">cancel</span><span class="p">()</span>
-</span><span id="__span-4-20"><a id="__codelineno-4-20" name="__codelineno-4-20" href="#__codelineno-4-20"></a>    <span class="k">await</span> <span class="n">queue</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
-</span><span id="__span-4-21"><a id="__codelineno-4-21" name="__codelineno-4-21" href="#__codelineno-4-21"></a>
-</span><span id="__span-4-22"><a id="__codelineno-4-22" name="__codelineno-4-22" href="#__codelineno-4-22"></a>
-</span><span id="__span-4-23"><a id="__codelineno-4-23" name="__codelineno-4-23" href="#__codelineno-4-23"></a><span class="c1"># One instance shared between the HTTP server and the background worker.</span>
-</span><span id="__span-4-24"><a id="__codelineno-4-24" name="__codelineno-4-24" href="#__codelineno-4-24"></a><span class="n">queue</span> <span class="o">=</span> <span class="n">NatsJobQueue</span><span class="p">(</span><span class="n">nats_url</span><span class="o">=</span><span class="s2">&quot;nats://localhost:4222&quot;</span><span class="p">,</span> <span class="n">agent_name</span><span class="o">=</span><span class="s2">&quot;my-agent&quot;</span><span class="p">)</span>
-</span><span id="__span-4-25"><a id="__codelineno-4-25" name="__codelineno-4-25" href="#__codelineno-4-25"></a><span class="n">agent</span> <span class="o">=</span> <span class="n">Agent</span><span class="p">(</span><span class="n">tools</span><span class="o">=</span><span class="p">[</span><span class="o">...</span><span class="p">])</span>
-</span><span id="__span-4-26"><a id="__codelineno-4-26" name="__codelineno-4-26" href="#__codelineno-4-26"></a><span class="n">app</span> <span class="o">=</span> <span class="n">create_app</span><span class="p">(</span><span class="n">agent</span><span class="p">,</span> <span class="n">queue</span><span class="o">=</span><span class="n">queue</span><span class="p">)</span>   <span class="c1"># same instance — not queue_nats_url</span>
-</span><span id="__span-4-27"><a id="__codelineno-4-27" name="__codelineno-4-27" href="#__codelineno-4-27"></a><span class="n">app</span><span class="o">.</span><span class="n">router</span><span class="o">.</span><span class="n">lifespan_context</span> <span class="o">=</span> <span class="n">lifespan</span>
-</span></code></pre></div>
-<blockquote>
-<p><strong>Important</strong>: passing <code>queue_nats_url=</code> instead of <code>queue=</code> creates a second
-internal instance.  That instance's <code>_events</code> buffer will never be populated
-by the worker, so the SSE endpoint will always return empty.  Always use
-<code>queue=</code> when wiring a background worker in the same process.</p>
-<p>For multi-process deployments replace the in-memory buffer with a persistent
-backend (e.g. NATS KV, Redis).</p>
-</blockquote>
-<hr />
-<h2 id="submitting-a-job">Submitting a job<a class="headerlink" href="#submitting-a-job" title="Permanent link">&para;</a></h2>
-<p>Add <code>"queue": true</code> to any <code>/api/chat</code> request body:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>curl<span class="w"> </span>-s<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>http://localhost:8000/api/chat<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">&quot;Content-Type: application/json&quot;</span><span class="w"> </span><span class="se">\</span>
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">  </span>-d<span class="w"> </span><span class="s1">&#39;{</span>
-</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="s1">    &quot;queue&quot;: true,</span>
-</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="s1">    &quot;messages&quot;: [{&quot;role&quot;: &quot;user&quot;, &quot;content&quot;: &quot;Run my long task&quot;}]</span>
-</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="s1">  }&#39;</span>
-</span></code></pre></div>
-<p>Response:</p>
-<div class="language-json highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="p">{</span><span class="nt">&quot;job_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;550e8400-e29b-41d4-a716-446655440000&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;status&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;queued&quot;</span><span class="p">}</span>
-</span></code></pre></div>
-<hr />
-<h2 id="streaming-events-sse">Streaming events (SSE)<a class="headerlink" href="#streaming-events-sse" title="Permanent link">&para;</a></h2>
-<p>Open an SSE connection using the <code>job_id</code> from the submit response:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>curl<span class="w"> </span>-N<span class="w"> </span>http://localhost:8000/api/jobs/550e8400-e29b-41d4-a716-446655440000/events/stream
-</span></code></pre></div>
-<p>Each event is a JSON object on a <code>data:</code> line:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>id: 0
-</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>data: {&quot;job_id&quot;: &quot;550e...&quot;, &quot;event_type&quot;: &quot;status&quot;, &quot;data&quot;: {&quot;status&quot;: &quot;running&quot;}, &quot;seq&quot;: 0}
-</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>
-</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>id: 1
-</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>data: {&quot;job_id&quot;: &quot;550e...&quot;, &quot;event_type&quot;: &quot;log&quot;, &quot;data&quot;: {&quot;message&quot;: &quot;Step 1 done&quot;}, &quot;seq&quot;: 1}
-</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>
-</span><span id="__span-8-7"><a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a>id: 2
-</span><span id="__span-8-8"><a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>data: {&quot;job_id&quot;: &quot;550e...&quot;, &quot;event_type&quot;: &quot;done&quot;, &quot;data&quot;: {}, &quot;seq&quot;: 2}
-</span></code></pre></div>
-<p>The stream closes automatically after a terminal event (<code>done</code> or <code>error</code>).</p>
-<h3 id="resuming-after-disconnect">Resuming after disconnect<a class="headerlink" href="#resuming-after-disconnect" title="Permanent link">&para;</a></h3>
-<p>Pass <code>?after=N</code> (or send a <code>Last-Event-ID</code> header) to skip events already
-received:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>curl<span class="w"> </span>-N<span class="w"> </span><span class="s2">&quot;http://localhost:8000/api/jobs/&lt;job_id&gt;/events/stream?after=5&quot;</span>
-</span></code></pre></div>
-<hr />
-<h2 id="emitting-events-from-a-worker">Emitting events from a worker<a class="headerlink" href="#emitting-events-from-a-worker" title="Permanent link">&para;</a></h2>
-<p>Call <code>queue.emit_event()</code> inside your handler to push progress to clients:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">dcaf.core.queue.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">JobEvent</span>
-</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>
-</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="k">await</span> <span class="n">queue</span><span class="o">.</span><span class="n">emit_event</span><span class="p">(</span><span class="n">JobEvent</span><span class="p">(</span>
-</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>    <span class="n">job_id</span><span class="o">=</span><span class="n">job</span><span class="o">.</span><span class="n">job_id</span><span class="p">,</span>
-</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>    <span class="n">event_type</span><span class="o">=</span><span class="s2">&quot;log&quot;</span><span class="p">,</span>
-</span><span id="__span-10-6"><a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>    <span class="n">data</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;message&quot;</span><span class="p">:</span> <span class="s2">&quot;Cloning repository…&quot;</span><span class="p">},</span>
-</span><span id="__span-10-7"><a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="p">))</span>
-</span><span id="__span-10-8"><a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>
-</span><span id="__span-10-9"><a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a><span class="k">await</span> <span class="n">queue</span><span class="o">.</span><span class="n">emit_event</span><span class="p">(</span><span class="n">JobEvent</span><span class="p">(</span>
-</span><span id="__span-10-10"><a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a>    <span class="n">job_id</span><span class="o">=</span><span class="n">job</span><span class="o">.</span><span class="n">job_id</span><span class="p">,</span>
-</span><span id="__span-10-11"><a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a>    <span class="n">event_type</span><span class="o">=</span><span class="s2">&quot;done&quot;</span><span class="p">,</span>
-</span><span id="__span-10-12"><a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a>    <span class="n">data</span><span class="o">=</span><span class="p">{},</span>
-</span><span id="__span-10-13"><a id="__codelineno-10-13" name="__codelineno-10-13" href="#__codelineno-10-13"></a><span class="p">))</span>
-</span></code></pre></div>
-<hr />
-<h2 id="nats-streams-created-automatically">NATS streams created automatically<a class="headerlink" href="#nats-streams-created-automatically" title="Permanent link">&para;</a></h2>
+<p>The agent creates <strong>both streams</strong> on startup.  The external system only needs
+the NATS server address and the agreed subject names.</p>
+<h3 id="subject-naming">Subject naming<a class="headerlink" href="#subject-naming" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
-<th>Stream</th>
-<th>Retention</th>
+<th>Direction</th>
 <th>Subject pattern</th>
-<th>Purpose</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>DCAF_JOBS_IN</code></td>
-<td>WORK_QUEUE</td>
-<td><code>dcaf.jobs.in.&gt;</code></td>
-<td>Deliver jobs to workers</td>
+<td>External → Agent</td>
+<td><code>dcaf.channel.in.&lt;agent_name&gt;</code></td>
 </tr>
 <tr>
-<td><code>DCAF_JOBS_OUT</code></td>
-<td>LIMITS (7 days)</td>
-<td><code>dcaf.jobs.out.&gt;</code></td>
-<td>Persist emitted events</td>
+<td>Agent → External</td>
+<td><code>dcaf.channel.out.&lt;agent_name&gt;.&lt;thread_id&gt;</code></td>
 </tr>
 </tbody>
 </table>
-<p>Both streams are created on first <code>queue.connect()</code> if they do not already exist.</p>
+<h3 id="in-message-types">IN message types<a class="headerlink" href="#in-message-types" title="Permanent link">&para;</a></h3>
+<p>The <code>type</code> field in every IN message determines how the agent handles it:</p>
+<table>
+<thead>
+<tr>
+<th><code>type</code></th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>"task"</code></td>
+<td>Start a new agent run</td>
+</tr>
+<tr>
+<td><code>"answer"</code></td>
+<td>User reply to a clarification question (PAUSED run)</td>
+</tr>
+<tr>
+<td><code>"checkpoint_approve"</code></td>
+<td>Approve a checkpoint gate</td>
+</tr>
+<tr>
+<td><code>"checkpoint_feedback"</code></td>
+<td>Re-run a checkpoint step with feedback</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="subclassing-agentworker">Subclassing AgentWorker<a class="headerlink" href="#subclassing-agentworker" title="Permanent link">&para;</a></h2>
+<p>Subclass <code>AgentWorker</code> and implement <code>handle_task</code>.  Everything else —
+concurrency control, deduplication, heartbeat, graceful shutdown — is provided
+by the base class.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">asyncio</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">dcaf.core.queue</span><span class="w"> </span><span class="kn">import</span> <span class="n">AgentWorker</span><span class="p">,</span> <span class="n">AgentMessageHandle</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="k">class</span><span class="w"> </span><span class="nc">MyWorker</span><span class="p">(</span><span class="n">AgentWorker</span><span class="p">):</span>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">handle_task</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">handle</span><span class="p">:</span> <span class="n">AgentMessageHandle</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>        <span class="n">thread_id</span> <span class="o">=</span> <span class="n">msg</span><span class="p">[</span><span class="s2">&quot;thread_id&quot;</span><span class="p">]</span>
+</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>
+</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>        <span class="c1"># Start heartbeat to prevent NATS redelivery during long work</span>
+</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>        <span class="n">heartbeat</span> <span class="o">=</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">create_task</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">heartbeat_loop</span><span class="p">(</span><span class="n">handle</span><span class="p">))</span>
+</span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>        <span class="k">try</span><span class="p">:</span>
+</span><span id="__span-3-13"><a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>            <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">emit</span><span class="p">(</span><span class="n">thread_id</span><span class="p">,</span> <span class="s2">&quot;status&quot;</span><span class="p">,</span> <span class="n">message</span><span class="o">=</span><span class="s2">&quot;Starting...&quot;</span><span class="p">)</span>
+</span><span id="__span-3-14"><a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a>
+</span><span id="__span-3-15"><a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a>            <span class="c1"># ... do work ...</span>
+</span><span id="__span-3-16"><a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a>
+</span><span id="__span-3-17"><a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a>            <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">emit</span><span class="p">(</span><span class="n">thread_id</span><span class="p">,</span> <span class="s2">&quot;complete&quot;</span><span class="p">,</span> <span class="n">message</span><span class="o">=</span><span class="s2">&quot;Done&quot;</span><span class="p">)</span>
+</span><span id="__span-3-18"><a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a>            <span class="k">await</span> <span class="n">handle</span><span class="o">.</span><span class="n">ack</span><span class="p">()</span>
+</span><span id="__span-3-19"><a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a>        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+</span><span id="__span-3-20"><a id="__codelineno-3-20" name="__codelineno-3-20" href="#__codelineno-3-20"></a>            <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">emit</span><span class="p">(</span><span class="n">thread_id</span><span class="p">,</span> <span class="s2">&quot;error&quot;</span><span class="p">,</span> <span class="n">message</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">exc</span><span class="p">))</span>
+</span><span id="__span-3-21"><a id="__codelineno-3-21" name="__codelineno-3-21" href="#__codelineno-3-21"></a>            <span class="k">await</span> <span class="n">handle</span><span class="o">.</span><span class="n">nak</span><span class="p">()</span>
+</span><span id="__span-3-22"><a id="__codelineno-3-22" name="__codelineno-3-22" href="#__codelineno-3-22"></a>        <span class="k">finally</span><span class="p">:</span>
+</span><span id="__span-3-23"><a id="__codelineno-3-23" name="__codelineno-3-23" href="#__codelineno-3-23"></a>            <span class="n">heartbeat</span><span class="o">.</span><span class="n">cancel</span><span class="p">()</span>
+</span><span id="__span-3-24"><a id="__codelineno-3-24" name="__codelineno-3-24" href="#__codelineno-3-24"></a>
+</span><span id="__span-3-25"><a id="__codelineno-3-25" name="__codelineno-3-25" href="#__codelineno-3-25"></a>
+</span><span id="__span-3-26"><a id="__codelineno-3-26" name="__codelineno-3-26" href="#__codelineno-3-26"></a><span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+</span><span id="__span-3-27"><a id="__codelineno-3-27" name="__codelineno-3-27" href="#__codelineno-3-27"></a>    <span class="n">asyncio</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">MyWorker</span><span class="p">(</span><span class="s2">&quot;my-agent&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">run</span><span class="p">())</span>
+</span></code></pre></div>
+<h3 id="optional-handlers">Optional handlers<a class="headerlink" href="#optional-handlers" title="Permanent link">&para;</a></h3>
+<p>Override any of these if your agent supports the corresponding flow:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">handle_answer</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">handle</span><span class="p">:</span> <span class="n">AgentMessageHandle</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Resume a PAUSED run with the user&#39;s reply.&quot;&quot;&quot;</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>    <span class="o">...</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">handle_checkpoint_approve</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">handle</span><span class="p">:</span> <span class="n">AgentMessageHandle</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Resume after a checkpoint gate is approved.&quot;&quot;&quot;</span>
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>    <span class="o">...</span>
+</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>
+</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">handle_checkpoint_feedback</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">handle</span><span class="p">:</span> <span class="n">AgentMessageHandle</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Re-run a checkpoint step with user feedback.&quot;&quot;&quot;</span>
+</span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>    <span class="o">...</span>
+</span></code></pre></div>
+<p>Unimplemented handlers nak the message and log a warning by default.</p>
+<hr />
+<h2 id="type-inference">Type inference<a class="headerlink" href="#type-inference" title="Permanent link">&para;</a></h2>
+<p>Some external systems (e.g. HelpDesk) always send <code>type="task"</code> regardless of
+run state.  Override <code>resolve_message_type</code> to reclassify messages before
+dispatch:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">resolve_message_type</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">msg_type</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>    <span class="k">if</span> <span class="n">msg_type</span> <span class="o">==</span> <span class="s2">&quot;task&quot;</span><span class="p">:</span>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>        <span class="n">thread_id</span> <span class="o">=</span> <span class="n">msg</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;thread_id&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>        <span class="n">run_id</span> <span class="o">=</span> <span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">to_thread</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_store</span><span class="o">.</span><span class="n">find_by_thread_id</span><span class="p">,</span> <span class="n">thread_id</span><span class="p">)</span>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>        <span class="k">if</span> <span class="n">run_id</span><span class="p">:</span>
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>            <span class="n">run</span> <span class="o">=</span> <span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">to_thread</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_store</span><span class="o">.</span><span class="n">get</span><span class="p">,</span> <span class="n">run_id</span><span class="p">)</span>
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>            <span class="k">if</span> <span class="p">(</span><span class="n">run</span> <span class="ow">or</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;status&quot;</span><span class="p">)</span> <span class="o">==</span> <span class="s2">&quot;PAUSED&quot;</span><span class="p">:</span>
+</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>                <span class="k">return</span> <span class="s2">&quot;answer&quot;</span>
+</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>    <span class="k">return</span> <span class="n">msg_type</span>
+</span></code></pre></div>
+<hr />
+<h2 id="emitting-events">Emitting events<a class="headerlink" href="#emitting-events" title="Permanent link">&para;</a></h2>
+<p><code>AgentWorker.emit()</code> publishes an event to <code>DCAF_CHANNEL_OUT</code> for a given
+<code>thread_id</code>.  The external system's NATS client subscribes to the matching
+subject to receive them.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">emit</span><span class="p">(</span><span class="n">thread_id</span><span class="p">,</span> <span class="s2">&quot;status&quot;</span><span class="p">,</span> <span class="n">message</span><span class="o">=</span><span class="s2">&quot;Running step 3/7&quot;</span><span class="p">)</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">emit</span><span class="p">(</span><span class="n">thread_id</span><span class="p">,</span> <span class="s2">&quot;complete&quot;</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;pr_url&quot;</span><span class="p">:</span> <span class="s2">&quot;https://...&quot;</span><span class="p">})</span>
+</span></code></pre></div>
+<p>Standard <code>event_type</code> values: <code>"status"</code>, <code>"log"</code>, <code>"question"</code>,
+<code>"artifact"</code>, <code>"checkpoint"</code>, <code>"complete"</code>, <code>"error"</code>.</p>
+<hr />
+<h2 id="concurrency-and-deduplication">Concurrency and deduplication<a class="headerlink" href="#concurrency-and-deduplication" title="Permanent link">&para;</a></h2>
+<p><code>AgentWorker</code> enforces:</p>
+<ul>
+<li><strong>Concurrency limit</strong> — at most <code>max_concurrent</code> (default: 3) handlers run
+  in parallel.</li>
+<li><strong>Deduplication</strong> — a second <code>task</code> message for the same <code>thread_id</code> is
+  nak-ed while the first is still active.</li>
+</ul>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="n">worker</span> <span class="o">=</span> <span class="n">MyWorker</span><span class="p">(</span><span class="s2">&quot;my-agent&quot;</span><span class="p">,</span> <span class="n">max_concurrent</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
+</span></code></pre></div>
+<hr />
+<h2 id="graceful-shutdown">Graceful shutdown<a class="headerlink" href="#graceful-shutdown" title="Permanent link">&para;</a></h2>
+<p><code>AgentWorker.run()</code> registers SIGTERM and SIGINT handlers.  On signal:</p>
+<ol>
+<li>The subscribe loop stops accepting new messages.</li>
+<li>In-flight handlers are given <code>shutdown_timeout</code> seconds (default: 300) to
+   finish.</li>
+<li>Any handlers still running after the timeout are cancelled.</li>
+<li>The NATS connection is drained and closed.</li>
+</ol>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="n">worker</span> <span class="o">=</span> <span class="n">MyWorker</span><span class="p">(</span><span class="s2">&quot;my-agent&quot;</span><span class="p">,</span> <span class="n">shutdown_timeout</span><span class="o">=</span><span class="mi">120</span><span class="p">)</span>
+</span></code></pre></div>
+<hr />
+<h2 id="heartbeat-keep-alive">Heartbeat keep-alive<a class="headerlink" href="#heartbeat-keep-alive" title="Permanent link">&para;</a></h2>
+<p>NATS will redeliver a message if it is not ack-ed within <code>ack_wait</code> (1 hour).
+For long-running handlers, call <code>heartbeat_loop</code> to send periodic
+<code>in_progress()</code> signals:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="n">heartbeat</span> <span class="o">=</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">create_task</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">heartbeat_loop</span><span class="p">(</span><span class="n">handle</span><span class="p">,</span> <span class="n">interval</span><span class="o">=</span><span class="mi">30</span><span class="p">))</span>
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="k">try</span><span class="p">:</span>
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>    <span class="o">...</span>  <span class="c1"># long work</span>
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="k">finally</span><span class="p">:</span>
+</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>    <span class="n">heartbeat</span><span class="o">.</span><span class="n">cancel</span><span class="p">()</span>
+</span></code></pre></div>
+<hr />
+<h2 id="configuration">Configuration<a class="headerlink" href="#configuration" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>agent_name</code></td>
+<td>—</td>
+<td>Determines NATS subject names</td>
+</tr>
+<tr>
+<td><code>nats_url</code></td>
+<td><code>$NATS_URL</code> or <code>nats://localhost:4222</code></td>
+<td>NATS server address</td>
+</tr>
+<tr>
+<td><code>max_concurrent</code></td>
+<td><code>3</code></td>
+<td>Max parallel handlers</td>
+</tr>
+<tr>
+<td><code>shutdown_timeout</code></td>
+<td><code>300</code></td>
+<td>Seconds to wait for in-flight handlers on shutdown</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="using-agentchannel-directly">Using AgentChannel directly<a class="headerlink" href="#using-agentchannel-directly" title="Permanent link">&para;</a></h2>
+<p>If you need lower-level access (e.g. to publish from an external system in
+Python), use <code>AgentChannel</code> directly:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">dcaf.core.queue</span><span class="w"> </span><span class="kn">import</span> <span class="n">AgentChannel</span>
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>
+</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="n">channel</span> <span class="o">=</span> <span class="n">AgentChannel</span><span class="p">(</span><span class="s2">&quot;my-agent&quot;</span><span class="p">)</span>
+</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="k">await</span> <span class="n">channel</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span>
+</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>
+</span><span id="__span-10-6"><a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a><span class="c1"># Publish a task (external system → IN)</span>
+</span><span id="__span-10-7"><a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="k">await</span> <span class="n">channel</span><span class="o">.</span><span class="n">publish</span><span class="p">({</span>
+</span><span id="__span-10-8"><a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>    <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;task&quot;</span><span class="p">,</span>
+</span><span id="__span-10-9"><a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a>    <span class="s2">&quot;thread_id&quot;</span><span class="p">:</span> <span class="s2">&quot;thread-123&quot;</span><span class="p">,</span>
+</span><span id="__span-10-10"><a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a>    <span class="s2">&quot;messages&quot;</span><span class="p">:</span> <span class="p">[{</span><span class="s2">&quot;role&quot;</span><span class="p">:</span> <span class="s2">&quot;user&quot;</span><span class="p">,</span> <span class="s2">&quot;content&quot;</span><span class="p">:</span> <span class="s2">&quot;Add an RDS instance&quot;</span><span class="p">}],</span>
+</span><span id="__span-10-11"><a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a><span class="p">})</span>
+</span><span id="__span-10-12"><a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a>
+</span><span id="__span-10-13"><a id="__codelineno-10-13" name="__codelineno-10-13" href="#__codelineno-10-13"></a><span class="c1"># Emit an event (agent → OUT)</span>
+</span><span id="__span-10-14"><a id="__codelineno-10-14" name="__codelineno-10-14" href="#__codelineno-10-14"></a><span class="k">await</span> <span class="n">channel</span><span class="o">.</span><span class="n">emit</span><span class="p">(</span><span class="s2">&quot;thread-123&quot;</span><span class="p">,</span> <span class="s2">&quot;complete&quot;</span><span class="p">,</span> <span class="n">message</span><span class="o">=</span><span class="s2">&quot;Done&quot;</span><span class="p">)</span>
+</span><span id="__span-10-15"><a id="__codelineno-10-15" name="__codelineno-10-15" href="#__codelineno-10-15"></a>
+</span><span id="__span-10-16"><a id="__codelineno-10-16" name="__codelineno-10-16" href="#__codelineno-10-16"></a><span class="k">await</span> <span class="n">channel</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+</span></code></pre></div>
 
 
 
