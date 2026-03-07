@@ -115,6 +115,11 @@ class CredentialManager:
         for scope in ctx.scopes:
             if scope.type in _AWS_TYPES:
                 scope_envs[scope.name] = _build_aws_env(scope)
+                logger.debug(
+                    "CredentialManager: built AWS env for scope %s (keys: %s)",
+                    scope.name,
+                    list(scope_envs[scope.name].keys()),
+                )
             elif scope.type in _GCP_TYPES:
                 gcp_env = self._build_gcp_env(scope)
                 if gcp_env:
