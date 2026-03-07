@@ -78,10 +78,13 @@ curl -s -X POST http://localhost:8080/api/chat \
 **Observable:** DEBUG logs show `CredentialManager: using pre-populated kubeconfig_path` rather
 than a temp file write/delete.
 
-**Status:** ✅ Pass (code fix + unit tests; live log pending redeploy)
+**Status:** ✅ Pass
 **Notes:** Live testing with DEBUG logging revealed the gap — CredentialManager was decoding the
 base64 even when `kubeconfig_path` was present. Fixed in `credential_manager.py` (commit `f30e5cf`).
-Unit tests pass. Live log confirmation requires deploying the fix.
+Unit tests pass. Live log confirmed on image `main-1d3c37f` (`--tail=2000`):
+```
+DEBUG | 2026-03-07 01:08:38,920 | dcaf.core.services.credential_manager | CredentialManager: using pre-populated kubeconfig_path /tmp/fake-pre-populated.yaml
+```
 
 ---
 
