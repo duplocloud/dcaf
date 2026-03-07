@@ -12,13 +12,13 @@
         <meta name="author" content="DuploCloud">
       
       
-        <link rel="canonical" href="https://duplocloud.github.io/dcaf/main/adrs/006-strangler-fig-migration/">
+        <link rel="canonical" href="https://duplocloud.github.io/dcaf/main/guides/credential-injection/">
       
       
-        <link rel="prev" href="../005-cohesive-provider-modules/">
+        <link rel="prev" href="../environment-configuration/">
       
       
-        <link rel="next" href="../007-lowercase-chat-endpoints/">
+        <link rel="next" href="../session-management/">
       
       
         
@@ -29,7 +29,7 @@
     
     
       
-        <title>006: Strangler Fig Migration - DCAF Documentation</title>
+        <title>Credential Injection - DCAF Documentation</title>
       
     
     
@@ -80,7 +80,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#adr-006-strangler-fig-migration" class="md-skip">
+        <a href="#credential-injection" class="md-skip">
           Skip to content
         </a>
       
@@ -119,7 +119,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              006: Strangler Fig Migration
+              Credential Injection
             
           </span>
         </div>
@@ -311,11 +311,13 @@
   
   
   
+    
+  
   
     
     
-      <li class="md-tabs__item">
-        <a href="../../guides/custom-agents/" class="md-tabs__link">
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../custom-agents/" class="md-tabs__link">
           
   
   
@@ -333,12 +335,10 @@
   
   
   
-    
-  
   
     
     
-      <li class="md-tabs__item md-tabs__item--active">
+      <li class="md-tabs__item">
         <a href="../../architecture/" class="md-tabs__link">
           
   
@@ -1110,7 +1110,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/creating-custom-agents/" class="md-nav__link">
+      <a href="../creating-custom-agents/" class="md-nav__link">
         
   
   
@@ -1142,8 +1142,10 @@
       
   
   
+    
   
   
+  
     
     
       
@@ -1197,21 +1199,22 @@
     
     
       
+        
+        
+      
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
         
           
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
-        
-          
-          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
             
   
   
@@ -1229,7 +1232,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_5">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1247,7 +1250,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/custom-agents/" class="md-nav__link">
+      <a href="../custom-agents/" class="md-nav__link">
         
   
   
@@ -1275,7 +1278,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/building-tools/" class="md-nav__link">
+      <a href="../building-tools/" class="md-nav__link">
         
   
   
@@ -1303,7 +1306,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/agno-toolkits/" class="md-nav__link">
+      <a href="../agno-toolkits/" class="md-nav__link">
         
   
   
@@ -1331,7 +1334,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/skills/" class="md-nav__link">
+      <a href="../skills/" class="md-nav__link">
         
   
   
@@ -1359,7 +1362,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/mcp-tools/" class="md-nav__link">
+      <a href="../mcp-tools/" class="md-nav__link">
         
   
   
@@ -1387,7 +1390,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/tracing-observability/" class="md-nav__link">
+      <a href="../tracing-observability/" class="md-nav__link">
         
   
   
@@ -1415,7 +1418,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/environment-configuration/" class="md-nav__link">
+      <a href="../environment-configuration/" class="md-nav__link">
         
   
   
@@ -1440,10 +1443,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../../guides/credential-injection/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Credential Injection
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -1459,6 +1489,131 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#how-it-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How It Works
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scopes-wire-format" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scopes Wire Format
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Scopes Wire Format">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#supported-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Supported Types
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#credentialdata-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Credential.Data Fields
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#multi-scope-requests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Multi-Scope Requests
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#legacy-base64-kubeconfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Legacy Base64 Kubeconfig
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#aws-explicit-credentials-modelfactory" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AWS Explicit Credentials (ModelFactory)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#local-development-dcaf_is_local" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Local Development (DCAF_IS_LOCAL)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#security-notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Security Notes
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -1471,7 +1626,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/session-management/" class="md-nav__link">
+      <a href="../session-management/" class="md-nav__link">
         
   
   
@@ -1499,7 +1654,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/interceptors/" class="md-nav__link">
+      <a href="../interceptors/" class="md-nav__link">
         
   
   
@@ -1527,7 +1682,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/framework-adapters/" class="md-nav__link">
+      <a href="../framework-adapters/" class="md-nav__link">
         
   
   
@@ -1555,7 +1710,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/migration/" class="md-nav__link">
+      <a href="../migration/" class="md-nav__link">
         
   
   
@@ -1583,7 +1738,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/working-with-bedrock/" class="md-nav__link">
+      <a href="../working-with-bedrock/" class="md-nav__link">
         
   
   
@@ -1611,7 +1766,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/working-with-gemini/" class="md-nav__link">
+      <a href="../working-with-gemini/" class="md-nav__link">
         
   
   
@@ -1639,7 +1794,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/prompt-caching/" class="md-nav__link">
+      <a href="../prompt-caching/" class="md-nav__link">
         
   
   
@@ -1667,7 +1822,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/message-protocol/" class="md-nav__link">
+      <a href="../message-protocol/" class="md-nav__link">
         
   
   
@@ -1695,7 +1850,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/streaming/" class="md-nav__link">
+      <a href="../streaming/" class="md-nav__link">
         
   
   
@@ -1723,7 +1878,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/emitting-events/" class="md-nav__link">
+      <a href="../emitting-events/" class="md-nav__link">
         
   
   
@@ -1751,7 +1906,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/system-events/" class="md-nav__link">
+      <a href="../system-events/" class="md-nav__link">
         
   
   
@@ -1779,7 +1934,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/event-subscriptions/" class="md-nav__link">
+      <a href="../event-subscriptions/" class="md-nav__link">
         
   
   
@@ -1807,7 +1962,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/async-job-queue/" class="md-nav__link">
+      <a href="../async-job-queue/" class="md-nav__link">
         
   
   
@@ -1835,7 +1990,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/agent-channel/" class="md-nav__link">
+      <a href="../agent-channel/" class="md-nav__link">
         
   
   
@@ -1863,7 +2018,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/versioning/" class="md-nav__link">
+      <a href="../versioning/" class="md-nav__link">
         
   
   
@@ -1895,10 +2050,8 @@
       
   
   
-    
   
   
-  
     
     
       
@@ -1912,22 +2065,21 @@
     
     
       
-        
-        
-      
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
         
           
-          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
             
   
   
@@ -1945,7 +2097,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_6">
             <span class="md-nav__icon md-icon"></span>
             
@@ -2016,10 +2168,8 @@
                 
   
   
-    
   
   
-  
     
     
       
@@ -2046,21 +2196,20 @@
     
       
       
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
         
           
-          
         
-      
-    
-    
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
-      
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6_3" checked>
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6_3" >
         
           
-          <label class="md-nav__link" for="__nav_6_3" id="__nav_6_3_label" tabindex="">
+          <label class="md-nav__link" for="__nav_6_3" id="__nav_6_3_label" tabindex="0">
             
   
   
@@ -2078,7 +2227,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_6_3_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_6_3_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_6_3">
             <span class="md-nav__icon md-icon"></span>
             
@@ -2096,7 +2245,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../000-template/" class="md-nav__link">
+      <a href="../../adrs/000-template/" class="md-nav__link">
         
   
   
@@ -2124,7 +2273,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../001-clean-architecture/" class="md-nav__link">
+      <a href="../../adrs/001-clean-architecture/" class="md-nav__link">
         
   
   
@@ -2152,7 +2301,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../002-ddd-tactical-patterns/" class="md-nav__link">
+      <a href="../../adrs/002-ddd-tactical-patterns/" class="md-nav__link">
         
   
   
@@ -2180,7 +2329,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../003-adapter-pattern-for-frameworks/" class="md-nav__link">
+      <a href="../../adrs/003-adapter-pattern-for-frameworks/" class="md-nav__link">
         
   
   
@@ -2208,7 +2357,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../004-approval-first-design/" class="md-nav__link">
+      <a href="../../adrs/004-approval-first-design/" class="md-nav__link">
         
   
   
@@ -2236,7 +2385,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../005-cohesive-provider-modules/" class="md-nav__link">
+      <a href="../../adrs/005-cohesive-provider-modules/" class="md-nav__link">
         
   
   
@@ -2261,37 +2410,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    006: Strangler Fig Migration
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../adrs/006-strangler-fig-migration/" class="md-nav__link">
         
   
   
@@ -2307,159 +2429,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#status" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Status
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#context" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Context
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#decision" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Decision
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Decision">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#implementation-strategy" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Implementation Strategy
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#migration-phases" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Migration Phases
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#compatibility-bridge" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Compatibility Bridge
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#consequences" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Consequences
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Consequences">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#positive-consequences" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Positive Consequences
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#negative-consequences" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Negative Consequences
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#implementation-status" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Implementation Status
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#related-adrs" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Related ADRs
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -2472,7 +2441,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../007-lowercase-chat-endpoints/" class="md-nav__link">
+      <a href="../../adrs/007-lowercase-chat-endpoints/" class="md-nav__link">
         
   
   
@@ -2500,7 +2469,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../008-skills-design-decisions/" class="md-nav__link">
+      <a href="../../adrs/008-skills-design-decisions/" class="md-nav__link">
         
   
   
@@ -2590,10 +2559,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#status" class="md-nav__link">
+  <a href="#how-it-works" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Status
+        How It Works
       
     </span>
   </a>
@@ -2601,33 +2570,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#context" class="md-nav__link">
+  <a href="#scopes-wire-format" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Context
+        Scopes Wire Format
       
     </span>
   </a>
   
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#decision" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Decision
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Decision">
+    <nav class="md-nav" aria-label="Scopes Wire Format">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#implementation-strategy" class="md-nav__link">
+  <a href="#supported-types" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Implementation Strategy
+        Supported Types
       
     </span>
   </a>
@@ -2635,21 +2593,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#migration-phases" class="md-nav__link">
+  <a href="#credentialdata-fields" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Migration Phases
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#compatibility-bridge" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Compatibility Bridge
+        Credential.Data Fields
       
     </span>
   </a>
@@ -2662,49 +2609,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#consequences" class="md-nav__link">
+  <a href="#multi-scope-requests" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Consequences
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Consequences">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#positive-consequences" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Positive Consequences
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#negative-consequences" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Negative Consequences
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#implementation-status" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Implementation Status
+        Multi-Scope Requests
       
     </span>
   </a>
@@ -2712,10 +2620,43 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#related-adrs" class="md-nav__link">
+  <a href="#legacy-base64-kubeconfig" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Related ADRs
+        Legacy Base64 Kubeconfig
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#aws-explicit-credentials-modelfactory" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AWS Explicit Credentials (ModelFactory)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#local-development-dcaf_is_local" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Local Development (DCAF_IS_LOCAL)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#security-notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Security Notes
       
     </span>
   </a>
@@ -2765,28 +2706,10 @@
     
     
       <li class="md-path__item">
-        <a href="../../architecture/" class="md-path__link">
+        <a href="../custom-agents/" class="md-path__link">
           
   <span class="md-ellipsis">
-    Architecture
-  </span>
-
-        </a>
-      </li>
-    
-  
-
-      
-        
-  
-  
-    
-    
-      <li class="md-path__item">
-        <a href="../000-template/" class="md-path__link">
-          
-  <span class="md-ellipsis">
-    ADRs
+    Guides
   </span>
 
         </a>
@@ -2808,141 +2731,218 @@
   
 
 
-<h1 id="adr-006-strangler-fig-migration">ADR-006: Strangler Fig Migration<a class="headerlink" href="#adr-006-strangler-fig-migration" title="Permanent link">&para;</a></h1>
-<h2 id="status">Status<a class="headerlink" href="#status" title="Permanent link">&para;</a></h2>
-<p>Accepted</p>
-<h2 id="context">Context<a class="headerlink" href="#context" title="Permanent link">&para;</a></h2>
-<p>DCAF has an existing codebase with:</p>
-<ul>
-<li>Working agents (<code>cmd_agent.py</code>, <code>aws_agent.py</code>, <code>k8s_agent.py</code>)</li>
-<li>Established <code>AgentProtocol</code> interface</li>
-<li>Production usage via <code>agent_server.py</code></li>
-<li>Existing schemas and tools</li>
-</ul>
-<p>We want to introduce a new Core abstraction layer without:</p>
-<ul>
-<li>Breaking existing functionality</li>
-<li>Requiring a big-bang migration</li>
-<li>Disrupting current users</li>
-<li>Losing the ability to rollback</li>
-</ul>
-<h2 id="decision">Decision<a class="headerlink" href="#decision" title="Permanent link">&para;</a></h2>
-<p>We apply the <strong>Strangler Fig Pattern</strong>:</p>
+<h1 id="credential-injection">Credential Injection<a class="headerlink" href="#credential-injection" title="Permanent link">&para;</a></h1>
+<p>DCAF's <code>CredentialManager</code> centralises all cloud credential handling — Kubernetes kubeconfigs, AWS keys, and GCP service-account JSON files — so individual agents never have to decode, write, or clean up credential material themselves.</p>
+<hr />
+<h2 id="how-it-works">How It Works<a class="headerlink" href="#how-it-works" title="Permanent link">&para;</a></h2>
+<p>When a request arrives the <code>AgentService</code> passes the <code>PlatformContext</code> through a <code>CredentialManager</code> before calling the runtime:</p>
 <ol>
-<li>Build the new Core system alongside the existing system</li>
-<li>Route new functionality through Core</li>
-<li>Gradually migrate existing agents</li>
-<li>Eventually remove the old system</li>
+<li><strong>K8s scopes</strong> — builds a merged kubeconfig (one context per scope), writes it to a temp file, and adds <code>kubeconfig_path</code> to the context dict the agent receives.</li>
+<li><strong>AWS scopes</strong> — builds per-scope env dicts (<code>AWS_ACCESS_KEY_ID</code>, <code>AWS_SECRET_ACCESS_KEY</code>, <code>AWS_SESSION_TOKEN</code>, <code>AWS_DEFAULT_REGION</code>).</li>
+<li><strong>GCP scopes</strong> — writes per-scope service-account JSON key files, builds per-scope env dicts (<code>GOOGLE_APPLICATION_CREDENTIALS</code>).</li>
+<li><strong>Cleanup</strong> — all temp files are deleted after the request completes (async context manager).</li>
 </ol>
-<h3 id="implementation-strategy">Implementation Strategy<a class="headerlink" href="#implementation-strategy" title="Permanent link">&para;</a></h3>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>dcaf/
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>├── agents/              # EXISTING - Keep working
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>│   ├── cmd_agent.py
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>│   ├── aws_agent.py
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>│   └── k8s_agent.py
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>├── agent_server.py      # EXISTING - Still works with AgentProtocol
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>├── schemas/             # EXISTING - Reused by Core
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>├── tools.py             # EXISTING - Reused by Core
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>│
-</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>└── core/                # NEW - Built in parallel
-</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>    ├── domain/
-</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>    ├── application/
-</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>    └── adapters/
+<p>The agent runtime receives an enhanced <code>platform_context</code> dict containing <code>kubeconfig_path</code> (if applicable) and can call <code>PreparedCredentials.get_subprocess_env(scope_name)</code> to get a ready-to-use env dict for subprocess calls.</p>
+<hr />
+<h2 id="scopes-wire-format">Scopes Wire Format<a class="headerlink" href="#scopes-wire-format" title="Permanent link">&para;</a></h2>
+<p>Credentials arrive in <code>platform_context.scopes</code> as a list of scope objects matching Pranav's credential selector payload:</p>
+<div class="language-json highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="p">{</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="nt">&quot;messages&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[{</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">    </span><span class="nt">&quot;role&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;user&quot;</span><span class="p">,</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">    </span><span class="nt">&quot;content&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;list pods&quot;</span><span class="p">,</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">    </span><span class="nt">&quot;platform_context&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">      </span><span class="nt">&quot;scopes&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">        </span><span class="p">{</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="w">          </span><span class="nt">&quot;ProviderInfo&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="w">            </span><span class="nt">&quot;Type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;eks&quot;</span><span class="p">,</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="w">            </span><span class="nt">&quot;Name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;prod-cluster&quot;</span><span class="p">,</span>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="w">            </span><span class="nt">&quot;AccountId&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;https://prod-k8s-api.example.com&quot;</span>
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="w">          </span><span class="p">},</span>
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="w">          </span><span class="nt">&quot;Credential&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="w">            </span><span class="nt">&quot;Data&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="w">              </span><span class="nt">&quot;token&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;eyJ...&quot;</span><span class="p">,</span>
+</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a><span class="w">              </span><span class="nt">&quot;base64certdata&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;LS0tLS1CRUdJTi...&quot;</span>
+</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a><span class="w">            </span><span class="p">}</span>
+</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a><span class="w">          </span><span class="p">}</span>
+</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a><span class="w">        </span><span class="p">}</span>
+</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a><span class="w">      </span><span class="p">]</span>
+</span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a><span class="w">    </span><span class="p">}</span>
+</span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a><span class="w">  </span><span class="p">}]</span>
+</span><span id="__span-0-23"><a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a><span class="p">}</span>
 </span></code></pre></div>
-<h3 id="migration-phases">Migration Phases<a class="headerlink" href="#migration-phases" title="Permanent link">&para;</a></h3>
-<p><strong>Phase 1: Parallel Construction</strong>
-- Build Core in <code>dcaf/core/</code> without touching existing code
-- Existing agents continue to work unchanged
-- Core can import from existing <code>schemas/</code> and <code>tools.py</code></p>
-<p><strong>Phase 2: Facade Adapter</strong>
-- Create a <code>BedrockDirectAdapter</code> that wraps existing <code>BedrockLLM</code>
-- Allows Core use cases to work with existing infrastructure
-- Proves Core architecture without new framework dependencies</p>
-<p><strong>Phase 3: New Agents on Core</strong>
-- New agents (e.g., using Agno) are built on Core
-- Old and new agents coexist in <code>agent_server.py</code>
-- Both implement <code>AgentProtocol</code> for compatibility</p>
-<p><strong>Phase 4: Gradual Migration</strong>
-- Migrate existing agents one at a time
-- Each migration is a separate, reversible change
-- Old implementations kept until migration is verified</p>
-<p><strong>Phase 5: Cleanup</strong>
-- Remove old agent implementations
-- Core becomes the primary implementation
-- Old <code>AgentProtocol</code> may remain for backwards compatibility</p>
-<h3 id="compatibility-bridge">Compatibility Bridge<a class="headerlink" href="#compatibility-bridge" title="Permanent link">&para;</a></h3>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># dcaf/core/adapters/inbound/agent_protocol_bridge.py</span>
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="k">class</span><span class="w"> </span><span class="nc">CoreAgentBridge</span><span class="p">:</span>
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Wraps a Core use case to implement legacy AgentProtocol.&quot;&quot;&quot;</span>
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">execute_agent_service</span><span class="p">:</span> <span class="n">AgentService</span><span class="p">):</span>
-</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_service</span> <span class="o">=</span> <span class="n">execute_agent_service</span>
-</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>
-</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">invoke</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">messages</span><span class="p">:</span> <span class="n">Dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AgentMessage</span><span class="p">:</span>
-</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>        <span class="c1"># Convert legacy format to Core request</span>
-</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>        <span class="n">request</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_convert_to_request</span><span class="p">(</span><span class="n">messages</span><span class="p">)</span>
-</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>        <span class="n">response</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_service</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">request</span><span class="p">)</span>
-</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_convert_to_agent_message</span><span class="p">(</span><span class="n">response</span><span class="p">)</span>
-</span></code></pre></div>
-<h2 id="consequences">Consequences<a class="headerlink" href="#consequences" title="Permanent link">&para;</a></h2>
-<h3 id="positive-consequences">Positive Consequences<a class="headerlink" href="#positive-consequences" title="Permanent link">&para;</a></h3>
-<ul>
-<li>Zero downtime during migration</li>
-<li>Easy rollback if issues discovered</li>
-<li>Can migrate incrementally by agent</li>
-<li>New features can use Core immediately</li>
-<li>Team can learn Core patterns on new work</li>
-</ul>
-<h3 id="negative-consequences">Negative Consequences<a class="headerlink" href="#negative-consequences" title="Permanent link">&para;</a></h3>
-<ul>
-<li>Temporary code duplication</li>
-<li>Two mental models during transition</li>
-<li>Need to maintain compatibility layer</li>
-<li>Longer overall timeline than big-bang</li>
-</ul>
-<h2 id="implementation-status">Implementation Status<a class="headerlink" href="#implementation-status" title="Permanent link">&para;</a></h2>
-<p><strong>Current Phase: 3 - Unified Surface (Complete)</strong></p>
-<p>As of 2025-02, the unified surface is implemented:</p>
-<ul>
-<li>✅ <code>dcaf.core.create_app()</code> exposes both V1 and V2 endpoints</li>
-<li>✅ V2 endpoints (<code>/api/chat</code>, <code>/api/chat-stream</code>, <code>/api/chat-ws</code>) use V2 code path</li>
-<li>✅ V1 endpoints (<code>/api/sendMessage</code>, <code>/api/sendMessageStream</code>) use V1 code path</li>
-<li>✅ V1 handler functions extracted for reuse by unified app</li>
-<li>✅ Tests verify code path separation (<code>tests/core/test_request_fields.py</code>)</li>
-</ul>
-<p><strong>Key V2 Features (not available in V1):</strong></p>
+<h3 id="supported-types">Supported Types<a class="headerlink" href="#supported-types" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
-<th>Feature</th>
+<th><code>ProviderInfo.Type</code></th>
+<th>Category</th>
+<th>What CredentialManager produces</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>eks</code></td>
+<td>Kubernetes</td>
+<td>merged kubeconfig → <code>kubeconfig_path</code></td>
+</tr>
+<tr>
+<td><code>gke</code></td>
+<td>Kubernetes</td>
+<td>merged kubeconfig → <code>kubeconfig_path</code></td>
+</tr>
+<tr>
+<td><code>kubernetes</code></td>
+<td>Kubernetes</td>
+<td>merged kubeconfig → <code>kubeconfig_path</code></td>
+</tr>
+<tr>
+<td><code>aws</code></td>
+<td>AWS</td>
+<td>per-scope env dict with <code>AWS_*</code> vars</td>
+</tr>
+<tr>
+<td><code>gcp</code></td>
+<td>GCP</td>
+<td>per-scope JSON key file → <code>GOOGLE_APPLICATION_CREDENTIALS</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="credentialdata-fields">Credential.Data Fields<a class="headerlink" href="#credentialdata-fields" title="Permanent link">&para;</a></h3>
+<p><strong>K8s scopes (eks / gke / kubernetes):</strong></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
 <th>Description</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>_request_fields</code></td>
-<td>Top-level request fields forwarded to agent</td>
+<td><code>token</code></td>
+<td>Bearer token for the cluster API server</td>
 </tr>
 <tr>
-<td><code>meta_data.request_context</code></td>
-<td>Request fields echoed back in response</td>
-</tr>
-<tr>
-<td>WebSocket support</td>
-<td><code>/api/chat-ws</code> bidirectional streaming</td>
+<td><code>base64certdata</code></td>
+<td>Base64-encoded cluster CA certificate</td>
 </tr>
 </tbody>
 </table>
-<p><strong>Next Steps (Phase 4-5):</strong></p>
+<p><strong>AWS scopes:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>access_key</code></td>
+<td>AWS access key ID</td>
+</tr>
+<tr>
+<td><code>secret_key</code></td>
+<td>AWS secret access key</td>
+</tr>
+<tr>
+<td><code>session_token</code></td>
+<td>STS session token (required for temporary/JIT credentials)</td>
+</tr>
+<tr>
+<td><code>region</code></td>
+<td>AWS region (e.g. <code>us-east-1</code>)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>GCP scopes:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>service_account_json</code></td>
+<td>Full service-account JSON key as a string</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="multi-scope-requests">Multi-Scope Requests<a class="headerlink" href="#multi-scope-requests" title="Permanent link">&para;</a></h2>
+<p>A single request can include multiple scopes of different types. All scopes are processed; K8s scopes are merged into a single kubeconfig with one context per scope.</p>
+<div class="language-json highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">&quot;scopes&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="p">{</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">    </span><span class="nt">&quot;ProviderInfo&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;Type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;eks&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;Name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;prod-cluster&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;AccountId&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;https://...&quot;</span><span class="p">},</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">    </span><span class="nt">&quot;Credential&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;Data&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;token&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;eyJ...&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;base64certdata&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;LS0t...&quot;</span><span class="p">}}</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">  </span><span class="p">},</span>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">  </span><span class="p">{</span>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">    </span><span class="nt">&quot;ProviderInfo&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;Type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;aws&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;Name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;prod-aws&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;AccountId&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;123456789012&quot;</span><span class="p">},</span>
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">    </span><span class="nt">&quot;Credential&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;Data&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;access_key&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;AKIA...&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;secret_key&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;...&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;region&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;us-east-1&quot;</span><span class="p">}}</span>
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="w">  </span><span class="p">}</span>
+</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="p">]</span>
+</span></code></pre></div>
+<hr />
+<h2 id="legacy-base64-kubeconfig">Legacy Base64 Kubeconfig<a class="headerlink" href="#legacy-base64-kubeconfig" title="Permanent link">&para;</a></h2>
+<p>Callers that haven't migrated to scopes can still pass a single base64-encoded kubeconfig directly:</p>
+<div class="language-json highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nt">&quot;platform_context&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span><span class="nt">&quot;kubeconfig&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;&lt;base64-encoded kubeconfig YAML&gt;&quot;</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="p">}</span>
+</span></code></pre></div>
+<p><code>CredentialManager</code> decodes it and writes a temp file. The <code>kubeconfig_path</code> key is added to <code>platform_context</code> exactly as with scopes. Both paths clean up the temp file after the request.</p>
+<blockquote>
+<p><strong>Note:</strong> If both <code>kubeconfig_path</code> (pre-populated by an upstream pass) and <code>kubeconfig</code> (base64) are present, <code>kubeconfig_path</code> takes precedence and no temp file is written.</p>
+</blockquote>
+<hr />
+<h2 id="aws-explicit-credentials-modelfactory">AWS Explicit Credentials (ModelFactory)<a class="headerlink" href="#aws-explicit-credentials-modelfactory" title="Permanent link">&para;</a></h2>
+<p>When AWS credentials are passed via environment variables (<code>AWS_ACCESS_KEY_ID</code> + <code>AWS_SECRET_ACCESS_KEY</code>), <code>ModelFactory._create_bedrock_model()</code> creates an explicit <code>aioboto3.Session</code> with those credentials. This supports DuploCloud JIT (short-lived STS) credentials:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nv">AWS_ACCESS_KEY_ID</span><span class="o">=</span>ASIA3XIJPJFD...
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="nv">AWS_SECRET_ACCESS_KEY</span><span class="o">=</span>...
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="nv">AWS_SESSION_TOKEN</span><span class="o">=</span>...<span class="w">          </span><span class="c1"># required for STS/JIT credentials</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="nv">AWS_REGION</span><span class="o">=</span>us-east-1
+</span></code></pre></div>
+<p>The three credential resolution paths, in priority order:</p>
+<table>
+<thead>
+<tr>
+<th>Priority</th>
+<th>Condition</th>
+<th>Behaviour</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><code>AWS_PROFILE</code> set</td>
+<td>Named profile session</td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>AWS_ACCESS_KEY_ID</code> + <code>AWS_SECRET_ACCESS_KEY</code> set</td>
+<td>Explicit session with those credentials</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Neither</td>
+<td>Default IAM / credential chain (EC2 instance role, ECS task role, etc.)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="local-development-dcaf_is_local">Local Development (<code>DCAF_IS_LOCAL</code>)<a class="headerlink" href="#local-development-dcaf_is_local" title="Permanent link">&para;</a></h2>
+<p>In production, credentials are injected at runtime via scopes. In local development, set <code>DCAF_IS_LOCAL=true</code> so DCAF expects credentials from the environment instead:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nv">DCAF_IS_LOCAL</span><span class="o">=</span><span class="nb">true</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="nv">AWS_PROFILE</span><span class="o">=</span>my-local-profile
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="nv">GOOGLE_APPLICATION_CREDENTIALS</span><span class="o">=</span>/path/to/service-account.json
+</span></code></pre></div>
+<p>See <a href="../environment-configuration/#dcaf_is_local">Environment Configuration</a> for details.</p>
+<hr />
+<h2 id="security-notes">Security Notes<a class="headerlink" href="#security-notes" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Migrate existing agents to Core one at a time</li>
-<li>Eventually deprecate <code>dcaf.agent_server.create_chat_app()</code> for new projects</li>
-</ul>
-<h2 id="related-adrs">Related ADRs<a class="headerlink" href="#related-adrs" title="Permanent link">&para;</a></h2>
-<ul>
-<li>ADR-001: Clean Architecture</li>
-<li>ADR-003: Adapter Pattern for Frameworks</li>
-<li>ADR-007: Lowercase Chat Endpoints</li>
+<li><code>CredentialManager</code> <strong>never mutates <code>os.environ</code></strong> — credentials flow via subprocess env dicts and explicit SDK session objects, keeping concurrent async requests isolated.</li>
+<li>Temp files are always cleaned up in <code>CredentialManager.__aexit__</code>, even if the request raises an exception.</li>
+<li>Do not log raw credential values; debug logging only records key names, not values.</li>
 </ul>
 
 

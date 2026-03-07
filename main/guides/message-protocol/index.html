@@ -1193,6 +1193,8 @@
       
         
       
+        
+      
     
     
     
@@ -1424,6 +1426,34 @@
     
   
     Environment Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../credential-injection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Credential Injection
   
 
     
@@ -4229,12 +4259,22 @@
 <tr>
 <td><code>kubeconfig</code></td>
 <td><code>string</code></td>
-<td>Base64-encoded kubeconfig</td>
+<td>Base64-encoded kubeconfig (legacy; prefer <code>scopes</code>)</td>
 </tr>
 <tr>
 <td><code>aws_credentials</code></td>
 <td><code>object</code></td>
 <td>AWS credential info</td>
+</tr>
+<tr>
+<td><code>scopes</code></td>
+<td><code>array</code></td>
+<td>Typed cloud credentials (K8s, AWS, GCP) — see <a href="../credential-injection/">Credential Injection</a></td>
+</tr>
+<tr>
+<td><code>gcp_credentials</code></td>
+<td><code>object</code></td>
+<td>GCP credential info (reserved for future use)</td>
 </tr>
 </tbody>
 </table>
