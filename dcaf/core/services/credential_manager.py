@@ -103,6 +103,12 @@ class CredentialManager:
         kubeconfig_path: str | None = None
         if k8s_scopes:
             kubeconfig_path = self._write_merged_kubeconfig(k8s_scopes)
+        elif ctx.extra.get("kubeconfig_path"):
+            # Pre-populated by an upstream CredentialManager pass — use as-is, skip decode
+            kubeconfig_path = ctx.extra["kubeconfig_path"]
+            logger.debug(
+                "CredentialManager: using pre-populated kubeconfig_path %s", kubeconfig_path
+            )
         elif ctx.kubeconfig:
             # Legacy: single base64-encoded kubeconfig (no scopes)
             kubeconfig_path = self._write_raw_tempfile(ctx.kubeconfig, "kubeconfig_")
@@ -111,6 +117,11 @@ class CredentialManager:
         for scope in ctx.scopes:
             if scope.type in _AWS_TYPES:
                 scope_envs[scope.name] = _build_aws_env(scope)
+                logger.debug(
+                    "CredentialManager: built AWS env for scope %s (keys: %s)",
+                    scope.name,
+                    list(scope_envs[scope.name].keys()),
+                )
             elif scope.type in _GCP_TYPES:
                 gcp_env = self._build_gcp_env(scope)
                 if gcp_env:

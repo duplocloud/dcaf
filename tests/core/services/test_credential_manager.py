@@ -190,3 +190,25 @@ class TestCredentialManagerGcpScopes:
             path = prepared.get_subprocess_env("prod-gcp").get("GOOGLE_APPLICATION_CREDENTIALS")
         assert path is not None
         assert not os.path.exists(path)
+
+
+class TestCredentialManagerKubeconfigPrecedence:
+    async def test_prepopulated_kubeconfig_path_wins_over_base64(self):
+        """kubeconfig_path in extra takes precedence — no temp file is written."""
+        kube_b64 = base64.b64encode(FAKE_KUBECONFIG).decode()
+        ctx = PlatformContext.from_dict(
+            {"kubeconfig": kube_b64, "kubeconfig_path": "/tmp/pre-populated.yaml"}
+        )
+        async with CredentialManager(ctx) as prepared:
+            assert prepared.kubeconfig_path == "/tmp/pre-populated.yaml"
+
+    async def test_prepopulated_kubeconfig_path_no_tempfile_written(self):
+        """When kubeconfig_path is pre-populated, the base64 kubeconfig is not decoded."""
+        kube_b64 = base64.b64encode(FAKE_KUBECONFIG).decode()
+        ctx = PlatformContext.from_dict(
+            {"kubeconfig": kube_b64, "kubeconfig_path": "/tmp/pre-populated.yaml"}
+        )
+        async with CredentialManager(ctx) as prepared:
+            # Path is the pre-populated one, not a temp file
+            assert prepared.kubeconfig_path is not None
+            assert "kubeconfig_" not in prepared.kubeconfig_path
