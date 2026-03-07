@@ -106,7 +106,9 @@ class CredentialManager:
         elif ctx.extra.get("kubeconfig_path"):
             # Pre-populated by an upstream CredentialManager pass — use as-is, skip decode
             kubeconfig_path = ctx.extra["kubeconfig_path"]
-            logger.debug("CredentialManager: using pre-populated kubeconfig_path %s", kubeconfig_path)
+            logger.debug(
+                "CredentialManager: using pre-populated kubeconfig_path %s", kubeconfig_path
+            )
         elif ctx.kubeconfig:
             # Legacy: single base64-encoded kubeconfig (no scopes)
             kubeconfig_path = self._write_raw_tempfile(ctx.kubeconfig, "kubeconfig_")
