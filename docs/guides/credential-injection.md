@@ -37,6 +37,14 @@ Credentials arrive in `platform_context.scopes` as a list of scope objects match
 }
 ```
 
+**GCP** (access token for command execution):
+```json
+{
+  "ProviderInfo": {"Type": "gcp", "Name": "my-gcp-project", "AccountId": "my-gcp-project"},
+  "Credential": {"Data": {"service-account-access-token": "ya29.xxx..."}}
+}
+```
+
 ### Supported Types
 
 | `ProviderInfo.Type` | Category | What CredentialManager produces |
@@ -45,7 +53,7 @@ Credentials arrive in `platform_context.scopes` as a list of scope objects match
 | `gke` | Kubernetes | merged kubeconfig → `kubeconfig_path` |
 | `kubernetes` | Kubernetes | merged kubeconfig → `kubeconfig_path` |
 | `aws` | AWS | per-scope env dict with `AWS_*` vars |
-| `gcp` | GCP | per-scope JSON key file → `GOOGLE_APPLICATION_CREDENTIALS` |
+| `gcp` | GCP | access token → `CLOUDSDK_AUTH_ACCESS_TOKEN` + `CLOUDSDK_CONFIG`; or JSON key → `GOOGLE_APPLICATION_CREDENTIALS` |
 
 ### Credential.Data Fields
 
@@ -72,11 +80,21 @@ Credentials arrive in `platform_context.scopes` as a list of scope objects match
 | `session_token` | STS session token (required for temporary/JIT credentials) |
 | `region` | AWS region (e.g. `us-east-1`) |
 
-**GCP scopes:**
+**GCP scopes — short-lived access token (preferred):**
 
 | Field | Description |
 |-------|-------------|
-| `service_account_json` | Full service-account JSON key as a string |
+| `service-account-access-token` | Short-lived OAuth2 access token from Pranav's credential selector |
+
+Sets `CLOUDSDK_AUTH_ACCESS_TOKEN` and an isolated `CLOUDSDK_CONFIG` directory (deleted after the request).
+
+**GCP scopes — long-lived JSON key (legacy):**
+
+| Field | Description |
+|-------|-------------|
+| `json_key` | Base64-encoded GCP service account JSON key file |
+
+Writes a temp file and sets `GOOGLE_APPLICATION_CREDENTIALS`. When both fields are present, the access token takes precedence.
 
 ---
 

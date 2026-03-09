@@ -19,6 +19,7 @@ from __future__ import annotations
 import base64
 import logging
 import os
+import shutil
 import tempfile
 from dataclasses import dataclass, field
 from typing import Any
@@ -87,6 +88,7 @@ class CredentialManager:
     def __init__(self, context: PlatformContext) -> None:
         self._context = context
         self._temp_files: list[str] = []
+        self._temp_dirs: list[str] = []
 
     async def __aenter__(self) -> PreparedCredentials:
         return self._prepare()
@@ -213,8 +215,33 @@ class CredentialManager:
             return None
 
     def _build_gcp_env(self, scope: Scope) -> dict[str, str]:
-        """Write GCP JSON key to temp file and return env dict."""
-        json_b64 = scope.credential.get("json_key", "")
+        """Build GCP credential env vars from a Scope.
+
+        Two credential paths:
+        - service-account-access-token: short-lived JIT token from Pranav's selector.
+          Sets CLOUDSDK_AUTH_ACCESS_TOKEN and an isolated CLOUDSDK_CONFIG directory.
+        - json_key: base64-encoded service account JSON key (long-lived, legacy).
+          Writes temp file and sets GOOGLE_APPLICATION_CREDENTIALS.
+        """
+        cred = scope.credential
+
+        # Short-lived access token (preferred when available)
+        access_token = cred.get("service-account-access-token", "")
+        if access_token:
+            config_dir = tempfile.mkdtemp(prefix="gcloud_config_")
+            self._temp_dirs.append(config_dir)
+            logger.debug(
+                "CredentialManager: built GCP access token env for scope %s (config_dir=%s)",
+                scope.name,
+                config_dir,
+            )
+            return {
+                "CLOUDSDK_AUTH_ACCESS_TOKEN": access_token,
+                "CLOUDSDK_CONFIG": config_dir,
+            }
+
+        # Long-lived JSON key (legacy fallback)
+        json_b64 = cred.get("json_key", "")
         if not json_b64:
             return {}
         gcp_path = self._write_raw_tempfile(json_b64, "gcp_key_", suffix=".json")
@@ -232,6 +259,14 @@ class CredentialManager:
             except Exception as e:
                 logger.warning("CredentialManager: failed to delete %s: %s", path, e)
         self._temp_files.clear()
+
+        for path in self._temp_dirs:
+            try:
+                shutil.rmtree(path, ignore_errors=True)
+                logger.debug("CredentialManager: deleted temp dir %s", path)
+            except Exception as e:
+                logger.warning("CredentialManager: failed to delete dir %s: %s", path, e)
+        self._temp_dirs.clear()
 
 
 def _build_aws_env(scope: Scope) -> dict[str, str]:
