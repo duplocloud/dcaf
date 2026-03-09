@@ -127,3 +127,57 @@ class TestFilterRequiringApproval:
         ]
         result = policy.filter_requiring_approval(tools)
         assert len(result) == 2
+
+
+# =============================================================================
+# Baseline regression: behaviour when NO permissions in context (Task 1)
+# These tests must pass BEFORE any implementation changes.
+# =============================================================================
+
+
+class TestApprovalPolicyNoPermissionsRegression:
+    """Pins the existing tool-flag behaviour so refactors can't silently break it."""
+
+    def test_no_context_safe_tool_approved(self):
+        policy = ApprovalPolicy()
+        tool = FakeTool("list_pods", requires_approval=False)
+        decision = policy.check(tool)
+        assert not decision.requires_approval
+
+    def test_no_context_dangerous_tool_needs_approval(self):
+        policy = ApprovalPolicy()
+        tool = FakeTool("delete_pod", requires_approval=True)
+        decision = policy.check(tool)
+        assert decision.requires_approval
+        assert "delete_pod" in decision.reason
+
+    def test_empty_context_safe_tool_approved(self):
+        policy = ApprovalPolicy()
+        tool = FakeTool("list_pods", requires_approval=False)
+        ctx = PlatformContext.empty()
+        decision = policy.check(tool, ctx)
+        assert not decision.requires_approval
+
+    def test_empty_context_dangerous_tool_needs_approval(self):
+        policy = ApprovalPolicy()
+        tool = FakeTool("delete_pod", requires_approval=True)
+        ctx = PlatformContext.empty()
+        decision = policy.check(tool, ctx)
+        assert decision.requires_approval
+
+    def test_context_without_permissions_falls_back_to_tool_flag(self):
+        policy = ApprovalPolicy()
+        tool = FakeTool("scale", requires_approval=True)
+        ctx = PlatformContext.from_dict({"tenant_name": "production"})
+        decision = policy.check(tool, ctx)
+        assert decision.requires_approval
+
+    def test_approval_decision_approved_has_no_block(self):
+        d = ApprovalDecision.approved()
+        assert not d.requires_approval
+        assert d.reason is None
+
+    def test_approval_decision_needs_approval_has_reason(self):
+        d = ApprovalDecision.needs_approval("too risky")
+        assert d.requires_approval
+        assert d.reason == "too risky"
