@@ -49,6 +49,22 @@ class ApprovalDecision:
         return cls(requires_approval=False, is_blocked=True, reason=reason)
 
 
+def _find_chain_match(
+    tool_name: str,
+    arg_str: str | None,
+    permissions: tuple,
+    list_type: str,
+) -> tuple[str, str] | None:
+    """Return (layer_name, rule_raw) of the first matching rule in the given chain, else None."""
+    for layer_name in _LAYER_ORDER:
+        for layer in permissions:
+            if layer.layer == layer_name and layer.list == list_type:
+                for rule in layer.rules:
+                    if rule.matches(tool_name, arg_str):
+                        return layer_name, rule.raw
+    return None
+
+
 def _primary_argument(tool_input: "dict[str, Any] | str | None") -> str | None:
     """Extract a single string from tool input for permission rule matching.
 
@@ -131,22 +147,14 @@ class ApprovalPolicy:
             arg_str = _primary_argument(tool_input)
 
             # Steps 1-5: deny chain (global → project → agent → skill → ticket)
-            for layer_name in _LAYER_ORDER:
-                for layer in context.permissions:
-                    if layer.layer == layer_name and layer.list == "deny":
-                        for rule in layer.rules:
-                            if rule.matches(tool.name, arg_str):
-                                return ApprovalDecision.deny(
-                                    f"Blocked by {layer_name} deny rule: {rule.raw}"
-                                )
+            deny_match = _find_chain_match(tool.name, arg_str, context.permissions, "deny")
+            if deny_match:
+                layer_name, rule_raw = deny_match
+                return ApprovalDecision.deny(f"Blocked by {layer_name} deny rule: {rule_raw}")
 
             # Steps 6-10: allow chain (global → project → agent → skill → ticket)
-            for layer_name in _LAYER_ORDER:
-                for layer in context.permissions:
-                    if layer.layer == layer_name and layer.list == "allow":
-                        for rule in layer.rules:
-                            if rule.matches(tool.name, arg_str):
-                                return ApprovalDecision.approved()
+            if _find_chain_match(tool.name, arg_str, context.permissions, "allow"):
+                return ApprovalDecision.approved()
 
             # Step 11: no rule matched → HITL
             return ApprovalDecision.needs_approval(

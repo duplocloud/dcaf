@@ -179,6 +179,7 @@ class ToolCallDTO:
             status=tool_call.status.value,
             result=tool_call.result,
             error=tool_call.error,
+            rejection_reason=tool_call.rejection_reason,
         )
 
 
