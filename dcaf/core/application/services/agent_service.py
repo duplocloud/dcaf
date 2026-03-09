@@ -380,9 +380,12 @@ class AgentService:
         # Process tool calls
         processed_tool_calls = []
         for tc_dto in runtime_response.tool_calls:
-            # Find the tool to check approval requirements
+            # Find the registered tool (may be None for runtime-only tools)
             tool = self._find_tool(tc_dto.name, tools)
-            requires_approval = tool.requires_approval if tool else tc_dto.requires_approval
+
+            # Evaluate permission policy
+            _tool_for_policy = tool or _FallbackTool(tc_dto.name, tc_dto.requires_approval)
+            decision = self._policy.check(_tool_for_policy, context, tc_dto.input)
 
             # Create domain entity
             tool_call = ToolCall(
@@ -391,15 +394,21 @@ class AgentService:
                 input=ToolInput(tc_dto.input),
                 description=tc_dto.description,
                 intent=tc_dto.intent,
-                requires_approval=requires_approval,
+                requires_approval=decision.requires_approval,
             )
 
-            if requires_approval:
-                # Add to pending approvals
+            if decision.is_blocked:
+                # Hard deny — reject immediately, no HITL
+                tool_call.reject(decision.reason or "Blocked by permission policy")
+                processed_tool_calls.append(ToolCallDTO.from_tool_call(tool_call))
+
+            elif decision.requires_approval:
+                # Send to human-in-the-loop
                 conversation.request_tool_approval([tool_call])
                 processed_tool_calls.append(ToolCallDTO.from_tool_call(tool_call))
+
             else:
-                # Execute immediately
+                # Auto-approve and execute
                 tool_call.auto_approve()
                 if tool:
                     try:
@@ -441,3 +450,19 @@ class AgentService:
         if self._events:
             events = conversation.clear_events()
             self._events.publish_all(events)
+
+
+class _FallbackTool:
+    """Minimal ToolLike for runtime tool calls not registered in the tools list."""
+
+    def __init__(self, name: str, requires_approval: bool) -> None:
+        self._name = name
+        self._requires_approval = requires_approval
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @property
+    def requires_approval(self) -> bool:
+        return self._requires_approval

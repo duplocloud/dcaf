@@ -704,6 +704,7 @@ Agent returns with executed approval:
 | `aws_credentials` | `object` | AWS credential info |
 | `scopes` | `array` | Typed cloud credentials (K8s, AWS, GCP) — see [Credential Injection](credential-injection.md) |
 | `gcp_credentials` | `object` | GCP credential info (reserved for future use) |
+| `permissions` | `array` | Layered deny/allow rules — see [Permissions](permissions.md) |
 
 ### Passing Context
 

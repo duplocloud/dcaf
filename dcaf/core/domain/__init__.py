@@ -29,6 +29,8 @@ from .services import ApprovalPolicy
 from .value_objects import (
     ConversationId,
     MessageContent,
+    PermissionLayer,
+    PermissionRule,
     PlatformContext,
     ToolCallId,
     ToolInput,
@@ -45,6 +47,8 @@ __all__ = [
     "ToolInput",
     "MessageContent",
     "PlatformContext",
+    "PermissionLayer",
+    "PermissionRule",
     # Services
     "ApprovalPolicy",
     # Events

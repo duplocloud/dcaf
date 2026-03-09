@@ -57,3 +57,100 @@ class TestPlatformContextScopes:
         ctx2 = ctx1.with_scope(s)
         assert ctx1 is not ctx2
         assert len(ctx1.scopes) == 0  # original unchanged
+
+
+class TestPlatformContextPermissions:
+    def test_empty_context_has_no_permissions(self):
+        ctx = PlatformContext.empty()
+        assert ctx.permissions == ()
+
+    def test_from_dict_parses_permissions(self):
+        data = {
+            "permissions": [
+                {
+                    "layer": "global",
+                    "list": "deny",
+                    "rules": ["Bash(kubectl delete *)"],
+                },
+                {
+                    "layer": "global",
+                    "list": "allow",
+                    "rules": ["Bash(kubectl get *)"],
+                },
+            ]
+        }
+        ctx = PlatformContext.from_dict(data)
+        assert len(ctx.permissions) == 2
+        assert ctx.permissions[0].layer == "global"
+        assert ctx.permissions[0].list == "deny"
+        assert ctx.permissions[1].list == "allow"
+
+    def test_from_dict_no_permissions_key(self):
+        ctx = PlatformContext.from_dict({"tenant_name": "prod"})
+        assert ctx.permissions == ()
+
+    def test_to_dict_includes_permissions(self):
+        from dcaf.core.domain.value_objects.permission import PermissionLayer, PermissionRule
+
+        layer = PermissionLayer(
+            layer="global",
+            list="deny",
+            rules=(PermissionRule("Bash(kubectl delete *)"),),
+        )
+        ctx = PlatformContext(permissions=(layer,))
+        d = ctx.to_dict()
+        assert "permissions" in d
+        assert d["permissions"][0]["layer"] == "global"
+        assert d["permissions"][0]["rules"] == ["Bash(kubectl delete *)"]
+
+    def test_to_dict_omits_permissions_when_empty(self):
+        ctx = PlatformContext.empty()
+        assert "permissions" not in ctx.to_dict()
+
+    def test_with_tracing_carries_permissions(self):
+        from dcaf.core.domain.value_objects.permission import PermissionLayer, PermissionRule
+
+        layer = PermissionLayer(
+            layer="global", list="deny", rules=(PermissionRule("Bash(rm -rf *)"),)
+        )
+        ctx = PlatformContext(permissions=(layer,))
+        ctx2 = ctx.with_tracing(user_id="alice")
+        assert ctx2.permissions == ctx.permissions
+
+    def test_with_extra_carries_permissions(self):
+        from dcaf.core.domain.value_objects.permission import PermissionLayer, PermissionRule
+
+        layer = PermissionLayer(
+            layer="global", list="deny", rules=(PermissionRule("Bash(rm -rf *)"),)
+        )
+        ctx = PlatformContext(permissions=(layer,))
+        ctx2 = ctx.with_extra(foo="bar")
+        assert ctx2.permissions == ctx.permissions
+
+    def test_with_scope_carries_permissions(self):
+        from dcaf.core.domain.value_objects.permission import PermissionLayer, PermissionRule
+
+        layer = PermissionLayer(
+            layer="global", list="deny", rules=(PermissionRule("Bash(rm -rf *)"),)
+        )
+        ctx = PlatformContext(permissions=(layer,))
+        scope = Scope.from_dict(
+            {
+                "ProviderInfo": {"Type": "eks", "Name": "prod", "AccountId": "https://api"},
+                "Credential": {"Data": {"token": "t", "base64certdata": "c"}},
+            }
+        )
+        ctx2 = ctx.with_scope(scope)
+        assert ctx2.permissions == ctx.permissions
+
+    def test_from_dict_roundtrip(self):
+        data = {
+            "tenant_name": "prod",
+            "permissions": [
+                {"layer": "global", "list": "deny", "rules": ["Bash(kubectl delete *)"]},
+            ],
+        }
+        ctx = PlatformContext.from_dict(data)
+        result = ctx.to_dict()
+        assert result["tenant_name"] == "prod"
+        assert result["permissions"][0]["layer"] == "global"
