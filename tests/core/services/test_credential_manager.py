@@ -129,6 +129,26 @@ class TestCredentialManagerK8sScopes:
         assert path is not None
         assert not os.path.exists(path)
 
+    async def test_gke_scope_uses_service_account_access_token(self):
+        """GKE wire format sends 'service-account-access-token', not 'token'."""
+        gke_scope = Scope.from_dict(
+            {
+                "ProviderInfo": {"Type": "gke", "Name": "gke-prod", "AccountId": "https://gke-api"},
+                "Credential": {
+                    "Data": {
+                        "service-account-access-token": FAKE_TOKEN,
+                        "base64certdata": FAKE_CERT,
+                    }
+                },
+            }
+        )
+        ctx = PlatformContext(scopes=(gke_scope,))
+        async with CredentialManager(ctx) as prepared:
+            with open(prepared.kubeconfig_path) as f:
+                kubeconfig = yaml.safe_load(f.read())
+            user_tokens = {u["name"]: u["user"].get("token") for u in kubeconfig["users"]}
+            assert user_tokens.get("gke-prod") == FAKE_TOKEN
+
     async def test_non_k8s_scopes_not_in_kubeconfig(self):
         """AWS scope does not pollute the kubeconfig."""
         k8s = Scope.eks(

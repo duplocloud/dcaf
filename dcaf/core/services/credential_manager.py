@@ -140,7 +140,8 @@ class CredentialManager:
 
         for scope in scopes:
             cred = scope.credential
-            token = cred.get("token", "")
+            # GKE uses "service-account-access-token"; EKS/generic k8s uses "token"
+            token = cred.get("service-account-access-token") or cred.get("token", "")
             ca_cert = cred.get("base64certdata", "")
             server = scope.account_id  # account_id holds the API server URL for K8s types
 
