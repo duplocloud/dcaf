@@ -200,7 +200,7 @@ class AgentChannel:
             subjects=[CHANNEL_IN_SUBJECT_PATTERN],
             retention=RetentionPolicy.WORK_QUEUE,
             storage=StorageType.FILE,
-            max_age=timedelta(days=7),
+            max_age=timedelta(days=7).total_seconds(),
         )
         try:
             await self._js.stream_info(CHANNEL_IN_STREAM)  # type: ignore[attr-defined]
@@ -219,7 +219,7 @@ class AgentChannel:
             subjects=[CHANNEL_OUT_SUBJECT_PATTERN],
             retention=RetentionPolicy.LIMITS,
             storage=StorageType.FILE,
-            max_age=timedelta(days=7),
+            max_age=timedelta(days=7).total_seconds(),
             max_msgs_per_subject=10_000,
         )
         try:
