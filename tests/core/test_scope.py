@@ -47,6 +47,16 @@ class TestScopeFactories:
         assert s.account_id == "my-project"
         assert s.credential["json_key"] == "base64json=="
 
+    def test_gcp_with_access_token_factory(self):
+        s = Scope.gcp_with_access_token(
+            name="prod-gcp", project_id="my-project", access_token="ya29.fake-token"
+        )
+        assert s.type == "gcp"
+        assert s.name == "prod-gcp"
+        assert s.account_id == "my-project"
+        assert s.credential["service-account-access-token"] == "ya29.fake-token"
+        assert "json_key" not in s.credential
+
     def test_scope_is_frozen(self):
         s = Scope.k8s(name="x", server="s", token="t", ca_cert="c")
         with pytest.raises((AttributeError, TypeError)):

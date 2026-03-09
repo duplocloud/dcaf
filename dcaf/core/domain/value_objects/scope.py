@@ -83,6 +83,16 @@ class Scope:
         """GCP service account credential (base64-encoded JSON key)."""
         return cls(type="gcp", name=name, account_id=project_id, _data=(("json_key", json_key),))
 
+    @classmethod
+    def gcp_with_access_token(cls, *, name: str, project_id: str, access_token: str) -> Scope:
+        """GCP short-lived service account access token (JIT, from Pranav's credential selector)."""
+        return cls(
+            type="gcp",
+            name=name,
+            account_id=project_id,
+            _data=(("service-account-access-token", access_token),),
+        )
+
     @property
     def credential(self) -> dict[str, str]:
         """Credential data as a plain dict."""

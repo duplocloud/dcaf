@@ -212,6 +212,62 @@ class TestCredentialManagerGcpScopes:
         assert not os.path.exists(path)
 
 
+class TestCredentialManagerGcpAccessToken:
+    async def test_gcp_scope_with_access_token_sets_cloudsdk_auth_token(self):
+        """CLOUDSDK_AUTH_ACCESS_TOKEN is set from service-account-access-token."""
+        s = Scope.gcp_with_access_token(
+            name="prod-gcp", project_id="my-project", access_token="ya29.fake-token"
+        )
+        ctx = PlatformContext(scopes=(s,))
+        async with CredentialManager(ctx) as prepared:
+            env = prepared.get_subprocess_env("prod-gcp")
+            assert env["CLOUDSDK_AUTH_ACCESS_TOKEN"] == "ya29.fake-token"
+
+    async def test_gcp_scope_with_access_token_sets_isolated_cloudsdk_config(self):
+        """CLOUDSDK_CONFIG is set to a unique temp directory (not shared gcloud config)."""
+        s = Scope.gcp_with_access_token(
+            name="prod-gcp", project_id="my-project", access_token="ya29.fake-token"
+        )
+        ctx = PlatformContext(scopes=(s,))
+        async with CredentialManager(ctx) as prepared:
+            env = prepared.get_subprocess_env("prod-gcp")
+            config_dir = env["CLOUDSDK_CONFIG"]
+            assert config_dir is not None
+            assert os.path.isdir(config_dir)
+
+    async def test_gcp_cloudsdk_config_dir_deleted_on_exit(self):
+        """Isolated CLOUDSDK_CONFIG directory is deleted when context exits."""
+        s = Scope.gcp_with_access_token(
+            name="prod-gcp", project_id="my-project", access_token="ya29.fake-token"
+        )
+        ctx = PlatformContext(scopes=(s,))
+        config_dir = None
+        async with CredentialManager(ctx) as prepared:
+            config_dir = prepared.get_subprocess_env("prod-gcp").get("CLOUDSDK_CONFIG")
+        assert config_dir is not None
+        assert not os.path.exists(config_dir)
+
+    async def test_gcp_access_token_does_not_set_google_application_credentials(self):
+        """Access token path does not write a JSON key file."""
+        s = Scope.gcp_with_access_token(
+            name="prod-gcp", project_id="my-project", access_token="ya29.fake-token"
+        )
+        ctx = PlatformContext(scopes=(s,))
+        async with CredentialManager(ctx) as prepared:
+            env = prepared.get_subprocess_env("prod-gcp")
+            assert "GOOGLE_APPLICATION_CREDENTIALS" not in env
+
+    async def test_gcp_json_key_still_works_unchanged(self):
+        """Existing json_key path is unaffected by the new access_token path."""
+        gcp_b64 = base64.b64encode(FAKE_GCP_JSON).decode()
+        s = Scope.gcp(name="prod-gcp", project_id="my-project", json_key=gcp_b64)
+        ctx = PlatformContext(scopes=(s,))
+        async with CredentialManager(ctx) as prepared:
+            env = prepared.get_subprocess_env("prod-gcp")
+            assert "GOOGLE_APPLICATION_CREDENTIALS" in env
+            assert "CLOUDSDK_AUTH_ACCESS_TOKEN" not in env
+
+
 class TestCredentialManagerKubeconfigPrecedence:
     async def test_prepopulated_kubeconfig_path_wins_over_base64(self):
         """kubeconfig_path in extra takes precedence — no temp file is written."""
