@@ -21,29 +21,19 @@ The agent runtime receives an enhanced `platform_context` dict containing `kubec
 
 Credentials arrive in `platform_context.scopes` as a list of scope objects matching Pranav's credential selector payload:
 
+**EKS:**
 ```json
 {
-  "messages": [{
-    "role": "user",
-    "content": "list pods",
-    "platform_context": {
-      "scopes": [
-        {
-          "ProviderInfo": {
-            "Type": "eks",
-            "Name": "prod-cluster",
-            "AccountId": "https://prod-k8s-api.example.com"
-          },
-          "Credential": {
-            "Data": {
-              "token": "eyJ...",
-              "base64certdata": "LS0tLS1CRUdJTi..."
-            }
-          }
-        }
-      ]
-    }
-  }]
+  "ProviderInfo": {"Type": "eks", "Name": "prod-cluster", "AccountId": "https://prod-k8s-api.example.com"},
+  "Credential": {"Data": {"token": "eyJ...", "base64certdata": "LS0tLS1CRUdJTi..."}}
+}
+```
+
+**GKE** (uses `service-account-access-token` instead of `token`):
+```json
+{
+  "ProviderInfo": {"Type": "gke", "Name": "gke-prod", "AccountId": "https://gke-api.example.com"},
+  "Credential": {"Data": {"service-account-access-token": "eyJ...", "base64certdata": "LS0tLS1CRUdJTi..."}}
 }
 ```
 
@@ -59,11 +49,18 @@ Credentials arrive in `platform_context.scopes` as a list of scope objects match
 
 ### Credential.Data Fields
 
-**K8s scopes (eks / gke / kubernetes):**
+**K8s scopes — EKS / generic kubernetes:**
 
 | Field | Description |
 |-------|-------------|
 | `token` | Bearer token for the cluster API server |
+| `base64certdata` | Base64-encoded cluster CA certificate |
+
+**K8s scopes — GKE:**
+
+| Field | Description |
+|-------|-------------|
+| `service-account-access-token` | GKE service account bearer token |
 | `base64certdata` | Base64-encoded cluster CA certificate |
 
 **AWS scopes:**
