@@ -2168,6 +2168,34 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#duplocloud-jit-credential-injection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DuploCloud / JIT Credential Injection
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="DuploCloud / JIT Credential Injection">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#how-it-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How it works
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#resources" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3475,6 +3503,34 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#duplocloud-jit-credential-injection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DuploCloud / JIT Credential Injection
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="DuploCloud / JIT Credential Injection">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#how-it-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How it works
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#resources" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4135,6 +4191,19 @@
 <li><code>examples/gemini_tools.py</code> - Tool use with Gemini</li>
 <li><code>examples/gemini_multi_agent.py</code> - Multi-agent with Gemini</li>
 </ul>
+<h2 id="duplocloud-jit-credential-injection">DuploCloud / JIT Credential Injection<a class="headerlink" href="#duplocloud-jit-credential-injection" title="Permanent link">&para;</a></h2>
+<p>When DCAF is deployed inside DuploCloud (e.g. on GKE), Vertex AI credentials can be injected at request time via <code>platform_context</code> instead of relying on static ADC. This is the preferred approach for short-lived (JIT) credentials.</p>
+<h3 id="how-it-works">How it works<a class="headerlink" href="#how-it-works" title="Permanent link">&para;</a></h3>
+<ol>
+<li>The caller includes a GCP scope with a <code>service-account-access-token</code> in <code>platform_context.scopes</code>.</li>
+<li>DCAF extracts the token and passes it directly to the Vertex AI client — bypassing ADC entirely.</li>
+<li><strong>Gemini models</strong> use <code>google.oauth2.credentials.Credentials(token=...)</code> as the <code>credentials</code> kwarg.</li>
+<li><strong>Vertex Claude models</strong> use <code>AnthropicVertex(access_token=...)</code>.</li>
+<li>The model instance is <strong>not cached</strong> for token-authenticated requests (tokens are short-lived and change per request).</li>
+</ol>
+<p>When no token is present, both models fall back to ADC as normal — existing GKE Workload Identity or <code>GOOGLE_APPLICATION_CREDENTIALS</code> deployments are unaffected.</p>
+<p>For full wire-format details and how the <code>CredentialManager</code> handles GCP scopes for subprocess tools, see the <a href="../credential-injection/#gcp-access-token-llm-vertex-ai">Credential Injection guide</a>.</p>
+<hr />
 <h2 id="resources">Resources<a class="headerlink" href="#resources" title="Permanent link">&para;</a></h2>
 <ul>
 <li><a href="https://cloud.google.com/vertex-ai/docs">Vertex AI Documentation</a></li>
