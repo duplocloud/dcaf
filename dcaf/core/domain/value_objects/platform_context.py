@@ -3,6 +3,7 @@
 from dataclasses import dataclass
 from typing import Any
 
+from dcaf.core.domain.value_objects.permission import PermissionLayer
 from dcaf.core.domain.value_objects.scope import Scope
 
 
@@ -49,6 +50,9 @@ class PlatformContext:
     # Cloud provider credential scopes
     scopes: tuple["Scope", ...] = ()
 
+    # Layered deny/allow permission rules
+    permissions: tuple["PermissionLayer", ...] = ()
+
     # Additional context can be stored here
     _extra: tuple = ()  # Stored as tuple for immutability
 
@@ -63,6 +67,9 @@ class PlatformContext:
         # Convert scopes list to tuple for immutability
         if isinstance(self.scopes, list):
             object.__setattr__(self, "scopes", tuple(self.scopes))
+        # Convert permissions list to tuple for immutability
+        if isinstance(self.permissions, list):
+            object.__setattr__(self, "permissions", tuple(self.permissions))
 
     @property
     def extra(self) -> dict[str, Any]:
@@ -87,6 +94,7 @@ class PlatformContext:
             run_id=self.run_id,
             request_id=self.request_id,
             scopes=self.scopes,
+            permissions=self.permissions,
             _extra=tuple(sorted(new_extra.items())),
         )
 
@@ -126,6 +134,7 @@ class PlatformContext:
             run_id=run_id or self.run_id,
             request_id=request_id or self.request_id,
             scopes=self.scopes,
+            permissions=self.permissions,
             _extra=self._extra,
         )
 
@@ -145,6 +154,7 @@ class PlatformContext:
             run_id=self.run_id,
             request_id=self.request_id,
             scopes=(*self.scopes, scope),
+            permissions=self.permissions,
             _extra=self._extra,
         )
 
@@ -188,6 +198,8 @@ class PlatformContext:
             result["request_id"] = self.request_id
         if self.scopes:
             result["scopes"] = [s.to_dict() for s in self.scopes]
+        if self.permissions:
+            result["permissions"] = [p.to_dict() for p in self.permissions]
         result.update(self.extra)
         return result
 
@@ -236,6 +248,8 @@ class PlatformContext:
             "request_id",
             # Scopes
             "scopes",
+            # Permissions
+            "permissions",
         }
         known = {k: v for k, v in data.items() if k in known_keys}
         extra = {k: v for k, v in data.items() if k not in known_keys}
@@ -249,6 +263,15 @@ class PlatformContext:
             raw = known["scopes"]
             known["scopes"] = (
                 tuple(Scope.from_dict(s) for s in raw) if isinstance(raw, list) else ()
+            )
+
+        # Parse permissions from wire format
+        if "permissions" in known:
+            raw_perms = known["permissions"]
+            known["permissions"] = (
+                tuple(PermissionLayer.from_dict(p) for p in raw_perms)
+                if isinstance(raw_perms, list)
+                else ()
             )
 
         return cls(**known, _extra=tuple(sorted(extra.items())))
