@@ -147,6 +147,7 @@ nav:
     - Tracing & Observability: guides/tracing-observability.md
     - Environment Configuration: guides/environment-configuration.md
     - Credential Injection: guides/credential-injection.md
+    - Permissions: guides/permissions.md
     - Session Management: guides/session-management.md
     - Interceptors: guides/interceptors.md
     - Framework Adapters: guides/framework-adapters.md
