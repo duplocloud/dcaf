@@ -112,9 +112,13 @@ class AgnoModelFactory:
         """Get the provider name."""
         return self._config.provider
 
-    async def create_model(self) -> Any:
+    async def create_model(self, gcp_access_token: str | None = None) -> Any:
         """
         Create or retrieve the cached model instance.
+
+        When ``gcp_access_token`` is provided (Google provider only), a fresh
+        model is created per call with token-based credentials.  The cache is
+        bypassed so each request gets the correct short-lived token.
 
         Returns:
             An Agno model instance
@@ -122,10 +126,14 @@ class AgnoModelFactory:
         Raises:
             ValueError: If the provider is not supported
         """
+        provider = self._config.provider.lower()
+
+        # Per-request token injection bypasses the cache (Google only).
+        if gcp_access_token and provider == "google":
+            return self._create_google_model(gcp_access_token=gcp_access_token)
+
         if self._model is not None:
             return self._model
-
-        provider = self._config.provider.lower()
 
         if provider == "bedrock":
             self._model = await self._create_bedrock_model()
@@ -288,7 +296,7 @@ class AgnoModelFactory:
         logger.info(f"Creating Azure OpenAI model: {config.model_id}")
         return AzureOpenAI(**model_kwargs)
 
-    def _create_google_model(self) -> Any:
+    def _create_google_model(self, gcp_access_token: str | None = None) -> Any:
         """
         Create a Google Vertex AI model.
 
@@ -296,10 +304,9 @@ class AgnoModelFactory:
         - Claude models (model_id starts with "claude") use agno.models.vertexai.claude
         - All other models use agno.models.google.Gemini
 
-        Uses Vertex AI with Application Default Credentials (ADC):
-        - Works with GKE Workload Identity
-        - Auto-detects project_id from ADC or metadata service
-        - Auto-detects location from zone, with override option
+        Uses Vertex AI with Application Default Credentials (ADC) by default.
+        When ``gcp_access_token`` is provided, it is passed directly to the model
+        client so each request can authenticate with a short-lived JIT token.
 
         Raises:
             ValueError: If project_id or location cannot be determined
@@ -343,21 +350,30 @@ class AgnoModelFactory:
         logger.info(f"GCP model location: {location} ({location_source})")
 
         if is_claude:
-            return self._create_vertex_claude_model(project_id=project_id, location=location)
+            return self._create_vertex_claude_model(
+                project_id=project_id, location=location, gcp_access_token=gcp_access_token
+            )
 
-        return self._create_vertex_gemini_model(project_id=project_id, location=location)
+        return self._create_vertex_gemini_model(
+            project_id=project_id, location=location, gcp_access_token=gcp_access_token
+        )
 
-    def _create_vertex_claude_model(self, *, project_id: str, location: str) -> Any:
+    def _create_vertex_claude_model(
+        self, *, project_id: str, location: str, gcp_access_token: str | None = None
+    ) -> Any:
         """
         Create a Claude model via Google Vertex AI.
 
         Uses agno.models.vertexai.claude for Anthropic Claude models hosted
         on Vertex AI. Authentication is handled via Application Default
-        Credentials (ADC), same as the Gemini path.
+        Credentials (ADC) by default; when ``gcp_access_token`` is given it is
+        forwarded as ``client_params={"access_token": ...}`` which AnthropicVertex
+        accepts directly (bypasses ADC entirely for that request).
 
         Args:
             project_id: GCP project ID
             location: GCP region (e.g., us-east5)
+            gcp_access_token: Short-lived OAuth2 access token (optional)
 
         Raises:
             ImportError: If agno vertex AI claude package is not installed
@@ -381,20 +397,32 @@ class AgnoModelFactory:
             "temperature": config.temperature,
         }
 
-        logger.info(
-            f"Creating Vertex AI Claude model: {config.model_id} "
-            f"(project={project_id}, region={location})"
-        )
+        if gcp_access_token:
+            model_kwargs["client_params"] = {"access_token": gcp_access_token}
+            logger.info(
+                f"Creating Vertex AI Claude model with access token: {config.model_id} "
+                f"(project={project_id}, region={location})"
+            )
+        else:
+            logger.info(
+                f"Creating Vertex AI Claude model: {config.model_id} "
+                f"(project={project_id}, region={location})"
+            )
 
         return VertexClaude(**model_kwargs)
 
-    def _create_vertex_gemini_model(self, *, project_id: str, location: str) -> Any:
+    def _create_vertex_gemini_model(
+        self, *, project_id: str, location: str, gcp_access_token: str | None = None
+    ) -> Any:
         """
         Create a Gemini model via Google Vertex AI.
 
         Args:
             project_id: GCP project ID
             location: GCP region (e.g., us-central1)
+            gcp_access_token: Short-lived OAuth2 access token (optional).
+                When provided, ``google.oauth2.credentials.Credentials(token=...)``
+                is passed as the ``credentials`` kwarg, bypassing ADC.
 
         Raises:
             ImportError: If google-generativeai is not installed
@@ -418,10 +446,19 @@ class AgnoModelFactory:
             "location": location,
         }
 
-        logger.info(
-            f"Creating Vertex AI Gemini model: {config.model_id} "
-            f"(project={project_id}, location={location})"
-        )
+        if gcp_access_token:
+            from google.oauth2.credentials import Credentials
+
+            model_kwargs["credentials"] = Credentials(token=gcp_access_token)
+            logger.info(
+                f"Creating Vertex AI Gemini model with access token: {config.model_id} "
+                f"(project={project_id}, location={location})"
+            )
+        else:
+            logger.info(
+                f"Creating Vertex AI Gemini model: {config.model_id} "
+                f"(project={project_id}, location={location})"
+            )
 
         return Gemini(**model_kwargs)
 

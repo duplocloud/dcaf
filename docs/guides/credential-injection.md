@@ -133,6 +133,20 @@ Callers that haven't migrated to scopes can still pass a single base64-encoded k
 
 ---
 
+## GCP Access Token (LLM — Vertex AI)
+
+When a GCP scope carries `service-account-access-token`, DCAF automatically uses it to authenticate the **Vertex AI LLM call** in addition to subprocess tools. The flow is:
+
+1. `AgnoAdapter._extract_gcp_access_token()` finds the first GCP scope with the field.
+2. The token is passed to `AgnoModelFactory.create_model(gcp_access_token=...)`.
+3. **Gemini models**: `google.oauth2.credentials.Credentials(token=...)` is passed as the `credentials` kwarg — bypasses ADC entirely.
+4. **Vertex Claude models**: `client_params={"access_token": token}` is forwarded to `AnthropicVertex(access_token=...)` — also bypasses ADC.
+5. The model is **not cached** when a token is used; a fresh instance is created per request (short-lived tokens change per request).
+
+> **Note:** When no GCP access token is present, both models fall back to Application Default Credentials (ADC) as before. Existing ADC-based deployments (GKE Workload Identity, `GOOGLE_APPLICATION_CREDENTIALS`) are unaffected.
+
+---
+
 ## AWS Explicit Credentials (ModelFactory)
 
 When AWS credentials are passed via environment variables (`AWS_ACCESS_KEY_ID` + `AWS_SECRET_ACCESS_KEY`), `ModelFactory._create_bedrock_model()` creates an explicit `aioboto3.Session` with those credentials. This supports DuploCloud JIT (short-lived STS) credentials:

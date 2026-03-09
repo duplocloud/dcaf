@@ -946,5 +946,76 @@ class TestAgnoResponseConverterWithRealAgnoObjects:
         )
 
 
+class TestGcpTokenExtraction:
+    """Tests for AgnoAdapter._extract_gcp_access_token."""
+
+    def test_returns_none_for_none_context(self):
+        from dcaf.core.adapters.outbound.agno.adapter import AgnoAdapter
+
+        assert AgnoAdapter._extract_gcp_access_token(None) is None
+
+    def test_returns_none_when_no_scopes(self):
+        from dcaf.core.adapters.outbound.agno.adapter import AgnoAdapter
+
+        assert AgnoAdapter._extract_gcp_access_token({}) is None
+        assert AgnoAdapter._extract_gcp_access_token({"scopes": []}) is None
+
+    def test_returns_none_for_non_gcp_scopes(self):
+        from dcaf.core.adapters.outbound.agno.adapter import AgnoAdapter
+
+        ctx = {
+            "scopes": [
+                {
+                    "ProviderInfo": {"Type": "eks", "Name": "prod"},
+                    "Credential": {"Data": {"token": "k8s-token"}},
+                }
+            ]
+        }
+        assert AgnoAdapter._extract_gcp_access_token(ctx) is None
+
+    def test_returns_token_from_gcp_scope(self):
+        from dcaf.core.adapters.outbound.agno.adapter import AgnoAdapter
+
+        ctx = {
+            "scopes": [
+                {
+                    "ProviderInfo": {"Type": "gcp", "Name": "my-project"},
+                    "Credential": {"Data": {"service-account-access-token": "ya29.mytoken"}},
+                }
+            ]
+        }
+        assert AgnoAdapter._extract_gcp_access_token(ctx) == "ya29.mytoken"
+
+    def test_returns_none_when_gcp_scope_has_json_key_only(self):
+        from dcaf.core.adapters.outbound.agno.adapter import AgnoAdapter
+
+        ctx = {
+            "scopes": [
+                {
+                    "ProviderInfo": {"Type": "gcp", "Name": "my-project"},
+                    "Credential": {"Data": {"json_key": "base64json=="}},
+                }
+            ]
+        }
+        assert AgnoAdapter._extract_gcp_access_token(ctx) is None
+
+    def test_returns_first_gcp_token_when_multiple_scopes(self):
+        from dcaf.core.adapters.outbound.agno.adapter import AgnoAdapter
+
+        ctx = {
+            "scopes": [
+                {
+                    "ProviderInfo": {"Type": "eks", "Name": "k8s"},
+                    "Credential": {"Data": {"token": "k8s-token"}},
+                },
+                {
+                    "ProviderInfo": {"Type": "gcp", "Name": "gcp-proj"},
+                    "Credential": {"Data": {"service-account-access-token": "ya29.first"}},
+                },
+            ]
+        }
+        assert AgnoAdapter._extract_gcp_access_token(ctx) == "ya29.first"
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

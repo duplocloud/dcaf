@@ -653,8 +653,9 @@ class AgnoAdapter:
         Returns:
             Configured AgnoAgent
         """
-        # Create the model with async session
-        model = await self._get_or_create_model_async()
+        # Create the model with async session, passing any per-request GCP token
+        gcp_access_token = self._extract_gcp_access_token(platform_context)
+        model = await self._get_or_create_model_async(gcp_access_token=gcp_access_token)
 
         # Convert tools to Agno format and optionally prepend default toolkits
         agno_tools = self._prepare_tools_with_defaults(tools, platform_context)
@@ -758,12 +759,14 @@ class AgnoAdapter:
     # Model Creation (delegated to ModelFactory)
     # =========================================================================
 
-    async def _get_or_create_model_async(self) -> Any:
+    async def _get_or_create_model_async(self, gcp_access_token: str | None = None) -> Any:
         """
         Get or create the Agno model with async session.
 
         Delegates to the ModelFactory for provider-specific model creation.
         For Bedrock, this uses aioboto3 for true async AWS calls.
+        When ``gcp_access_token`` is provided the Google model is created fresh
+        (cache bypassed) with the short-lived token.
 
         Returns:
             An Agno model instance
@@ -772,7 +775,33 @@ class AgnoAdapter:
         self._model_factory._config.static_system = self._static_system
         self._model_factory._config.dynamic_system = self._dynamic_system
 
-        return await self._model_factory.create_model()
+        return await self._model_factory.create_model(gcp_access_token=gcp_access_token)
+
+    @staticmethod
+    def _extract_gcp_access_token(
+        platform_context: dict[str, Any] | None,
+    ) -> str | None:
+        """
+        Extract the GCP service-account-access-token from platform_context scopes.
+
+        Searches ``platform_context["scopes"]`` for the first GCP-type scope
+        that carries a ``service-account-access-token`` credential field.
+
+        Returns the token string, or ``None`` if not present.
+        """
+        if not platform_context:
+            return None
+        for scope in platform_context.get("scopes") or []:
+            if not isinstance(scope, dict):
+                continue
+            info = scope.get("ProviderInfo") or {}
+            if info.get("Type", "").lower() != "gcp":
+                continue
+            data = (scope.get("Credential") or {}).get("Data") or {}
+            token: str = data.get("service-account-access-token") or ""
+            if token:
+                return token
+        return None
 
     # =========================================================================
     # Tool Conversion
