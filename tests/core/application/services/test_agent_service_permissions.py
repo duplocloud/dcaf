@@ -103,8 +103,10 @@ class TestAgentServicePermissionBlocked:
         response = await service.execute(request)
 
         tool_call = response.tool_calls[0]
-        assert "deny" in (tool_call.rejection_reason or "").lower() or \
-               "blocked" in (tool_call.rejection_reason or "").lower()
+        assert (
+            "deny" in (tool_call.rejection_reason or "").lower()
+            or "blocked" in (tool_call.rejection_reason or "").lower()
+        )
 
 
 class TestAgentServicePermissionAllowed:

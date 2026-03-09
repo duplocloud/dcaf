@@ -110,7 +110,9 @@ class TestPlatformContextPermissions:
     def test_with_tracing_carries_permissions(self):
         from dcaf.core.domain.value_objects.permission import PermissionLayer, PermissionRule
 
-        layer = PermissionLayer(layer="global", list="deny", rules=(PermissionRule("Bash(rm -rf *)"),))
+        layer = PermissionLayer(
+            layer="global", list="deny", rules=(PermissionRule("Bash(rm -rf *)"),)
+        )
         ctx = PlatformContext(permissions=(layer,))
         ctx2 = ctx.with_tracing(user_id="alice")
         assert ctx2.permissions == ctx.permissions
@@ -118,7 +120,9 @@ class TestPlatformContextPermissions:
     def test_with_extra_carries_permissions(self):
         from dcaf.core.domain.value_objects.permission import PermissionLayer, PermissionRule
 
-        layer = PermissionLayer(layer="global", list="deny", rules=(PermissionRule("Bash(rm -rf *)"),))
+        layer = PermissionLayer(
+            layer="global", list="deny", rules=(PermissionRule("Bash(rm -rf *)"),)
+        )
         ctx = PlatformContext(permissions=(layer,))
         ctx2 = ctx.with_extra(foo="bar")
         assert ctx2.permissions == ctx.permissions
@@ -126,12 +130,16 @@ class TestPlatformContextPermissions:
     def test_with_scope_carries_permissions(self):
         from dcaf.core.domain.value_objects.permission import PermissionLayer, PermissionRule
 
-        layer = PermissionLayer(layer="global", list="deny", rules=(PermissionRule("Bash(rm -rf *)"),))
+        layer = PermissionLayer(
+            layer="global", list="deny", rules=(PermissionRule("Bash(rm -rf *)"),)
+        )
         ctx = PlatformContext(permissions=(layer,))
-        scope = Scope.from_dict({
-            "ProviderInfo": {"Type": "eks", "Name": "prod", "AccountId": "https://api"},
-            "Credential": {"Data": {"token": "t", "base64certdata": "c"}},
-        })
+        scope = Scope.from_dict(
+            {
+                "ProviderInfo": {"Type": "eks", "Name": "prod", "AccountId": "https://api"},
+                "Credential": {"Data": {"token": "t", "base64certdata": "c"}},
+            }
+        )
         ctx2 = ctx.with_scope(scope)
         assert ctx2.permissions == ctx.permissions
 
