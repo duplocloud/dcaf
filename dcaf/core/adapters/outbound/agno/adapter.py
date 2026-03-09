@@ -268,6 +268,20 @@ class AgnoAdapter:
     # Async Interface (FastAPI runs in async context)
     # =========================================================================
 
+    def _log_platform_context(self, platform_context: dict[str, Any] | None) -> None:
+        if platform_context is None:
+            logger.debug("  Platform Context: None")
+            return
+        scopes = platform_context.get("scopes", [])
+        logger.debug(f"  Platform Context: {len(scopes)} scope(s)")
+        for i, s in enumerate(scopes):
+            info = s.get("ProviderInfo", {})
+            cred_keys = list((s.get("Credential") or {}).get("Data", {}).keys())
+            logger.debug(
+                f"    [{i}] type={info.get('Type')} name={info.get('Name')} "
+                f"account={info.get('AccountId')} credential_fields={cred_keys}"
+            )
+
     async def invoke(
         self,
         messages: list[Any],
@@ -310,7 +324,7 @@ class AgnoAdapter:
         logger.debug(f"  System Prompt: {system_prompt}")
         logger.debug(f"  Static System Prompt: {static_system}")
         logger.debug(f"  Dynamic System Prompt: {dynamic_system}")
-        logger.debug(f"  Platform Context: {platform_context}")
+        self._log_platform_context(platform_context)
 
         # Store system prompt parts for model creation (if using caching)
         self._static_system = static_system
@@ -404,7 +418,7 @@ class AgnoAdapter:
         logger.debug(f"  System Prompt: {system_prompt}")
         logger.debug(f"  Static System Prompt: {static_system}")
         logger.debug(f"  Dynamic System Prompt: {dynamic_system}")
-        logger.debug(f"  Platform Context: {platform_context}")
+        self._log_platform_context(platform_context)
 
         # Store system prompt parts for model creation (if using caching)
         self._static_system = static_system

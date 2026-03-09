@@ -560,6 +560,24 @@ Complete examples available in the repository:
 - `examples/gemini_tools.py` - Tool use with Gemini
 - `examples/gemini_multi_agent.py` - Multi-agent with Gemini
 
+## DuploCloud / JIT Credential Injection
+
+When DCAF is deployed inside DuploCloud (e.g. on GKE), Vertex AI credentials can be injected at request time via `platform_context` instead of relying on static ADC. This is the preferred approach for short-lived (JIT) credentials.
+
+### How it works
+
+1. The caller includes a GCP scope with a `service-account-access-token` in `platform_context.scopes`.
+2. DCAF extracts the token and passes it directly to the Vertex AI client — bypassing ADC entirely.
+3. **Gemini models** use `google.oauth2.credentials.Credentials(token=...)` as the `credentials` kwarg.
+4. **Vertex Claude models** use `AnthropicVertex(access_token=...)`.
+5. The model instance is **not cached** for token-authenticated requests (tokens are short-lived and change per request).
+
+When no token is present, both models fall back to ADC as normal — existing GKE Workload Identity or `GOOGLE_APPLICATION_CREDENTIALS` deployments are unaffected.
+
+For full wire-format details and how the `CredentialManager` handles GCP scopes for subprocess tools, see the [Credential Injection guide](credential-injection.md#gcp-access-token-llm-vertex-ai).
+
+---
+
 ## Resources
 
 - [Vertex AI Documentation](https://cloud.google.com/vertex-ai/docs)
