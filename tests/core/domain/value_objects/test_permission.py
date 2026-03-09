@@ -1,7 +1,5 @@
 """Tests for PermissionRule and PermissionLayer value objects."""
 
-import pytest
-
 from dcaf.core.domain.value_objects.permission import PermissionLayer, PermissionRule
 
 

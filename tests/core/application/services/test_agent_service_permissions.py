@@ -2,15 +2,11 @@
 
 from typing import Any
 
-import pytest
-
 from dcaf.core.application.dto.requests import AgentRequest
 from dcaf.core.application.dto.responses import AgentResponse, ToolCallDTO
 from dcaf.core.application.services.agent_service import AgentService
 from dcaf.core.domain.entities import Message
-from dcaf.core.domain.value_objects.platform_context import PlatformContext
 from dcaf.core.testing import FakeConversationRepository, FakeEventPublisher
-
 
 # ---------------------------------------------------------------------------
 # Fake runtime that injects tool calls into the response
