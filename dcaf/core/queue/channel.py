@@ -33,7 +33,7 @@ import contextlib
 import json
 import logging
 from collections.abc import Awaitable, Callable
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any, Protocol, runtime_checkable
 
 from pydantic import BaseModel, Field
@@ -200,7 +200,7 @@ class AgentChannel:
             subjects=[CHANNEL_IN_SUBJECT_PATTERN],
             retention=RetentionPolicy.WORK_QUEUE,
             storage=StorageType.FILE,
-            max_age=7 * 24 * 3600,  # 7 days in seconds
+            max_age=timedelta(days=7).total_seconds(),
         )
         try:
             await self._js.stream_info(CHANNEL_IN_STREAM)  # type: ignore[attr-defined]
@@ -219,7 +219,7 @@ class AgentChannel:
             subjects=[CHANNEL_OUT_SUBJECT_PATTERN],
             retention=RetentionPolicy.LIMITS,
             storage=StorageType.FILE,
-            max_age=7 * 24 * 3600,  # 7 days in seconds
+            max_age=timedelta(days=7).total_seconds(),
             max_msgs_per_subject=10_000,
         )
         try:
