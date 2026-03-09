@@ -46,7 +46,7 @@ Example - With custom routes:
 
 import inspect
 import logging
-from collections.abc import Callable, Iterator, Sequence
+from collections.abc import AsyncGenerator, Callable, Iterator, Sequence
 from typing import TYPE_CHECKING, Any, Union
 
 from .agent import Agent
@@ -58,6 +58,7 @@ if TYPE_CHECKING:
     from ..channel_routing import ChannelResponseRouter
     from .a2a.models import AgentCard
     from .primitives import AgentResult
+    from .queue.interface import JobQueue
     from .schemas.messages import AgentMessage
     from .session import Session
 
@@ -96,6 +97,9 @@ def serve(
     mcp_transport: str = DEFAULT_MCP_TRANSPORT,
     ws_ping_interval: float | None = DEFAULT_WS_PING_INTERVAL,
     ws_ping_timeout: float | None = DEFAULT_WS_PING_TIMEOUT,
+    queue_nats_url: str | None = None,
+    queue_agent_name: str | None = None,
+    queue: "JobQueue | None" = None,
 ) -> None:
     """
     Start a REST server for the agent.
@@ -250,6 +254,9 @@ def serve(
         a2a=a2a,
         a2a_adapter=a2a_adapter,
         a2a_agent_card=a2a_agent_card,
+        queue_nats_url=queue_nats_url,
+        queue_agent_name=queue_agent_name,
+        queue=queue,
     )
 
     logger.info(f"Starting DCAF server at http://{host}:{port}")
@@ -301,6 +308,9 @@ def create_app(
     a2a: bool = False,
     a2a_adapter: str = "agno",  # noqa: ARG001 - Reserved for future A2A adapter selection
     a2a_agent_card: "AgentCard | dict | None" = None,
+    queue_nats_url: str | None = None,
+    queue_agent_name: str | None = None,
+    queue: "JobQueue | None" = None,
 ) -> "FastAPI":
     """
     Create a FastAPI application for the agent without starting the server.
@@ -380,14 +390,38 @@ def create_app(
         def status():
             return {"agents_running": 1}
     """
+    import contextlib
+
     from fastapi import Body, FastAPI, HTTPException
     from fastapi.responses import StreamingResponse
 
     # Create the appropriate adapter based on agent type
     adapter = _create_adapter(agent)
 
+    # Optionally create NATS job queue.
+    # Prefer an externally-created instance (queue=) so the caller can share
+    # the same NatsJobQueue between the HTTP server and a background worker,
+    # which is required for the in-memory event buffer to stay consistent.
+    # Fall back to creating one from queue_nats_url when no instance is given.
+    queue_backend = queue
+    if queue_backend is None and queue_nats_url:
+        from .queue.nats_js import NatsJobQueue
+
+        queue_backend = NatsJobQueue(
+            nats_url=queue_nats_url,
+            agent_name=queue_agent_name or "default",
+        )
+
+    @contextlib.asynccontextmanager
+    async def _lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+        if queue_backend is not None:
+            await queue_backend.connect()
+        yield
+        if queue_backend is not None:
+            await queue_backend.close()
+
     # Create FastAPI app
-    app = FastAPI(title="DCAF Core Chat Service", version="2.0.0")
+    app = FastAPI(title="DCAF Core Chat Service", version="2.0.0", lifespan=_lifespan)
 
     # Health endpoint
     @app.get("/health", tags=["system"])
@@ -415,6 +449,18 @@ def create_app(
             should_respond = channel_router.should_agent_respond(raw_body["messages"])
             if not should_respond.get("should_respond", True):
                 return {"role": "assistant", "content": ""}
+
+        # Async queue mode: publish job and return job_id immediately
+        if raw_body.get("queue") and queue_backend is not None:
+            from .queue.models import JobRequest
+
+            job = JobRequest(
+                agent_name=queue_agent_name or "default",
+                messages=raw_body["messages"],
+                request_fields={k: v for k, v in request_fields.items() if k != "queue"},
+            )
+            job_id = await queue_backend.enqueue(job)
+            return {"job_id": job_id, "status": "queued"}
 
         # Build the input dict for the agent
         agent_input: dict[str, Any] = {"messages": raw_body["messages"]}
@@ -550,6 +596,15 @@ def create_app(
             raise RuntimeError(
                 "A2A support requires additional dependencies. Install with: pip install httpx"
             ) from e
+
+    # Add job queue router when queue backend is configured
+    if queue_backend is not None:
+        from .queue.router import create_queue_router
+
+        app.include_router(create_queue_router(queue_backend))
+        logger.info(
+            "Job queue endpoints enabled: GET /api/jobs/{job_id}, GET /api/jobs/{job_id}/events"
+        )
 
     # Add any additional routers
     if additional_routers:

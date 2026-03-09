@@ -9,9 +9,9 @@ site_author: DuploCloud
 site_url: https://duplocloud.github.io/dcaf/
 
 repo_name: duplocloud/dcaf
-repo_url: https://github.com/duplocloud/service-desk-agents
+repo_url: https://github.com/duplocloud/dcaf
 
-copyright: Copyright &copy; 2024 DuploCloud
+copyright: Copyright &copy; 2026 DuploCloud
 
 theme:
   name: material
@@ -141,9 +141,12 @@ nav:
   - Guides:
     - Custom Agents: guides/custom-agents.md
     - Building Tools: guides/building-tools.md
+    - Agno Toolkits: guides/agno-toolkits.md
+    - Skills: guides/skills.md
     - MCP Tools (External): guides/mcp-tools.md
     - Tracing & Observability: guides/tracing-observability.md
     - Environment Configuration: guides/environment-configuration.md
+    - Credential Injection: guides/credential-injection.md
     - Session Management: guides/session-management.md
     - Interceptors: guides/interceptors.md
     - Framework Adapters: guides/framework-adapters.md
@@ -153,7 +156,11 @@ nav:
     - Prompt Caching: guides/prompt-caching.md
     - Message Protocol: guides/message-protocol.md
     - Streaming Responses: guides/streaming.md
+    - Emitting Events: guides/emitting-events.md
+    - System Events: guides/system-events.md
     - Event Subscriptions: guides/event-subscriptions.md
+    - Async Job Queue: guides/async-job-queue.md
+    - Agent Channel & Worker: guides/agent-channel.md
     - Documentation Versioning: guides/versioning.md
   
   - Architecture:
@@ -168,6 +175,7 @@ nav:
       - "005: Cohesive Provider Modules": adrs/005-cohesive-provider-modules.md
       - "006: Strangler Fig Migration": adrs/006-strangler-fig-migration.md
       - "007: Lowercase Chat Endpoints": adrs/007-lowercase-chat-endpoints.md
+      - "008: Skills Design Decisions": adrs/008-skills-design-decisions.md
   
   - Examples: examples/examples.md
 
@@ -179,10 +187,9 @@ extra:
     - icon: fontawesome/brands/twitter
       link: https://twitter.com/duplocloud
   
-  # Version provider for mike (only enable when deploying with mike)
-  # version:
-  #   provider: mike
-  #   default: latest
+  version:
+    provider: mike
+    default: latest
 
 # Temporarily disabled to debug code block issue
 # extra_css:

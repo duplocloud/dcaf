@@ -19,18 +19,18 @@ class _FakeLLM:
 
 
 def _tool_response(should_respond: bool, reasoning: str = "") -> LLMResponse:
-    """Build an LLMResponse with a tool call on the raw response."""
-    raw = MagicMock()
-    raw.tool_calls = [
-        {
-            "name": "slack_routing_decision",
-            "input": {
-                "should_respond": should_respond,
-                "reasoning": reasoning,
-            },
-        }
-    ]
-    return LLMResponse(raw=raw)
+    """Build an LLMResponse with a tool call."""
+    return LLMResponse(
+        tool_calls=[
+            {
+                "name": "slack_routing_decision",
+                "input": {
+                    "should_respond": should_respond,
+                    "reasoning": reasoning,
+                },
+            }
+        ],
+    )
 
 
 class TestSlackResponseRouter:

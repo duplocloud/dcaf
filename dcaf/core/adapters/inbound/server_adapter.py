@@ -15,19 +15,35 @@ Example:
 """
 
 import logging
-from collections.abc import AsyncIterator
+import os
+import shutil
+import subprocess
+import tempfile
+from collections.abc import AsyncIterator, Callable
 from typing import Any, cast
 
 from ....schemas.events import (
+    ApprovalsEvent,
     DoneEvent,
     ErrorEvent,
+    ExecutedApprovalsEvent,
+    ExecutedCommandsEvent,
     ExecutedToolCallsEvent,
     StreamEvent,
+    ToolCallsEvent,
 )
-from ....schemas.messages import AgentMessage, ExecutedToolCall
+from ....schemas.messages import (
+    AgentMessage,
+    Approval,
+    ExecutedApproval,
+    ExecutedCommand,
+    ExecutedToolCall,
+)
 from ...agent import Agent
 
 logger = logging.getLogger(__name__)
+
+ExecutorFn = Callable[[str, list[dict[str, Any]] | None, dict[str, Any] | None], str]
 
 
 class ServerAdapter:
@@ -45,6 +61,13 @@ class ServerAdapter:
 
     Args:
         agent: The Core Agent instance to wrap
+        execute_cmd: Optional custom command executor. When provided, replaces the
+            built-in subprocess implementation for all command execution paths.
+            Signature: ``(command: str, files: list[dict] | None, context: dict | None) -> str``
+
+            Use this for domain-specific execution: kubeconfig injection, sandboxing,
+            timeouts, environment setup. ``context`` carries the full platform_context
+            including ``thread_id`` if sent by the client.
 
     Example:
         from dcaf.core import Agent
@@ -64,10 +87,26 @@ class ServerAdapter:
         # Create and run the app
         app = create_chat_app(adapter)
         uvicorn.run(app, host="0.0.0.0", port=8000)
+
+        # Custom executor with kubeconfig injection
+        import os, subprocess
+
+        def k8s_executor(command, files, context):
+            env = os.environ.copy()
+            env["KUBECONFIG"] = (context or {}).get("kubeconfig_path", "")
+            result = subprocess.run(command, shell=True, env=env, capture_output=True, text=True)
+            return result.stdout
+
+        adapter = ServerAdapter(agent, execute_cmd=k8s_executor)
     """
 
-    def __init__(self, agent: Agent):
+    def __init__(
+        self,
+        agent: Agent,
+        execute_cmd: ExecutorFn | None = None,
+    ) -> None:
         self.agent = agent
+        self._cmd_executor = execute_cmd
 
     async def invoke(self, messages: dict[str, list[dict[str, Any]]]) -> AgentMessage:
         """
@@ -97,22 +136,17 @@ class ServerAdapter:
         # Check for approved tool calls that need to be processed
         executed_tool_calls = self._process_approved_tool_calls(messages_list, context)
 
-        # Convert to Core format (simple list of dicts with role/content)
-        core_messages = self._convert_messages(messages_list)
+        # Process legacy command approvals
+        executed_commands = self._process_approved_commands(messages_list, context)
 
-        # Inject executed tool results into conversation so the LLM can see them.
-        # Replace the last user message (the approval text) to maintain strict
-        # user/assistant alternation required by Bedrock.
-        if executed_tool_calls:
-            result_parts = [
-                f"Tool result for {tc.name} with inputs {tc.input}: {tc.output}"
-                for tc in executed_tool_calls
-            ]
-            result_content = "\n\n".join(result_parts)
-            if core_messages and core_messages[-1]["role"] == "user":
-                core_messages[-1]["content"] = result_content
-            else:
-                core_messages.append({"role": "user", "content": result_content})
+        # Process unified approvals
+        executed_approvals = self._process_approvals(messages_list, context)
+
+        # Convert to Core format and inject execution results
+        core_messages = self._convert_messages(messages_list)
+        self._inject_execution_results(
+            core_messages, executed_tool_calls, executed_commands, executed_approvals
+        )
 
         if not core_messages:
             return AgentMessage(content="No messages provided.")
@@ -127,9 +161,13 @@ class ServerAdapter:
             # Convert to AgentMessage using native to_message()
             agent_msg = response.to_message()
 
-            # Add any executed tool calls from this request
+            # Add any executed results from this request
             if executed_tool_calls:
-                agent_msg.data.executed_tool_calls.extend(executed_tool_calls)  # type: ignore[arg-type]
+                agent_msg.data.executed_tool_calls.extend(executed_tool_calls)
+            if executed_commands:
+                agent_msg.data.executed_cmds.extend(executed_commands)
+            if executed_approvals:
+                agent_msg.data.executed_approvals.extend(executed_approvals)
 
             # If there are pending approvals, ensure helpful content
             if response.needs_approval and not agent_msg.content:
@@ -171,22 +209,21 @@ class ServerAdapter:
         if executed_tool_calls:
             yield ExecutedToolCallsEvent(executed_tool_calls=executed_tool_calls)
 
-        # Convert to Core format
-        core_messages = self._convert_messages(messages_list)
+        # Process legacy command approvals
+        executed_commands = self._process_approved_commands(messages_list, context)
+        if executed_commands:
+            yield ExecutedCommandsEvent(executed_cmds=executed_commands)
 
-        # Inject executed tool results into conversation so the LLM can see them.
-        # Replace the last user message (the approval text) to maintain strict
-        # user/assistant alternation required by Bedrock.
-        if executed_tool_calls:
-            result_parts = [
-                f"Tool result for {tc.name} with inputs {tc.input}: {tc.output}"
-                for tc in executed_tool_calls
-            ]
-            result_content = "\n\n".join(result_parts)
-            if core_messages and core_messages[-1]["role"] == "user":
-                core_messages[-1]["content"] = result_content
-            else:
-                core_messages.append({"role": "user", "content": result_content})
+        # Process unified approvals
+        executed_approvals = self._process_approvals(messages_list, context)
+        if executed_approvals:
+            yield ExecutedApprovalsEvent(executed_approvals=executed_approvals)
+
+        # Convert to Core format and inject execution results
+        core_messages = self._convert_messages(messages_list)
+        self._inject_execution_results(
+            core_messages, executed_tool_calls, executed_commands, executed_approvals
+        )
 
         if not core_messages:
             yield ErrorEvent(error="No messages provided")
@@ -201,11 +238,59 @@ class ServerAdapter:
                 # Echo top-level request fields in DoneEvent for client correlation
                 if isinstance(event, DoneEvent) and request_fields:
                     event.meta_data["request_context"] = request_fields
-                yield event  # type: ignore[misc]
+
+                # Gap 1: translate ToolCallsEvent → ApprovalsEvent for unified approval clients
+                # ApprovalsEvent is emitted first; ToolCallsEvent follows for backward compat
+                if isinstance(event, ToolCallsEvent) and event.tool_calls:
+                    approvals = [
+                        Approval(
+                            id=tc.id,
+                            type="tool_call",
+                            name=tc.name,
+                            input=tc.input,
+                            description=tc.tool_description,
+                            intent=tc.intent,
+                        )
+                        for tc in event.tool_calls
+                    ]
+                    yield ApprovalsEvent(approvals=approvals)
+
+                yield event
 
         except Exception as e:
             logger.exception(f"Stream error: {e}")
             yield ErrorEvent(error=str(e))
+
+    def _inject_execution_results(
+        self,
+        core_messages: list[dict[str, Any]],
+        executed_tool_calls: list[ExecutedToolCall],
+        executed_commands: list[ExecutedCommand],
+        executed_approvals: list[ExecutedApproval],
+    ) -> None:
+        """Inject tool/command/approval results into the conversation as a user message."""
+        parts: list[str] = []
+        if executed_tool_calls:
+            parts.extend(
+                f"Tool result for {tc.name} with inputs {tc.input}: {tc.output}"
+                for tc in executed_tool_calls
+            )
+        if executed_commands:
+            parts.extend(
+                f"Executed command: {ec.command}\nOutput: {ec.output}" for ec in executed_commands
+            )
+        if executed_approvals:
+            parts.extend(
+                f"Tool result for {ea.name} with inputs {ea.input}: {ea.output}"
+                for ea in executed_approvals
+            )
+        if not parts:
+            return
+        result_content = "\n\n".join(parts)
+        if core_messages and core_messages[-1]["role"] == "user":
+            core_messages[-1]["content"] += "\n\n" + result_content
+        else:
+            core_messages.append({"role": "user", "content": result_content})
 
     def _convert_messages(self, messages_list: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """
@@ -222,12 +307,18 @@ class ServerAdapter:
 
             # Only include user and assistant messages
             if role in ["user", "assistant"]:
-                core_messages.append(
-                    {
-                        "role": role,
-                        "content": content,
-                    }
-                )
+                # Re-inject prior execution history so the LLM has context across
+                # turns. Clients send back executed_cmds / executed_tool_calls /
+                # executed_approvals from previous turns in every request.
+                if role == "user":
+                    data = msg.get("data", {})
+                    for ec in data.get("executed_cmds", []):
+                        content += f"\n\nPreviously executed: {ec.get('command', '')}\nOutput: {ec.get('output', '')}"
+                    for tc in data.get("executed_tool_calls", []):
+                        content += f"\n\nPreviously executed tool: {tc.get('name', '')} with inputs {tc.get('input', {})}\nOutput: {tc.get('output', '')}"
+                    for ea in data.get("executed_approvals", []):
+                        content += f"\n\nPreviously executed: {ea.get('name', '')} with inputs {ea.get('input', {})}\nOutput: {ea.get('output', '')}"
+                core_messages.append({"role": role, "content": content})
 
         return core_messages
 
@@ -321,3 +412,152 @@ class ServerAdapter:
                     return f"Error executing {tool_name}: {str(e)}"
 
         return f"Tool '{tool_name}' not found"
+
+    def _execute_cmd(
+        self,
+        command: str,
+        files: list[dict[str, Any]] | None = None,
+        context: dict[str, Any] | None = None,
+    ) -> str:
+        """Execute a shell command. If a custom executor was provided at construction,
+        it is called instead of the built-in subprocess implementation.
+
+        If files are provided (in the default path), they are written to a temporary
+        directory which is used as the working directory for the command. The directory
+        is always cleaned up after execution, even on error.
+        """
+        if self._cmd_executor is not None:
+            return self._cmd_executor(command, files, context)
+
+        work_dir: str | None = None
+        try:
+            if files:
+                work_dir = tempfile.mkdtemp()
+                written_names: set[str] = set()
+                for f in files:
+                    # Use basename only — never allow path traversal.
+                    # The `or "file"` guard handles the empty-string case
+                    # (f.get default only fires when the key is absent).
+                    safe_name = os.path.basename(f.get("file_path", "") or "file")
+                    if safe_name in written_names:
+                        logger.warning(
+                            "Duplicate filename '%s' in files list; overwriting previous content",
+                            safe_name,
+                        )
+                    written_names.add(safe_name)
+                    with open(os.path.join(work_dir, safe_name), "w") as fh:
+                        fh.write(f.get("file_content", ""))
+
+            result = subprocess.run(  # noqa: S602
+                command,
+                shell=True,
+                capture_output=True,
+                text=True,
+                cwd=work_dir,
+            )
+            output = result.stdout
+            if result.stderr:
+                output = (
+                    (output + f"\n\nErrors:\n{result.stderr}")
+                    if output
+                    else f"Errors:\n{result.stderr}"
+                )
+            return output or "Command executed successfully with no output."
+        except Exception as e:
+            logger.error("Error executing command: %s", e)
+            return f"Error executing command: {e}"
+        finally:
+            if work_dir:
+                shutil.rmtree(work_dir, ignore_errors=True)
+
+    def _process_approved_commands(
+        self,
+        messages_list: list[dict[str, Any]],
+        context: dict[str, Any] | None = None,
+    ) -> list[ExecutedCommand]:
+        """
+        Process approved/rejected commands from the legacy cmds field.
+
+        Reads data.cmds[] from the latest message. Approved commands are
+        executed via subprocess; rejected commands record the rejection reason.
+        """
+        executed: list[ExecutedCommand] = []
+
+        if not messages_list:
+            return executed
+
+        latest_message = messages_list[-1]
+        cmds = latest_message.get("data", {}).get("cmds", [])
+
+        for cmd in cmds:
+            command = cmd.get("command", "")
+            files = cmd.get("files") or None  # list[dict] | None
+            if cmd.get("execute", False):
+                logger.info("Executing approved command: %s", command)
+                output = self._execute_cmd(command, files=files, context=context)
+                executed.append(ExecutedCommand(command=command, output=output))
+            elif cmd.get("rejection_reason"):
+                executed.append(
+                    ExecutedCommand(
+                        command=command,
+                        output=f"Rejected: {cmd['rejection_reason']}",
+                    )
+                )
+
+        return executed
+
+    def _process_approvals(
+        self,
+        messages_list: list[dict[str, Any]],
+        platform_context: dict[str, Any],
+    ) -> list[ExecutedApproval]:
+        """
+        Process approved/rejected items from the unified approvals field.
+
+        Reads data.approvals[] from the latest message. For each:
+        - If execute=True: runs the tool via _execute_tool() and captures output
+        - If rejection_reason is set: captures the rejection as output
+        """
+        executed: list[ExecutedApproval] = []
+
+        if not messages_list:
+            return executed
+
+        latest_message = messages_list[-1]
+        data = latest_message.get("data", {})
+        approvals = data.get("approvals", [])
+
+        for approval in approvals:
+            approval_id = approval.get("id", "")
+            approval_type = approval.get("type", "")
+            name = approval.get("name", "")
+            tool_input = approval.get("input", {})
+
+            if approval.get("execute", False):
+                if approval_type == "command":
+                    result = self._execute_cmd(
+                        tool_input.get("command", name), files=None, context=platform_context
+                    )
+                else:
+                    result = self._execute_tool(name, tool_input, platform_context)
+                executed.append(
+                    ExecutedApproval(
+                        id=approval_id,
+                        type=approval_type,
+                        name=name,
+                        input=tool_input,
+                        output=result,
+                    )
+                )
+            elif approval.get("rejection_reason"):
+                executed.append(
+                    ExecutedApproval(
+                        id=approval_id,
+                        type=approval_type,
+                        name=name,
+                        input=tool_input,
+                        output=f"Rejected: {approval['rejection_reason']}",
+                    )
+                )
+
+        return executed

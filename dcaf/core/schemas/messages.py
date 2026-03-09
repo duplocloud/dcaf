@@ -1,48 +1,53 @@
 from datetime import UTC, datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl
+from pydantic import BaseModel, ConfigDict, Field
+
+# Re-export shared wire-format types from the canonical public module so that
+# isinstance() checks work correctly regardless of which namespace the caller
+# imports from.  dcaf.schemas is the dependency-free source of truth; dcaf.core
+# is allowed to import from it (no contract violation).
+from ...schemas.messages import (
+    Approval,
+    Command,
+    ExecutedApproval,
+    ExecutedCommand,
+    ExecutedToolCall,
+    FileObject,
+    ToolCall,
+    URLConfig,
+)
+
+__all__ = [
+    "Approval",
+    "Command",
+    "ExecutedApproval",
+    "ExecutedCommand",
+    "ExecutedToolCall",
+    "FileObject",
+    "SkillDefinitionSchema",
+    "ToolCall",
+    "URLConfig",
+    "PlatformContext",
+    "AmbientContext",
+    "Data",
+    "User",
+    "Agent",
+    "Message",
+    "UserMessage",
+    "AgentMessage",
+    "Messages",
+]
 
 
-class FileObject(BaseModel):
-    file_path: str
-    file_content: str
-    refers_persistent_file: str | None = None  # From main: reference to persistent file storage
+class SkillDefinitionSchema(BaseModel):
+    """Wire-format schema for a skill definition in platform context."""
 
-
-class Command(BaseModel):
-    command: str
-    execute: bool = False
-    rejection_reason: str | None = None
-    files: list[FileObject] | None = None
-
-
-class ExecutedCommand(BaseModel):
-    command: str
-    output: str
-
-
-class ToolCall(BaseModel):
-    id: str
     name: str
-    input: dict[str, Any]
-    execute: bool = False
-    tool_description: str
-    input_description: dict[str, Any]
-    intent: str | None = None
-    rejection_reason: str | None = None
-
-
-class ExecutedToolCall(BaseModel):
-    id: str
-    name: str
-    input: dict[str, Any]
-    output: str
-
-
-class URLConfig(BaseModel):
-    url: HttpUrl
-    description: str
+    version: str
+    url: str
+    s3_path: str | None = None
+    content: str | None = None
 
 
 class PlatformContext(BaseModel):
@@ -72,6 +77,9 @@ class PlatformContext(BaseModel):
     aws_credentials: dict[str, Any] | None = None
     aws_region: str | None = None
 
+    # Skills to load into the agent
+    skills: list[SkillDefinitionSchema] = Field(default_factory=list)
+
     # Scopes (evolving — kept generic intentionally)
     scopes: list[dict[str, Any]] = Field(default_factory=list)
 
@@ -84,10 +92,14 @@ class AmbientContext(BaseModel):
 
 
 class Data(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
     cmds: list[Command] = Field(default_factory=list)
     executed_cmds: list[ExecutedCommand] = Field(default_factory=list)
     tool_calls: list[ToolCall] = Field(default_factory=list)
     executed_tool_calls: list[ExecutedToolCall] = Field(default_factory=list)
+    approvals: list[Approval] = Field(default_factory=list)
+    executed_approvals: list[ExecutedApproval] = Field(default_factory=list)
     url_configs: list[URLConfig] = Field(default_factory=list)
     user_file_uploads: list[FileObject] = Field(
         default_factory=list

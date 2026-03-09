@@ -98,6 +98,96 @@ class TestMCPToolInitialization:
         assert mcp._post_hook is None
 
 
+class TestMCPToolHeaders:
+    """Test headers parameter support."""
+
+    def test_headers_stored_on_init(self):
+        """Should store headers dict when provided."""
+        from dcaf.mcp import MCPTool
+
+        headers = {"Authorization": "Bearer token123"}
+        mcp = MCPTool(
+            url="http://localhost:8000/mcp",
+            transport="streamable-http",
+            headers=headers,
+        )
+        assert mcp._headers == headers
+
+    def test_headers_none_by_default(self):
+        """Headers should default to None when not provided."""
+        from dcaf.mcp import MCPTool
+
+        mcp = MCPTool(url="http://localhost:8000/mcp", transport="streamable-http")
+        assert mcp._headers is None
+
+    def test_headers_raises_for_stdio_transport(self):
+        """Should raise ValueError if headers used with stdio transport."""
+        from dcaf.mcp import MCPTool
+
+        with pytest.raises(ValueError, match="headers.*only supported.*sse.*streamable-http"):
+            MCPTool(
+                command="python server.py",
+                transport="stdio",
+                headers={"Authorization": "Bearer token"},
+            )
+
+    def test_headers_allowed_with_sse_transport(self):
+        """Should accept headers with sse transport."""
+        from dcaf.mcp import MCPTool
+
+        mcp = MCPTool(
+            url="http://localhost:8000/mcp",
+            transport="sse",
+            headers={"Authorization": "Bearer token"},
+        )
+        assert mcp._headers == {"Authorization": "Bearer token"}
+
+    def test_headers_forwarded_as_header_provider(self):
+        """Should forward headers as header_provider callable to Agno MCPTools."""
+        pytest.importorskip("mcp", reason="MCP package not installed")
+        from dcaf.mcp import MCPTool
+
+        headers = {"Authorization": "Bearer token123"}
+        mcp = MCPTool(
+            url="http://localhost:8000/mcp",
+            transport="streamable-http",
+            headers=headers,
+        )
+
+        with patch("agno.tools.mcp.MCPTools") as MockAgnoMCPTools:
+            mock_instance = Mock()
+            mock_instance.functions = {}
+            MockAgnoMCPTools.return_value = mock_instance
+
+            mcp._create_agno_mcp_tools()
+
+            # Verify header_provider was passed
+            call_kwargs = MockAgnoMCPTools.call_args[1]
+            assert "header_provider" in call_kwargs
+            assert callable(call_kwargs["header_provider"])
+            assert call_kwargs["header_provider"]() == headers
+
+    def test_no_header_provider_when_headers_none(self):
+        """Should not pass header_provider when headers is None."""
+        pytest.importorskip("mcp", reason="MCP package not installed")
+        from dcaf.mcp import MCPTool
+
+        mcp = MCPTool(
+            url="http://localhost:8000/mcp",
+            transport="streamable-http",
+        )
+
+        with patch("agno.tools.mcp.MCPTools") as MockAgnoMCPTools:
+            mock_instance = Mock()
+            mock_instance.functions = {}
+            MockAgnoMCPTools.return_value = mock_instance
+
+            mcp._create_agno_mcp_tools()
+
+            call_kwargs = MockAgnoMCPTools.call_args[1]
+            assert call_kwargs.get("header_provider") is None
+
+
 class TestMCPToolNotConnectedErrors:
     """Test that appropriate errors are raised when not connected."""
 

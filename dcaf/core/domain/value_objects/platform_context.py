@@ -3,6 +3,8 @@
 from dataclasses import dataclass
 from typing import Any
 
+from dcaf.core.domain.value_objects.scope import Scope
+
 
 @dataclass(frozen=True)
 class PlatformContext:
@@ -44,6 +46,9 @@ class PlatformContext:
     run_id: str | None = None  # Unique identifier for this execution run
     request_id: str | None = None  # HTTP request correlation ID
 
+    # Cloud provider credential scopes
+    scopes: tuple["Scope", ...] = ()
+
     # Additional context can be stored here
     _extra: tuple = ()  # Stored as tuple for immutability
 
@@ -55,6 +60,9 @@ class PlatformContext:
         # Convert user_roles list to tuple for immutability
         if isinstance(self.user_roles, list):
             object.__setattr__(self, "user_roles", tuple(self.user_roles))
+        # Convert scopes list to tuple for immutability
+        if isinstance(self.scopes, list):
+            object.__setattr__(self, "scopes", tuple(self.scopes))
 
     @property
     def extra(self) -> dict[str, Any]:
@@ -78,6 +86,7 @@ class PlatformContext:
             session_id=self.session_id,
             run_id=self.run_id,
             request_id=self.request_id,
+            scopes=self.scopes,
             _extra=tuple(sorted(new_extra.items())),
         )
 
@@ -116,8 +125,33 @@ class PlatformContext:
             session_id=session_id or self.session_id,
             run_id=run_id or self.run_id,
             request_id=request_id or self.request_id,
+            scopes=self.scopes,
             _extra=self._extra,
         )
+
+    def with_scope(self, scope: "Scope") -> "PlatformContext":
+        """Return a new PlatformContext with the given scope appended."""
+        return PlatformContext(
+            tenant_id=self.tenant_id,
+            tenant_name=self.tenant_name,
+            user_roles=self.user_roles,
+            k8s_namespace=self.k8s_namespace,
+            kubeconfig=self.kubeconfig,
+            duplo_base_url=self.duplo_base_url,
+            duplo_token=self.duplo_token,
+            aws_region=self.aws_region,
+            user_id=self.user_id,
+            session_id=self.session_id,
+            run_id=self.run_id,
+            request_id=self.request_id,
+            scopes=(*self.scopes, scope),
+            _extra=self._extra,
+        )
+
+    def scopes_for_type(self, types: list[str]) -> list["Scope"]:
+        """Return scopes whose type is in the given list (case-insensitive)."""
+        lower = {t.lower() for t in types}
+        return [s for s in self.scopes if s.type.lower() in lower]
 
     def to_dict(self) -> dict[str, Any]:
         """
@@ -152,6 +186,8 @@ class PlatformContext:
             result["run_id"] = self.run_id
         if self.request_id:
             result["request_id"] = self.request_id
+        if self.scopes:
+            result["scopes"] = [s.to_dict() for s in self.scopes]
         result.update(self.extra)
         return result
 
@@ -198,6 +234,8 @@ class PlatformContext:
             "session_id",
             "run_id",
             "request_id",
+            # Scopes
+            "scopes",
         }
         known = {k: v for k, v in data.items() if k in known_keys}
         extra = {k: v for k, v in data.items() if k not in known_keys}
@@ -205,6 +243,13 @@ class PlatformContext:
         # Convert user_roles list to tuple
         if "user_roles" in known and isinstance(known["user_roles"], list):
             known["user_roles"] = tuple(known["user_roles"])
+
+        # Parse scopes from wire format
+        if "scopes" in known:
+            raw = known["scopes"]
+            known["scopes"] = (
+                tuple(Scope.from_dict(s) for s in raw) if isinstance(raw, list) else ()
+            )
 
         return cls(**known, _extra=tuple(sorted(extra.items())))
 

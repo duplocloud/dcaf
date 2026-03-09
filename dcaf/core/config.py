@@ -50,7 +50,7 @@ DEFAULTS = {
 
 # Provider-specific model defaults
 PROVIDER_MODEL_DEFAULTS = {
-    "bedrock": "anthropic.claude-3-sonnet-20240229-v1:0",
+    "bedrock": "us.anthropic.claude-3-sonnet-20240229-v1:0",
     "anthropic": "claude-3-sonnet-20240229",
     "google": "gemini-3-flash",
     "openai": "gpt-4",
@@ -90,6 +90,7 @@ class EnvVars:
     GOOGLE_MODEL_LOCATION = (
         "DCAF_GOOGLE_MODEL_LOCATION"  # Where Gemini models run (default: us-central1)
     )
+    GOOGLE_APPLICATION_CREDENTIALS = "GOOGLE_APPLICATION_CREDENTIALS"  # ADC key file path
 
     # A2A Identity
     AGENT_NAME = "DCAF_AGENT_NAME"
@@ -99,6 +100,11 @@ class EnvVars:
     TOOL_CALL_LIMIT = "DCAF_TOOL_CALL_LIMIT"
     DISABLE_HISTORY = "DCAF_DISABLE_HISTORY"
     DISABLE_TOOL_FILTERING = "DCAF_DISABLE_TOOL_FILTERING"
+    DEFAULT_TOOLKIT = "DCAF_DEFAULT_TOOLKIT"
+    IS_LOCAL = "DCAF_IS_LOCAL"  # Local-dev mode: env-var credentials expected
+
+    # Storage
+    PERSISTENT_VOLUME_STORAGE = "PERSISTENT_VOLUME_STORAGE"
 
 
 # ============================================================================
@@ -261,6 +267,7 @@ def load_agent_config(
         config["disable_history"] = disable_history
     if disable_filtering := get_env(EnvVars.DISABLE_TOOL_FILTERING, cast=bool):
         config["disable_tool_filtering"] = disable_filtering
+    config["is_local"] = get_env(EnvVars.IS_LOCAL, default=False, cast=bool)
 
     # Apply overrides
     config.update(overrides)

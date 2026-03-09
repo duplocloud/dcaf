@@ -5,7 +5,7 @@ name: Version Bump
 
 on:
   push:
-    branches: [main, vnext]
+    branches: [main]
     paths-ignore:
       - '.github/workflows/version-bump.yml'
 

@@ -13,6 +13,8 @@ import os
 from dataclasses import dataclass
 from typing import Any
 
+import aioboto3
+
 from .caching_bedrock import CachingAwsBedrock
 from .gcp_metadata import GCPMetadataManager, get_default_gcp_metadata_manager
 
@@ -155,23 +157,30 @@ class AgnoModelFactory:
         Returns:
             Agno AwsBedrock model configured with async session
         """
-        import aioboto3
-
         config = self._config
 
         # Infer region from model ID if it's an ARN
         region = self._infer_region_from_model_id(config.model_id, config.aws_region or "us-east-1")
 
-        # Create async session with profile if specified
+        # Create async session with the appropriate credential strategy:
+        # 1. Named profile (e.g., from ~/.aws/credentials)
+        # 2. Explicit key/secret pair (e.g., injected from Pranav's credential selector)
+        # 3. Default chain: env vars, EC2 instance profile, ECS task role, etc.
         if config.aws_profile:
             logger.info(f"Agno: Using AWS profile '{config.aws_profile}' (region: {region})")
             async_session = aioboto3.Session(
                 region_name=region,
                 profile_name=config.aws_profile,
             )
+        elif config.aws_access_key and config.aws_secret_key:
+            logger.info(f"Agno: Using explicit AWS key/secret (region: {region})")
+            async_session = aioboto3.Session(
+                region_name=region,
+                aws_access_key_id=config.aws_access_key,
+                aws_secret_access_key=config.aws_secret_key,
+            )
         else:
-            # Use default credential chain (env vars, instance profile, etc.)
-            logger.info(f"Agno: Using default AWS credentials (region: {region})")
+            logger.info(f"Agno: Using default AWS credential chain / IAM role (region: {region})")
             async_session = aioboto3.Session(region_name=region)
 
         # Cache the session

@@ -21,7 +21,14 @@ from typing import Any
 
 # Agno SDK imports
 from agno.agent import Agent as AgnoAgent
+from agno.skills import Skills
 from agno.tools import tool as agno_tool_decorator
+from agno.tools.file import FileTools
+from agno.tools.file_generation import FileGenerationTools
+from agno.tools.local_file_system import LocalFileSystemTools
+from agno.tools.python import PythonTools
+from agno.tools.shell import ShellTools
+from agno.tools.toolkit import Toolkit as AgnoToolkit
 from agno.utils.log import set_log_level_to_debug, set_log_level_to_info
 
 from ....application.dto.responses import (
@@ -30,8 +37,11 @@ from ....application.dto.responses import (
     StreamEventType,
 )
 from ....application.ports.mcp_protocol import MCPToolLike
+from ....config import EnvVars
 from ....events import Event, EventRegistry
 from ....llm import LLM as DcafLLM
+from ....services.skill_manager import SkillManager
+from ....services.skill_translator import translate_skills
 from .gcp_metadata import GCPMetadataManager, get_default_gcp_metadata_manager
 from .message_converter import AgnoMessageConverter
 from .model_factory import AgnoModelFactory, ModelConfig
@@ -93,11 +103,11 @@ class AgnoAdapter:
         - Parallel tool execution workaround
         - Metrics extraction and logging
 
-    Production Workarounds:
+    Production Notes:
         - Message history is filtered to remove tool-related messages
         - Strict user/assistant alternation is enforced
-        - Parallel tool calls are limited to prevent Bedrock bugs
-        - System prompt includes single-tool instruction
+        - Parallel tool call results are merged into a single user message
+          (required by Bedrock's ConverseStream API)
 
     Example:
         adapter = AgnoAdapter(
@@ -172,7 +182,7 @@ class AgnoAdapter:
             gcp_metadata_manager: Custom GCPMetadataManager instance for testing
 
             model_config: Configuration dict for model features (e.g., caching)
-            tool_call_limit: Max concurrent tool calls (default 1 to avoid bug)
+            tool_call_limit: Max concurrent tool calls per agent turn
             disable_history: If True, don't pass message history
             disable_tool_filtering: If True, skip tool message filtering
 
@@ -646,50 +656,103 @@ class AgnoAdapter:
         # Create the model with async session
         model = await self._get_or_create_model_async()
 
-        # Convert tools to Agno format (with context injection for tools that need it)
-        agno_tools = self._convert_tools_to_agno(tools, platform_context)
+        # Convert tools to Agno format and optionally prepend default toolkits
+        agno_tools = self._prepare_tools_with_defaults(tools, platform_context)
 
-        # WORKAROUND: Prepend instruction to prevent parallel tool calls
-        # This is necessary because Agno has a bug handling multiple toolUse blocks
-        modified_prompt = self._get_modified_system_prompt(system_prompt)
+        # Resolve skills from platform context
+        agno_skills = await self._resolve_skills(platform_context)
 
         logger.info(
             f"Agno: Creating agent with {len(agno_tools)} tools "
-            f"(stream={stream}, tool_limit={self._tool_call_limit})"
+            f"(stream={stream}, tool_limit={self._tool_call_limit}, "
+            f"skills={'yes' if agno_skills else 'no'})"
         )
 
         # Create the agent
         agent = AgnoAgent(
             model=model,
-            instructions=modified_prompt,
+            instructions=system_prompt,
             tools=agno_tools if agno_tools else None,
             stream=stream,
             tool_call_limit=self._tool_call_limit,
+            skills=agno_skills,
+            telemetry=False,
         )
 
         return agent
 
-    def _get_modified_system_prompt(self, system_prompt: str | None) -> str:
+    async def _resolve_skills(self, platform_context: dict[str, Any] | None) -> Skills | None:
         """
-        Modify system prompt to include single-tool instruction.
+        Extract and resolve skills from platform context.
 
-        This workaround prevents the model from requesting multiple tool calls
-        in a single response, which causes Bedrock validation errors.
+        Supports both the internal format (lowercase keys) and the
+        external platform format (PascalCase keys with Format field).
 
         Args:
-            system_prompt: Original system prompt
+            platform_context: The platform context dict, may contain a "skills" key.
 
         Returns:
-            Modified system prompt with single-tool instruction
+            An Agno Skills object, or None if no skills are defined.
         """
-        single_tool_instruction = (
-            "IMPORTANT: You must call tools ONE AT A TIME. Never request multiple tool calls "
-            "in a single response. Wait for each tool result before calling the next tool.\n\n"
-        )
+        if not platform_context:
+            return None
 
-        if system_prompt:
-            return single_tool_instruction + system_prompt
-        return single_tool_instruction
+        raw_skills = platform_context.get("skills")
+        if not raw_skills:
+            return None
+
+        definitions = translate_skills(raw_skills)
+        if not definitions:
+            return None
+
+        manager = SkillManager()
+        return await manager.resolve_skills(definitions)
+
+    def _build_default_toolkits(self) -> list[Any]:
+        """
+        Build the default set of Agno toolkits.
+
+        Returns a list of Agno toolkit instances: FileTools, LocalFileSystemTools,
+        PythonTools, ShellTools, and FileGenerationTools.
+
+        These are native Agno toolkits and are passed directly to AgnoAgent
+        without conversion through _convert_tools_to_agno().
+        """
+        return [
+            FileTools(),
+            LocalFileSystemTools(),
+            PythonTools(),
+            ShellTools(),
+            FileGenerationTools(),
+        ]
+
+    def _prepare_tools_with_defaults(
+        self,
+        tools: list[Any],
+        platform_context: dict[str, Any] | None = None,
+    ) -> list[Any]:
+        """
+        Convert user tools and optionally prepend default toolkits.
+
+        When DCAF_DEFAULT_TOOLKIT=true, the 5 built-in Agno toolkits are
+        prepended to the tools list. Default toolkits are native Agno objects
+        and bypass _convert_tools_to_agno().
+
+        Args:
+            tools: List of dcaf Tool objects from the caller.
+            platform_context: Optional platform context for tool injection.
+
+        Returns:
+            Combined list of Agno-compatible tools.
+        """
+        agno_tools = self._convert_tools_to_agno(tools, platform_context)
+
+        if os.getenv(EnvVars.DEFAULT_TOOLKIT, "false").lower() == "true":
+            default_toolkits = self._build_default_toolkits()
+            agno_tools = default_toolkits + agno_tools
+            logger.info(f"Default toolkit enabled: added {len(default_toolkits)} built-in toolkits")
+
+        return agno_tools
 
     # =========================================================================
     # Model Creation (delegated to ModelFactory)
@@ -767,6 +830,13 @@ class AgnoAdapter:
                         f"🔌 MCP: Added MCPTool to agent - will auto-connect "
                         f"(transport={tool_obj._transport}, target={target})"
                     )
+                continue
+
+            # Native Agno Toolkit — pass through directly (no conversion needed)
+            if isinstance(tool_obj, AgnoToolkit):
+                agno_tools.append(tool_obj)
+                toolkit_name = getattr(tool_obj, "name", type(tool_obj).__name__)
+                logger.info(f"Added native Agno toolkit: {toolkit_name}")
                 continue
 
             # Get the full tool schema including input_schema

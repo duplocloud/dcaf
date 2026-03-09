@@ -46,12 +46,16 @@ from typing import TYPE_CHECKING, Any, cast
 if TYPE_CHECKING:
     from dcaf.core.schemas.messages import AgentMessage
 
+    from .system_events import SystemEvent
+
+from ..schemas.messages import ToolCall as SchemaToolCall
 from .adapters.loader import load_adapter
 from .adapters.outbound.agno.types import DEFAULT_FRAMEWORK, DEFAULT_MODEL_ID, DEFAULT_PROVIDER
 from .adapters.outbound.persistence import InMemoryConversationRepository
 from .application.dto import AgentRequest
 from .application.services import AgentService, ApprovalService
 from .domain.entities import Conversation, ToolCall
+from .domain.value_objects import PlatformContext
 from .events import EventRegistry
 
 # Import interceptor types and utilities
@@ -73,6 +77,7 @@ from .models import ChatMessage, normalize_messages
 from .schemas.events import (
     DoneEvent,
     ErrorEvent,
+    IntermittentUpdateEvent,
     TextDeltaEvent,
     ToolCallsEvent,
 )
@@ -81,7 +86,6 @@ from .schemas.events import (
 from .schemas.events import (
     StreamEvent as ServerStreamEvent,
 )
-from .schemas.messages import ToolCall as SchemaToolCall
 from .session import Session
 
 logger = logging.getLogger(__name__)
@@ -92,6 +96,12 @@ RequestInterceptor = Callable[[LLMRequest], LLMRequest]
 
 # Type alias for response interceptors (for external use)
 ResponseInterceptor = Callable[[InterceptorLLMResponse], InterceptorLLMResponse]
+
+# Agno skill-access tool names — fired instead of regular tools when the agent
+# consults a skill.  The actual skill name is in tool_args["skill_name"].
+_SKILL_ACCESS_TOOLS: frozenset[str] = frozenset(
+    {"get_skill_instructions", "get_skill_reference", "get_skill_script"}
+)
 
 
 @dataclass
@@ -483,6 +493,8 @@ class Agent:
         # A2A configuration
         name: str | None = None,
         description: str | None = None,
+        # System event configuration
+        system_events: "list[SystemEvent] | bool | None" = None,
     ) -> None:
         """
         Create a new Agent.
@@ -501,6 +513,19 @@ class Agent:
         # A2A identity
         self.name = name or "dcaf-agent"
         self.description = description or system_prompt or "A DCAF agent"
+
+        # Resolve system events: build a lookup dict keyed by public event type string.
+        # False  → disable all (empty dict)
+        # None / True → use the two built-in defaults
+        # list   → use exactly the provided descriptors
+        from .system_events import DEFAULT_SYSTEM_EVENTS, SystemEvent
+
+        if system_events is False:
+            self._system_event_lookup: dict[str, SystemEvent] = {}
+        elif system_events is None or system_events is True:
+            self._system_event_lookup = {se.event_type: se for se in DEFAULT_SYSTEM_EVENTS}
+        else:
+            self._system_event_lookup = {se.event_type: se for se in system_events}
 
         # Store provider-specific configuration
         self._aws_profile = aws_profile
@@ -1028,53 +1053,109 @@ class Agent:
                 return
 
             # === BUILD CONVERSATION ===
-            from .domain.value_objects import PlatformContext
-
-            platform_context = PlatformContext.from_dict(prepared.context)
-
-            conversation = Conversation.create(context=platform_context)
-            if prepared.system_prompt:
-                conversation = conversation.with_system_prompt(prepared.system_prompt)
-
-            # Add messages from history
-            for msg in prepared.messages[:-1]:  # All except last
-                role = msg.get("role")
-                content = msg.get("content", "")
-                if role == "user":
-                    conversation.add_user_message(content)
-                elif role == "assistant":
-                    conversation.add_assistant_message(content)
-
-            # Add current message
-            conversation.add_user_message(prepared.current_message)
+            conversation, platform_context = self._build_conversation_from_prepared(prepared)
 
             # Stream from the runtime
             pending_tool_calls: list[SchemaToolCall] = []
+            # Dedup IntermittentUpdateEvents by text across all yield paths.
+            # Prevents duplicate status messages when both the framework system
+            # event AND user code (emit_update) fire the same text.
+            seen_update_texts: set[str] = set()
 
-            async for event in self._runtime.invoke_stream(
-                messages=conversation.messages,
-                tools=self.tools,
-                system_prompt=prepared.system_prompt,
-                static_system=prepared.static_system,
-                dynamic_system=prepared.dynamic_system,
-                platform_context=platform_context.to_dict() if platform_context else None,
-                event_registry=self._event_registry,
-            ):
-                # Convert internal stream events to server stream events
-                server_event = self._convert_stream_event(event, pending_tool_calls)
-                if server_event:
-                    yield server_event
+            # Set up the user-emit queue so tool/handler code can push events
+            # into the stream via dcaf.core.emit().
+            from collections import deque
 
-            # If there are pending tool calls that need approval, yield them
-            if pending_tool_calls:
-                yield ToolCallsEvent(tool_calls=pending_tool_calls)
+            from ._context import _active_queue
 
-            # Always end with a done event
-            yield DoneEvent()
+            user_events: deque = deque()
+            _queue_token = _active_queue.set(user_events)
+            try:
+                async for event in self._runtime.invoke_stream(
+                    messages=conversation.messages,
+                    tools=self.tools,
+                    system_prompt=prepared.system_prompt,
+                    static_system=prepared.static_system,
+                    dynamic_system=prepared.dynamic_system,
+                    platform_context=platform_context.to_dict() if platform_context else None,
+                    event_registry=self._event_registry,
+                ):
+                    # Drain user-emitted events before each framework event
+                    while user_events:
+                        evt = user_events.popleft()
+                        if self._is_new_update(evt, seen_update_texts):
+                            yield evt
+
+                    # Convert internal stream events to server stream events
+                    server_event = self._convert_stream_event(event, pending_tool_calls)
+                    if server_event and self._is_new_update(server_event, seen_update_texts):
+                        yield server_event
+
+                # Final drain after the runtime loop ends
+                while user_events:
+                    evt = user_events.popleft()
+                    if self._is_new_update(evt, seen_update_texts):
+                        yield evt
+
+                # If there are pending tool calls that need approval, yield them
+                if pending_tool_calls:
+                    yield ToolCallsEvent(tool_calls=pending_tool_calls)
+
+                # Always end with a done event
+                yield DoneEvent()
+            finally:
+                _active_queue.reset(_queue_token)
 
         except Exception as e:
             logger.error(f"Streaming error: {e}")
             yield ErrorEvent(error=str(e))
+
+    def _build_conversation_from_prepared(
+        self, prepared: _PreparedRequest
+    ) -> tuple[Conversation, PlatformContext]:
+        """Build a ``Conversation`` from a prepared request.
+
+        Extracted to keep ``run_stream`` within branch-count limits.
+        """
+        platform_context = PlatformContext.from_dict(prepared.context)
+        conversation = Conversation.create(context=platform_context)
+        if prepared.system_prompt:
+            conversation = conversation.with_system_prompt(prepared.system_prompt)
+        for msg in prepared.messages[:-1]:
+            role = msg.get("role")
+            content = msg.get("content", "")
+            if role == "user":
+                conversation.add_user_message(content)
+            elif role == "assistant":
+                conversation.add_assistant_message(content)
+        conversation.add_user_message(prepared.current_message)
+        return conversation, platform_context
+
+    def _is_new_update(self, event: Any, seen: set[str]) -> bool:
+        """Return True if this event should be yielded.
+
+        For IntermittentUpdateEvents, deduplicates by text within a single
+        run_stream call so the same status message is never sent twice —
+        whether it originates from the framework system event or from user
+        code calling emit_update().
+        """
+        if not isinstance(event, IntermittentUpdateEvent):
+            return True
+        if event.text in seen:
+            logger.info("DEDUP IntermittentUpdateEvent: %r", event.text)
+            return False
+        seen.add(event.text)
+        logger.info("YIELD IntermittentUpdateEvent: %r", event.text)
+        return True
+
+    def _system_update(self, key: str, data: dict[str, Any]) -> IntermittentUpdateEvent | None:
+        """Return an IntermittentUpdateEvent for a configured system event, or None."""
+        se = self._system_event_lookup.get(key)
+        if se:
+            text = se.format(data)
+            logger.info("Emitting system event [%s]: %r", key, text)
+            return IntermittentUpdateEvent(text=text)
+        return None
 
     def _convert_stream_event(
         self,
@@ -1083,46 +1164,9 @@ class Agent:
     ) -> ServerStreamEvent | None:
         """Convert internal stream event to server stream event."""
         from .application.dto.responses import StreamEvent as CoreStreamEvent
-        from .application.dto.responses import StreamEventType
 
         if isinstance(internal_event, CoreStreamEvent):
-            if internal_event.event_type == StreamEventType.TEXT_DELTA:
-                text = internal_event.data.get("text", "")
-                return TextDeltaEvent(text=text)
-            elif internal_event.event_type == StreamEventType.TOOL_USE_START:
-                # Accumulate tool calls for later
-                tool_call_id = internal_event.data.get("tool_call_id", "")
-                tool_name = internal_event.data.get("tool_name", "")
-                pending_tool_calls.append(
-                    SchemaToolCall(
-                        id=tool_call_id,
-                        name=tool_name,
-                        input={},
-                        tool_description="",
-                        input_description={},
-                    )
-                )
-                return None  # Don't yield yet, wait for complete tool call
-            elif internal_event.event_type == StreamEventType.TOOL_CALLS:
-                # Tool calls requiring approval (from RunPausedEvent)
-                tool_calls_data = internal_event.data.get("tool_calls", [])
-                schema_tool_calls = []
-                for tc in tool_calls_data:
-                    tc_data = tc if isinstance(tc, dict) else tc.to_dict()
-                    schema_tool_calls.append(
-                        SchemaToolCall(
-                            id=tc_data.get("id", ""),
-                            name=tc_data.get("name", ""),
-                            input=tc_data.get("input", {}),
-                            tool_description=tc_data.get("tool_description", ""),
-                            input_description=tc_data.get("input_description", {}),
-                        )
-                    )
-                if schema_tool_calls:
-                    return ToolCallsEvent(tool_calls=schema_tool_calls)
-                return None
-            elif internal_event.event_type == StreamEventType.ERROR:
-                return ErrorEvent(error=internal_event.data.get("message", "Unknown error"))
+            return self._convert_core_stream_event(internal_event, pending_tool_calls)
 
         # Handle dict events from mock/Bedrock
         if isinstance(internal_event, dict):
@@ -1134,6 +1178,101 @@ class Agent:
                     return TextDeltaEvent(text=delta.get("text", ""))
 
             # message_start and message_stop don't need to be forwarded
+
+        return None
+
+    def _convert_core_stream_event(
+        self,
+        internal_event: Any,
+        pending_tool_calls: list[SchemaToolCall],
+    ) -> ServerStreamEvent | None:
+        """Convert a CoreStreamEvent to a server stream event."""
+        from .application.dto.responses import StreamEventType
+
+        if internal_event.event_type == StreamEventType.TEXT_DELTA:
+            return TextDeltaEvent(text=internal_event.data.get("text", ""))
+
+        if internal_event.event_type in (
+            StreamEventType.REASONING_STARTED,
+            StreamEventType.REASONING_COMPLETED,
+        ):
+            key = (
+                "reasoning_started"
+                if internal_event.event_type == StreamEventType.REASONING_STARTED
+                else "reasoning_completed"
+            )
+            return self._system_update(key, {})
+
+        if internal_event.event_type == StreamEventType.TOOL_USE_START:
+            tool_call_id = internal_event.data.get("tool_call_id", "")
+            tool_name = internal_event.data.get("tool_name", "")
+            tool_args = internal_event.data.get("tool_args", {})
+
+            # Skill access tools carry the real skill name in tool_args["skill_name"].
+            # Show "Loading skill: <name>" instead of "Calling tool: get_skill_instructions".
+            if tool_name in _SKILL_ACCESS_TOOLS:
+                skill_name = tool_args.get("skill_name", tool_name)
+                logger.info(
+                    "Skill accessed: %s (via %s) id=%s", skill_name, tool_name, tool_call_id
+                )
+            else:
+                logger.info(
+                    "Tool call started: %s id=%s args=%r", tool_name, tool_call_id, tool_args
+                )
+
+            # Deduplicate: if Agno re-emits an event we already have, skip the UI update.
+            if tool_call_id and any(tc.id == tool_call_id for tc in pending_tool_calls):
+                logger.warning(
+                    "Duplicate tool_call_id=%s for %s — skipping system event",
+                    tool_call_id,
+                    tool_name,
+                )
+                return None
+
+            pending_tool_calls.append(
+                SchemaToolCall(
+                    id=tool_call_id,
+                    name=tool_name,
+                    input=tool_args,
+                    tool_description="",
+                    input_description={},
+                )
+            )
+
+            if tool_name in _SKILL_ACCESS_TOOLS:
+                skill_name = tool_args.get("skill_name", tool_name)
+                return self._system_update("skill_loaded", {"skill_name": skill_name})
+            return self._system_update("tool_call_started", {"tool_name": tool_name})
+
+        if internal_event.event_type == StreamEventType.TOOL_USE_END:
+            tool_name = internal_event.data.get("tool_name", "")
+            tool_call_id = internal_event.data.get("tool_call_id", "")
+            # Remove from pending — this tool executed without requiring approval
+            if tool_call_id:
+                pending_tool_calls[:] = [tc for tc in pending_tool_calls if tc.id != tool_call_id]
+            logger.info("Tool call completed: %s", tool_name)
+            return self._system_update("tool_call_completed", {"tool_name": tool_name})
+
+        if internal_event.event_type == StreamEventType.TOOL_CALLS:
+            # Tool calls requiring approval (from RunPausedEvent)
+            tool_calls_data = internal_event.data.get("tool_calls", [])
+            schema_tool_calls = [
+                SchemaToolCall(
+                    id=tc_data.get("id", ""),
+                    name=tc_data.get("name", ""),
+                    input=tc_data.get("input", {}),
+                    tool_description=tc_data.get("tool_description", ""),
+                    input_description=tc_data.get("input_description", {}),
+                )
+                for tc in tool_calls_data
+                for tc_data in (tc if isinstance(tc, dict) else tc.to_dict(),)
+            ]
+            if schema_tool_calls:
+                return ToolCallsEvent(tool_calls=schema_tool_calls)
+            return None
+
+        if internal_event.event_type == StreamEventType.ERROR:
+            return ErrorEvent(error=internal_event.data.get("error", "Unknown error"))
 
         return None
 

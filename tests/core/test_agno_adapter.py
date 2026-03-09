@@ -556,5 +556,395 @@ Here's the final response to the user.
         assert result == ""
 
 
+class TestDefaultToolkit:
+    """Tests for the default toolkit feature flag."""
+
+    def test_build_default_toolkits_returns_five_toolkits(self):
+        """Verify _build_default_toolkits returns all 5 Agno toolkit instances."""
+        from dcaf.core.adapters.outbound.agno.adapter import AgnoAdapter
+
+        adapter = AgnoAdapter(model_id="test", provider="bedrock")
+        toolkits = adapter._build_default_toolkits()
+
+        assert len(toolkits) == 5, f"Expected 5 toolkits, got {len(toolkits)}"
+
+    def test_build_default_toolkits_returns_correct_types(self):
+        """Verify each toolkit is the correct Agno type."""
+        from agno.tools.file import FileTools
+        from agno.tools.file_generation import FileGenerationTools
+        from agno.tools.local_file_system import LocalFileSystemTools
+        from agno.tools.python import PythonTools
+        from agno.tools.shell import ShellTools
+
+        from dcaf.core.adapters.outbound.agno.adapter import AgnoAdapter
+
+        adapter = AgnoAdapter(model_id="test", provider="bedrock")
+        toolkits = adapter._build_default_toolkits()
+
+        toolkit_types = {type(t) for t in toolkits}
+        expected_types = {
+            FileTools,
+            LocalFileSystemTools,
+            PythonTools,
+            ShellTools,
+            FileGenerationTools,
+        }
+
+        assert toolkit_types == expected_types, (
+            f"Expected types {expected_types}, got {toolkit_types}"
+        )
+
+    def test_default_toolkit_disabled_by_default(self, monkeypatch):
+        """Verify default toolkit is NOT included when env var is unset."""
+        from dcaf.core.config import EnvVars
+
+        monkeypatch.delenv(EnvVars.DEFAULT_TOOLKIT, raising=False)
+
+        from dcaf.core.adapters.outbound.agno.adapter import AgnoAdapter
+
+        adapter = AgnoAdapter(model_id="test", provider="bedrock")
+
+        from dcaf.core import tool
+
+        @tool(description="User tool")
+        def my_tool(x: str) -> str:
+            return x
+
+        agno_tools = adapter._prepare_tools_with_defaults([my_tool], platform_context=None)
+        # Should only have the user tool (converted), no default toolkits
+        assert len(agno_tools) == 1
+
+    def test_default_toolkit_enabled_merges_with_user_tools(self, monkeypatch):
+        """Verify default toolkits are merged when env var is true."""
+        from dcaf.core.config import EnvVars
+
+        monkeypatch.setenv(EnvVars.DEFAULT_TOOLKIT, "true")
+
+        from dcaf.core.adapters.outbound.agno.adapter import AgnoAdapter
+
+        adapter = AgnoAdapter(model_id="test", provider="bedrock")
+
+        from dcaf.core import tool
+
+        @tool(description="User tool")
+        def my_tool(x: str) -> str:
+            return x
+
+        agno_tools = adapter._prepare_tools_with_defaults([my_tool], platform_context=None)
+        # Should have 5 default toolkits + 1 user tool = 6
+        assert len(agno_tools) == 6
+
+    def test_default_toolkit_enabled_no_user_tools(self, monkeypatch):
+        """Verify default toolkits work even with no user tools."""
+        from dcaf.core.config import EnvVars
+
+        monkeypatch.setenv(EnvVars.DEFAULT_TOOLKIT, "true")
+
+        from dcaf.core.adapters.outbound.agno.adapter import AgnoAdapter
+
+        adapter = AgnoAdapter(model_id="test", provider="bedrock")
+
+        agno_tools = adapter._prepare_tools_with_defaults([], platform_context=None)
+        # Should have 5 default toolkits
+        assert len(agno_tools) == 5
+
+    @pytest.mark.parametrize(
+        "value,expected_count",
+        [
+            ("true", 5),
+            ("True", 5),
+            ("TRUE", 5),
+            ("false", 0),
+            ("0", 0),
+        ],
+    )
+    def test_default_toolkit_case_insensitive(self, monkeypatch, value, expected_count):
+        """Verify env var check is case-insensitive for 'true' and rejects other values."""
+        from dcaf.core.config import EnvVars
+
+        monkeypatch.setenv(EnvVars.DEFAULT_TOOLKIT, value)
+
+        from dcaf.core.adapters.outbound.agno.adapter import AgnoAdapter
+
+        adapter = AgnoAdapter(model_id="test", provider="bedrock")
+        agno_tools = adapter._prepare_tools_with_defaults([], platform_context=None)
+        assert len(agno_tools) == expected_count
+
+
+# =============================================================================
+# Test: Native Agno Toolkit pass-through
+# =============================================================================
+
+
+class TestNativeAgnoToolkitPassthrough:
+    """Tests verifying native Agno Toolkit instances pass through _convert_tools_to_agno()."""
+
+    def test_native_agno_toolkit_passes_through_without_conversion(self):
+        """Native Agno Toolkit instances should be appended directly, not sent to tool_converter."""
+        from agno.tools.toolkit import Toolkit as AgnoToolkit
+
+        from dcaf.core.adapters.outbound.agno.adapter import AgnoAdapter
+
+        # Create a minimal native Agno Toolkit subclass
+        class FakeNeo4jTools(AgnoToolkit):
+            def __init__(self):
+                super().__init__(name="neo4j_tools")
+
+        adapter = AgnoAdapter(model_id="test", provider="bedrock")
+        toolkit = FakeNeo4jTools()
+
+        agno_tools = adapter._convert_tools_to_agno([toolkit])
+
+        assert len(agno_tools) == 1
+        assert agno_tools[0] is toolkit
+
+    def test_native_agno_toolkit_does_not_crash(self):
+        """Regression: native Agno Toolkit should not raise AttributeError on missing .description."""
+        from agno.tools.toolkit import Toolkit as AgnoToolkit
+
+        from dcaf.core.adapters.outbound.agno.adapter import AgnoAdapter
+
+        class FakeDuckDbTools(AgnoToolkit):
+            def __init__(self):
+                super().__init__(name="duckdb_tools")
+
+        adapter = AgnoAdapter(model_id="test", provider="bedrock")
+        toolkit = FakeDuckDbTools()
+
+        # This should NOT raise AttributeError: 'FakeDuckDbTools' object has no attribute 'description'
+        agno_tools = adapter._convert_tools_to_agno([toolkit])
+        assert len(agno_tools) == 1
+
+    def test_mixed_dcaf_tools_and_native_toolkits(self):
+        """DCAF Tools and native Agno Toolkits should coexist in the same tools list."""
+        from agno.tools.toolkit import Toolkit as AgnoToolkit
+
+        from dcaf.core import tool
+        from dcaf.core.adapters.outbound.agno.adapter import AgnoAdapter
+
+        class FakeSqlTools(AgnoToolkit):
+            def __init__(self):
+                super().__init__(name="sql_tools")
+
+        @tool(description="A DCAF tool")
+        def my_dcaf_tool(x: str) -> str:
+            return x
+
+        adapter = AgnoAdapter(model_id="test", provider="bedrock")
+        toolkit = FakeSqlTools()
+
+        agno_tools = adapter._convert_tools_to_agno([toolkit, my_dcaf_tool])
+
+        # Should have 2 items: the native toolkit (passed through) + the DCAF tool (converted)
+        assert len(agno_tools) == 2
+        assert agno_tools[0] is toolkit  # Native toolkit first, passed through directly
+
+
+# =============================================================================
+# Test: AgnoResponseConverter stream events (tool name extraction)
+# =============================================================================
+
+
+class TestAgnoResponseConverterStreamEvents:
+    """
+    Tests for AgnoResponseConverter.convert_stream_event() with ToolCallStartedEvent.
+
+    Regression tests for commit 2f50996: tool name must come from
+    agno_event.tool.tool_name (nested ToolExecution), NOT agno_event.tool_name
+    (which doesn't exist on ToolCallStartedEvent).
+    """
+
+    @pytest.fixture
+    def converter(self):
+        from dcaf.core.adapters.outbound.agno.response_converter import AgnoResponseConverter
+
+        return AgnoResponseConverter()
+
+    def _make_event(self, tool_name="save_file", tool_call_id="tc-1", tool_args=None):
+        """Create a fake ToolCallStartedEvent with the correct class name."""
+        from types import SimpleNamespace
+
+        tool_exec = SimpleNamespace(
+            tool_name=tool_name,
+            tool_call_id=tool_call_id,
+            tool_args=tool_args or {},
+        )
+        ToolCallStartedEvent = type("ToolCallStartedEvent", (), {})
+        event = ToolCallStartedEvent()
+        event.tool = tool_exec
+        return event
+
+    def test_tool_name_extracted_from_nested_tool_exec(self, converter):
+        """REGRESSION: tool_name comes from agno_event.tool.tool_name, not agno_event.tool_name."""
+        from dcaf.core.application.dto.responses import StreamEventType
+
+        event = self._make_event(tool_name="kubectl")
+        result = converter.convert_stream_event(event)
+
+        assert result is not None
+        assert result.event_type == StreamEventType.TOOL_USE_START
+        assert result.data["tool_name"] == "kubectl", (
+            f"Expected 'kubectl', got {repr(result.data['tool_name'])}. "
+            "Did the code regress to reading top-level tool_name instead of tool.tool_name?"
+        )
+
+    def test_tool_name_none_falls_back_to_empty_string(self, converter):
+        """Edge case: ToolExecution.tool_name=None should produce '' (not crash)."""
+        event = self._make_event(tool_name=None)
+        result = converter.convert_stream_event(event)
+
+        assert result is not None
+        assert result.data["tool_name"] == ""
+
+    def test_tool_exec_none_falls_back_to_empty_string(self, converter):
+        """Edge case: ToolCallStartedEvent.tool=None should produce '' (not crash)."""
+        ToolCallStartedEvent = type("ToolCallStartedEvent", (), {})
+        event = ToolCallStartedEvent()
+        event.tool = None
+
+        result = converter.convert_stream_event(event)
+
+        assert result is not None
+        assert result.data["tool_name"] == ""
+
+    def test_tool_call_id_and_args_extracted(self, converter):
+        """Verify all fields (tool_name, tool_call_id, tool_args) are extracted."""
+        event = self._make_event(
+            tool_name="kubectl",
+            tool_call_id="tc-abc",
+            tool_args={"command": "get pods", "namespace": "default"},
+        )
+        result = converter.convert_stream_event(event)
+
+        assert result is not None
+        assert result.data["tool_name"] == "kubectl"
+        assert result.data["tool_call_id"] == "tc-abc"
+        assert result.data["tool_args"] == {"command": "get pods", "namespace": "default"}
+
+    def test_full_pipeline_produces_correct_system_event_text(self, converter):
+        """
+        Full pipeline regression: ToolCallStartedEvent → StreamEvent → IntermittentUpdateEvent text.
+
+        Simulates what agent.py does after convert_stream_event returns TOOL_USE_START.
+        The system event text must be 'Calling tool: save_file', not 'Calling tool: '.
+        """
+        from dcaf.core.system_events import TOOL_STARTED
+
+        event = self._make_event(tool_name="save_file")
+        stream_event = converter.convert_stream_event(event)
+
+        assert stream_event is not None
+        tool_name = stream_event.data.get("tool_name", "")
+
+        # Simulate agent.py: _system_update("tool_call_started", {"tool_name": tool_name})
+        text = TOOL_STARTED.format({"tool_name": tool_name})
+
+        assert text == "Calling tool: save_file", (
+            f"Expected 'Calling tool: save_file', got {repr(text)}. "
+            "This means IntermittentUpdateEvent would show blank tool name to the user."
+        )
+
+
+# =============================================================================
+# Integration Test: Real Agno objects (no mocks) — local smoke test
+# =============================================================================
+
+
+class TestAgnoResponseConverterWithRealAgnoObjects:
+    """
+    Integration tests using the real Agno ToolCallStartedEvent and ToolExecution classes.
+
+    These tests verify that:
+    1. The class name matching ('ToolCallStartedEvent') works with the installed Agno version.
+    2. Attribute access (event.tool.tool_name) works on real Agno objects.
+
+    Run these locally to confirm the fix works end-to-end with actual Agno internals:
+        pytest tests/core/test_agno_adapter.py::TestAgnoResponseConverterWithRealAgnoObjects -v -s
+    The -s flag shows the INFO log output from response_converter.py.
+    """
+
+    @pytest.fixture
+    def converter(self):
+        from dcaf.core.adapters.outbound.agno.response_converter import AgnoResponseConverter
+
+        return AgnoResponseConverter()
+
+    def test_real_tool_call_started_event_extracts_tool_name(self, converter, caplog):
+        """
+        Use the real Agno ToolCallStartedEvent + ToolExecution to verify tool_name extraction.
+
+        This is the definitive local smoke test — no mocks, real Agno objects.
+        """
+        import logging
+
+        from agno.models.response import ToolExecution
+        from agno.run.agent import ToolCallStartedEvent
+
+        from dcaf.core.application.dto.responses import StreamEventType
+
+        tool_exec = ToolExecution(
+            tool_call_id="tc-real-1",
+            tool_name="kubectl",
+            tool_args={"command": "get pods"},
+        )
+        event = ToolCallStartedEvent(tool=tool_exec)
+
+        with caplog.at_level(
+            logging.INFO, logger="dcaf.core.adapters.outbound.agno.response_converter"
+        ):
+            result = converter.convert_stream_event(event)
+
+        assert result is not None, "convert_stream_event should return a StreamEvent"
+        assert result.event_type == StreamEventType.TOOL_USE_START
+        assert result.data["tool_name"] == "kubectl", (
+            f"Expected 'kubectl', got {repr(result.data['tool_name'])}.\nLog output: {caplog.text}"
+        )
+        assert result.data["tool_call_id"] == "tc-real-1"
+
+        # Verify the INFO log was emitted with the correct values
+        assert "ToolCallStartedEvent" in caplog.text
+        assert "kubectl" in caplog.text
+
+    def test_real_event_class_name_matches_handler(self, converter):
+        """Verify type(event).__name__ matches the string used in convert_stream_event."""
+        from agno.run.agent import ToolCallStartedEvent
+
+        event = ToolCallStartedEvent()
+        assert type(event).__name__ == "ToolCallStartedEvent", (
+            f"Class name mismatch: got '{type(event).__name__}'. "
+            "Update the event_type check in response_converter.py if Agno renamed this class."
+        )
+
+    def test_real_tool_execution_has_tool_name_attr(self):
+        """Verify ToolExecution.tool_name is accessible as expected."""
+        from agno.models.response import ToolExecution
+
+        tool_exec = ToolExecution(tool_name="save_file")
+        assert tool_exec.tool_name == "save_file"
+
+    def test_full_pipeline_with_real_objects(self, converter):
+        """
+        Full pipeline: real ToolCallStartedEvent → convert_stream_event → system event text.
+        """
+        from agno.models.response import ToolExecution
+        from agno.run.agent import ToolCallStartedEvent
+
+        from dcaf.core.system_events import TOOL_STARTED
+
+        event = ToolCallStartedEvent(
+            tool=ToolExecution(tool_call_id="tc-2", tool_name="list_pods", tool_args={})
+        )
+        stream_event = converter.convert_stream_event(event)
+        assert stream_event is not None
+
+        tool_name = stream_event.data.get("tool_name", "")
+        text = TOOL_STARTED.format({"tool_name": tool_name})
+
+        assert text == "Calling tool: list_pods", (
+            f"Got: {repr(text)}\n"
+            "IntermittentUpdateEvent would show this to the user — should not be blank."
+        )
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

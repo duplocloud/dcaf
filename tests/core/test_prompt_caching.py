@@ -205,3 +205,86 @@ class TestAgentWithCaching:
         agent = Agent(system_prompt="Test prompt")
 
         assert agent._model_config.get("cache_system_prompt", False) is False
+
+
+class TestMergeParallelToolResults:
+    """Tests for CachingAwsBedrock._merge_parallel_tool_results."""
+
+    def _tool_result_msg(self, *tool_use_ids: str) -> dict:
+        """Build a user message with one toolResult block per ID."""
+        return {
+            "role": "user",
+            "content": [
+                {"toolResult": {"toolUseId": tid, "content": [{"json": {"result": "ok"}}]}}
+                for tid in tool_use_ids
+            ],
+        }
+
+    def _text_msg(self, role: str, text: str) -> dict:
+        return {"role": role, "content": [{"text": text}]}
+
+    def test_single_tool_result_unchanged(self):
+        """Single tool result message is not modified."""
+        messages = [self._tool_result_msg("id-1")]
+        result = CachingAwsBedrock._merge_parallel_tool_results(messages)
+        assert result == messages
+
+    def test_two_consecutive_tool_results_merged(self):
+        """Two consecutive single-result user messages are merged into one."""
+        messages = [
+            self._tool_result_msg("id-1"),
+            self._tool_result_msg("id-2"),
+        ]
+        result = CachingAwsBedrock._merge_parallel_tool_results(messages)
+        assert len(result) == 1
+        assert result[0]["role"] == "user"
+        ids = [block["toolResult"]["toolUseId"] for block in result[0]["content"]]
+        assert ids == ["id-1", "id-2"]
+
+    def test_three_consecutive_tool_results_merged(self):
+        """Three parallel results are all merged into one message."""
+        messages = [
+            self._tool_result_msg("id-1"),
+            self._tool_result_msg("id-2"),
+            self._tool_result_msg("id-3"),
+        ]
+        result = CachingAwsBedrock._merge_parallel_tool_results(messages)
+        assert len(result) == 1
+        ids = [block["toolResult"]["toolUseId"] for block in result[0]["content"]]
+        assert ids == ["id-1", "id-2", "id-3"]
+
+    def test_non_tool_messages_not_merged(self):
+        """Text messages between tool results break the merge window."""
+        messages = [
+            self._tool_result_msg("id-1"),
+            self._text_msg("assistant", "Here is the result."),
+            self._tool_result_msg("id-2"),
+        ]
+        result = CachingAwsBedrock._merge_parallel_tool_results(messages)
+        assert len(result) == 3
+
+    def test_full_conversation_preserved(self):
+        """Realistic conversation: text turn, then parallel tool results."""
+        messages = [
+            self._text_msg("user", "list my pods"),
+            self._text_msg("assistant", "calling tools"),
+            self._tool_result_msg("id-1"),
+            self._tool_result_msg("id-2"),
+            self._text_msg("assistant", "done"),
+        ]
+        result = CachingAwsBedrock._merge_parallel_tool_results(messages)
+        assert len(result) == 4
+        assert result[0] == self._text_msg("user", "list my pods")
+        assert result[1] == self._text_msg("assistant", "calling tools")
+        assert len(result[2]["content"]) == 2  # merged
+        assert result[3] == self._text_msg("assistant", "done")
+
+    def test_empty_messages(self):
+        """Empty list returns empty list."""
+        assert CachingAwsBedrock._merge_parallel_tool_results([]) == []
+
+    def test_already_grouped_results_unchanged(self):
+        """A message that already has multiple toolResult blocks is left alone."""
+        msg = self._tool_result_msg("id-1", "id-2")  # already grouped
+        result = CachingAwsBedrock._merge_parallel_tool_results([msg])
+        assert result == [msg]

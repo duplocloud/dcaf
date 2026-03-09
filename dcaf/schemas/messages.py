@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, HttpUrl
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 
 
 class FileObject(BaseModel):
@@ -37,6 +37,25 @@ class ExecutedToolCall(BaseModel):
     id: str
     name: str
     input: dict[str, Any]
+    output: str | dict
+
+
+class Approval(BaseModel):
+    id: str
+    type: str
+    name: str
+    input: dict[str, Any]
+    execute: bool = False
+    rejection_reason: str | None = None
+    description: str = ""
+    intent: str | None = None
+
+
+class ExecutedApproval(BaseModel):
+    id: str
+    type: str
+    name: str
+    input: dict[str, Any]
     output: str
 
 
@@ -46,6 +65,8 @@ class URLConfig(BaseModel):
 
 
 class PlatformContext(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
     k8s_namespace: str | None = None
     duplo_base_url: str | None = None
     duplo_token: str | None = None
@@ -61,10 +82,14 @@ class AmbientContext(BaseModel):
 
 
 class Data(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
     cmds: list[Command] = Field(default_factory=list)
     executed_cmds: list[ExecutedCommand] = Field(default_factory=list)
     tool_calls: list[ToolCall] = Field(default_factory=list)
     executed_tool_calls: list[ExecutedToolCall] = Field(default_factory=list)
+    approvals: list[Approval] = Field(default_factory=list)
+    executed_approvals: list[ExecutedApproval] = Field(default_factory=list)
     url_configs: list[URLConfig] = Field(default_factory=list)
     user_file_uploads: list[FileObject] = Field(default_factory=list)
 

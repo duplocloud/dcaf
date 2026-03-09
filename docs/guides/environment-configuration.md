@@ -92,13 +92,24 @@ AWS_SECRET_ACCESS_KEY=xxxxxxxxxxxxxxxxxx
 AWS_REGION=us-west-2
 ```
 
-#### Google Gemini (`DCAF_PROVIDER=google`)
+#### Google Vertex AI (`DCAF_PROVIDER=google`)
+
+DCAF uses Vertex AI with Application Default Credentials (ADC). On GKE, project and
+location are auto-detected via the metadata service. For local development, set them
+explicitly:
 
 ```bash
-GEMINI_API_KEY=your-gemini-api-key
-# Or
-GOOGLE_API_KEY=your-google-api-key
+# Project and location — auto-detected on GCP (no action needed in production)
+GOOGLE_CLOUD_PROJECT=my-gcp-project
+DCAF_GOOGLE_MODEL_LOCATION=us-central1
+
+# Local dev: path to a service account JSON key file
+GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json
 ```
+
+`GOOGLE_APPLICATION_CREDENTIALS` is a standard ADC variable respected by all Google
+client libraries. It lets you use a service account key file during local development
+while GKE Workload Identity handles production — no code changes needed.
 
 #### Anthropic Direct (`DCAF_PROVIDER=anthropic`)
 
@@ -141,7 +152,15 @@ Advanced configuration:
 DCAF_TOOL_CALL_LIMIT=1              # Max concurrent tool calls
 DCAF_DISABLE_HISTORY=false          # Disable message history
 DCAF_DISABLE_TOOL_FILTERING=false   # Disable tool filtering
+DCAF_IS_LOCAL=false                 # Local-dev mode (see below)
 ```
+
+#### `DCAF_IS_LOCAL`
+
+When `DCAF_IS_LOCAL=true`, DCAF expects cloud credentials to come from environment
+variables (`AWS_PROFILE`, `GOOGLE_APPLICATION_CREDENTIALS`, etc.) rather than from
+injected runtime credentials. Set this flag in your local `.env` file and leave it
+unset (or `false`) in production where credentials are injected at runtime.
 
 ### Timeout Configuration
 

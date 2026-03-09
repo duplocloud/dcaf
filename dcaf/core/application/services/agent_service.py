@@ -91,6 +91,8 @@ class AgentService:
         Returns:
             AgentResponse with the agent's response
         """
+        from dcaf.core.services.credential_manager import CredentialManager
+
         # 1. Get or create conversation
         conversation = self._get_or_create_conversation(request)
         context = request.get_platform_context()
@@ -100,14 +102,18 @@ class AgentService:
         conversation.add_user_message(request.content)
 
         # 3. Invoke the agent runtime (async)
-        runtime_response = await self._runtime.invoke(
-            messages=conversation.messages,
-            tools=request.tools,
-            system_prompt=request.system_prompt,
-            static_system=request.static_system,
-            dynamic_system=request.dynamic_system,
-            platform_context=context.to_dict() if context else None,
-        )
+        async with CredentialManager(context) as prepared:
+            platform_context_dict = (
+                {**context.to_dict(), **prepared.to_context_additions()} if context else None
+            )
+            runtime_response = await self._runtime.invoke(
+                messages=conversation.messages,
+                tools=request.tools,
+                system_prompt=request.system_prompt,
+                static_system=request.static_system,
+                dynamic_system=request.dynamic_system,
+                platform_context=platform_context_dict,
+            )
 
         # 4. Process the response
         response = self._process_response(
@@ -138,6 +144,8 @@ class AgentService:
         Yields:
             StreamEvent objects
         """
+        from dcaf.core.services.credential_manager import CredentialManager
+
         # 1. Get or create conversation
         conversation = self._get_or_create_conversation(request)
         context = request.get_platform_context()
@@ -149,31 +157,38 @@ class AgentService:
         # 3. Yield message start
         yield StreamEvent.message_start()
 
-        # 4. Stream from runtime (async)
+        # 4. Stream from runtime (async) — keep inside CredentialManager so temp files live
+        #    for the full stream duration
         collected_text: list[str] = []
         collected_tool_calls: list[ToolCallDTO] = []
         has_pending_approvals = False
 
-        async for event in self._runtime.invoke_stream(
-            messages=conversation.messages,
-            tools=request.tools,
-            system_prompt=request.system_prompt,
-            static_system=request.static_system,
-            dynamic_system=request.dynamic_system,
-            platform_context=context.to_dict() if context else None,
-        ):
-            # Track text for final response
-            if event.event_type.value == "text_delta":
-                collected_text.append(event.data.get("text", ""))
+        async with CredentialManager(context) as prepared:
+            platform_context_dict = (
+                {**context.to_dict(), **prepared.to_context_additions()} if context else None
+            )
+            async for event in self._runtime.invoke_stream(
+                messages=conversation.messages,
+                tools=request.tools,
+                system_prompt=request.system_prompt,
+                static_system=request.static_system,
+                dynamic_system=request.dynamic_system,
+                platform_context=platform_context_dict,
+            ):
+                # Track text for final response
+                if event.event_type.value == "text_delta":
+                    collected_text.append(event.data.get("text", ""))
 
-            # Track tool calls that need approval
-            if event.event_type == StreamEventType.TOOL_CALLS:
-                for tc_data in event.data.get("tool_calls", []):
-                    tc = ToolCallDTO.from_dict(tc_data) if isinstance(tc_data, dict) else tc_data
-                    collected_tool_calls.append(tc)
-                has_pending_approvals = True
+                # Track tool calls that need approval
+                if event.event_type == StreamEventType.TOOL_CALLS:
+                    for tc_data in event.data.get("tool_calls", []):
+                        tc = (
+                            ToolCallDTO.from_dict(tc_data) if isinstance(tc_data, dict) else tc_data
+                        )
+                        collected_tool_calls.append(tc)
+                    has_pending_approvals = True
 
-            yield event
+                yield event
 
         # 5. Build final response
         final_text = "".join(collected_text) if collected_text else None
