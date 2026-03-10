@@ -40,7 +40,7 @@ Supports three usage patterns:
 import inspect
 import json
 from collections.abc import Callable
-from typing import Any, Union, get_args, get_origin, get_type_hints
+from typing import Any, Literal, Union, get_args, get_origin, get_type_hints
 
 from pydantic import BaseModel, ConfigDict
 
@@ -215,7 +215,7 @@ class Tool(BaseModel):
     description: str
     input_schema: dict[str, Any]
     requires_approval: bool = False
-    approval_type: str = "tool_call"
+    approval_type: Literal["tool_call", "command"] = "tool_call"
     requires_platform_context: bool = False
 
     def __init__(self, **data: Any):
@@ -307,7 +307,7 @@ def tool(
     description: str | None = None,
     name: str | None = None,
     requires_approval: bool = True,  # V1 default: True (safe by default)
-    approval_type: str = "tool_call",
+    approval_type: Literal["tool_call", "command"] = "tool_call",
     schema: dict[str, Any] | type[BaseModel] | Any | None = None,
 ) -> Tool | Callable[[Callable], Tool]:
     """

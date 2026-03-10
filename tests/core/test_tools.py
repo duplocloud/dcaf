@@ -19,10 +19,9 @@ def test_tool_approval_type_can_be_set_to_command():
     assert run_cmd.approval_type == "command"
 
 
-def test_tool_approval_type_preserved_in_tool_object():
-    @tool(description="kubectl", approval_type="command")
-    def kubectl(args: str) -> str:
-        return args
-
-    assert isinstance(kubectl, Tool)
-    assert kubectl.approval_type == "command"
+def test_tool_approval_type_rejects_invalid_value():
+    import pytest
+    with pytest.raises(Exception):
+        @tool(description="bad", approval_type="invalid")  # type: ignore[arg-type]
+        def bad_tool(x: str) -> str:
+            return x
