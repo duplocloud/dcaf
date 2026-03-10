@@ -54,6 +54,11 @@ class AgnoResponseConverter:
     - Metrics
     """
 
+    def __init__(self, tool_approval_types: dict[str, str] | None = None) -> None:
+        self._tool_approval_types: dict[str, str] = (
+            tool_approval_types if tool_approval_types is not None else {}
+        )
+
     def extract_metrics(self, run_output: Any) -> AgnoMetrics | None:
         """
         Extract metrics from Agno's RunOutput.
@@ -200,13 +205,16 @@ class AgnoResponseConverter:
             tool_calls = []
             for tool_exec in paused_tools:
                 if getattr(tool_exec, "requires_confirmation", False):
+                    tool_name = getattr(tool_exec, "tool_name", "") or ""
+                    approval_type = self._tool_approval_types.get(tool_name, "tool_call")
                     tool_calls.append(
                         ToolCallDTO(
                             id=getattr(tool_exec, "tool_call_id", "") or "",
-                            name=getattr(tool_exec, "tool_name", "") or "",
+                            name=tool_name,
                             input=getattr(tool_exec, "tool_args", {}) or {},
                             requires_approval=True,
                             status="pending",
+                            approval_type=approval_type,
                         )
                     )
             if tool_calls:

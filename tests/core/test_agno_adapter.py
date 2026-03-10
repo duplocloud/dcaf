@@ -741,6 +741,58 @@ class TestNativeAgnoToolkitPassthrough:
 
 
 # =============================================================================
+# Test: Toolkit approval type registry
+# =============================================================================
+
+
+class TestToolkitApprovalTypes:
+    """Tests for the TOOLKIT_TOOL_APPROVAL_TYPES registry and _tool_approval_types instance dict."""
+
+    def test_toolkit_approval_types_marks_shell_as_command(self):
+        """TOOLKIT_TOOL_APPROVAL_TYPES must exist at module level with shell tool marked as command."""
+        from dcaf.core.adapters.outbound.agno.adapter import TOOLKIT_TOOL_APPROVAL_TYPES
+
+        assert TOOLKIT_TOOL_APPROVAL_TYPES.get("run_shell_command") == "command"
+
+    def test_dcaf_tool_approval_type_registered_in_adapter(self):
+        """@tool with approval_type='command' must appear in _tool_approval_types after conversion."""
+        from dcaf.core import tool as dcaf_tool
+        from dcaf.core.adapters.outbound.agno.adapter import AgnoAdapter
+
+        @dcaf_tool(description="Run kubectl", approval_type="command", requires_approval=True)
+        def run_kubectl(args: str) -> str:
+            return args
+
+        adapter = AgnoAdapter(model_id="test", provider="bedrock")
+        assert hasattr(adapter, "_tool_approval_types"), (
+            "AgnoAdapter must have a _tool_approval_types attribute"
+        )
+
+        # Convert the tool — this should populate _tool_approval_types
+        adapter._convert_tools_to_agno([run_kubectl])
+
+        assert adapter._tool_approval_types.get("run_kubectl") == "command", (
+            f"Expected 'command' for run_kubectl, got: {adapter._tool_approval_types}"
+        )
+
+    def test_dcaf_tool_default_approval_type_is_tool_call(self):
+        """@tool without explicit approval_type defaults to 'tool_call' in the registry."""
+        from dcaf.core import tool as dcaf_tool
+        from dcaf.core.adapters.outbound.agno.adapter import AgnoAdapter
+
+        @dcaf_tool(description="A plain tool")
+        def plain_tool(x: str) -> str:
+            return x
+
+        adapter = AgnoAdapter(model_id="test", provider="bedrock")
+        adapter._convert_tools_to_agno([plain_tool])
+
+        assert adapter._tool_approval_types.get("plain_tool") == "tool_call", (
+            f"Expected 'tool_call' for plain_tool, got: {adapter._tool_approval_types}"
+        )
+
+
+# =============================================================================
 # Test: AgnoResponseConverter stream events (tool name extraction)
 # =============================================================================
 
