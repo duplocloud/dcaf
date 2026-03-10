@@ -156,6 +156,7 @@ class MCPTool:
         tool_name_prefix: str | None = None,
         refresh_connection: bool = False,
         auto_approve_tools: list[str] | None = None,
+        approval_type: str = "tool_call",
         pre_hook: PreHookFunc | None = None,
         post_hook: PostHookFunc | None = None,
         headers: dict[str, str] | None = None,
@@ -179,6 +180,11 @@ class MCPTool:
                 approval. Tools matching any pattern run immediately; all other tools
                 require user confirmation before execution. Uses fnmatch glob syntax
                 (e.g., "*_get*", "*_list*", "read_*").
+            approval_type: UI hint for the approval experience when tools from this
+                          server require confirmation. "tool_call" shows a structured
+                          tool approval dialog; "command" shows a terminal-style
+                          approval dialog. Defaults to "tool_call". Applies to all
+                          tools from this server.
             pre_hook: Async or sync function called before each tool execution.
                      Receives MCPToolCall with tool_name and arguments.
                      Use for logging, validation, or modifying arguments.
@@ -219,6 +225,7 @@ class MCPTool:
         self._tool_name_prefix = tool_name_prefix
         self._refresh_connection = refresh_connection
         self._auto_approve_tools = auto_approve_tools
+        self._approval_type = approval_type
         self._pre_hook = pre_hook
         self._post_hook = post_hook
         self._headers = headers

@@ -2,6 +2,8 @@
 
 from unittest.mock import AsyncMock, MagicMock
 
+import pytest
+
 from dcaf.core.adapters.inbound.server_adapter import ServerAdapter
 from dcaf.core.schemas.events import (
     ApprovalsEvent as CoreApprovalsEvent,
@@ -22,7 +24,7 @@ from dcaf.core.schemas.messages import (
 from dcaf.core.schemas.messages import (
     ExecutedApproval as CoreExecutedApproval,
 )
-from dcaf.schemas.events import ApprovalsEvent, ExecutedApprovalsEvent
+from dcaf.schemas.events import ApprovalsEvent, ExecutedApprovalsEvent, ToolCallsEvent
 from dcaf.schemas.messages import Approval, Data, ExecutedApproval
 
 
@@ -477,3 +479,132 @@ class TestInvokeWithApprovals:
         exec_event = [e for e in events if e.type == "executed_approvals"][0]
         assert len(exec_event.executed_approvals) == 1
         assert exec_event.executed_approvals[0].output == "pod1"
+
+
+async def _collect_gap1_events(tc_event: "ToolCallsEvent") -> list:  # type: ignore[name-defined]
+    """Drive the server_adapter invoke_stream with a single ToolCallsEvent and collect all events."""
+    from dcaf.schemas.events import DoneEvent
+
+    mock_agent = MagicMock()
+    mock_agent.tools = []
+
+    async def fake_stream(*args: object, **kwargs: object):
+        yield tc_event
+        yield DoneEvent()
+
+    mock_agent.run_stream = MagicMock(side_effect=fake_stream)
+
+    adapter = ServerAdapter(mock_agent)
+
+    messages = {"messages": [{"role": "user", "content": "go"}]}
+    return [event async for event in adapter.invoke_stream(messages)]
+
+
+class TestServerAdapterApprovalTypeSplitting:
+    """Tests that server_adapter splits ToolCallsEvent by approval_type."""
+
+    @pytest.fixture
+    def make_tool_call(self):
+        from dcaf.schemas.messages import ToolCall
+
+        def _make(name: str, approval_type: str) -> ToolCall:
+            return ToolCall(
+                id=f"id-{name}",
+                name=name,
+                input={"cmd": name},
+                tool_description="desc",
+                input_description={},
+                approval_type=approval_type,
+            )
+
+        return _make
+
+    async def test_tool_call_type_yields_approvals_and_tool_calls_event(self, make_tool_call):
+        """approval_type='tool_call' -> ApprovalsEvent + ToolCallsEvent, no CommandsEvent."""
+        from dcaf.schemas.events import ToolCallsEvent
+
+        tc_event = ToolCallsEvent(tool_calls=[make_tool_call("get_user", "tool_call")])
+        events = await _collect_gap1_events(tc_event)
+        event_types = [type(e).__name__ for e in events]
+
+        assert "ApprovalsEvent" in event_types
+        assert "ToolCallsEvent" in event_types
+        assert "CommandsEvent" not in event_types
+
+    async def test_command_type_yields_approvals_and_commands_event(self, make_tool_call):
+        """approval_type='command' -> ApprovalsEvent + CommandsEvent, no ToolCallsEvent."""
+        from dcaf.schemas.events import ToolCallsEvent
+
+        tc_event = ToolCallsEvent(tool_calls=[make_tool_call("run_shell_command", "command")])
+        events = await _collect_gap1_events(tc_event)
+        event_types = [type(e).__name__ for e in events]
+
+        assert "ApprovalsEvent" in event_types
+        assert "CommandsEvent" in event_types
+        assert "ToolCallsEvent" not in event_types
+
+    async def test_mixed_types_split_correctly(self, make_tool_call):
+        """Mixed types -> one ApprovalsEvent with all, split legacy events."""
+        from dcaf.schemas.events import ApprovalsEvent, CommandsEvent, ToolCallsEvent
+
+        tc_event = ToolCallsEvent(
+            tool_calls=[
+                make_tool_call("run_shell_command", "command"),
+                make_tool_call("get_user", "tool_call"),
+            ]
+        )
+        events = await _collect_gap1_events(tc_event)
+
+        approvals_events = [e for e in events if isinstance(e, ApprovalsEvent)]
+        cmd_events = [e for e in events if isinstance(e, CommandsEvent)]
+        tc_events = [e for e in events if isinstance(e, ToolCallsEvent)]
+
+        assert len(approvals_events) == 1
+        assert len(approvals_events[0].approvals) == 2  # both in unified
+        assert len(cmd_events) == 1
+        assert len(tc_events) == 1
+        # Each legacy CommandsEvent has only command-type items
+        assert all(c.command == "run_shell_command" for c in cmd_events[0].commands)
+
+    async def test_approval_type_correct_in_approvals_event(self, make_tool_call):
+        """approval_type on each Approval matches what was set on ToolCall."""
+        from dcaf.schemas.events import ApprovalsEvent, ToolCallsEvent
+
+        tc_event = ToolCallsEvent(
+            tool_calls=[
+                make_tool_call("run_shell_command", "command"),
+                make_tool_call("get_user", "tool_call"),
+            ]
+        )
+        events = await _collect_gap1_events(tc_event)
+        approvals = next(e for e in events if isinstance(e, ApprovalsEvent)).approvals
+        types_by_name = {a.name: a.type for a in approvals}
+        assert types_by_name["run_shell_command"] == "command"
+        assert types_by_name["get_user"] == "tool_call"
+
+
+def test_tool_call_schema_approval_type_defaults_to_tool_call():
+    from dcaf.schemas.messages import ToolCall
+
+    tc = ToolCall(
+        id="t1",
+        name="my_tool",
+        input={},
+        tool_description="A tool",
+        input_description={},
+    )
+    assert tc.approval_type == "tool_call"
+
+
+def test_tool_call_schema_approval_type_can_be_command():
+    from dcaf.schemas.messages import ToolCall
+
+    tc = ToolCall(
+        id="t1",
+        name="run_kubectl",
+        input={"args": "get pods"},
+        tool_description="Run kubectl",
+        input_description={},
+        approval_type="command",
+    )
+    assert tc.approval_type == "command"

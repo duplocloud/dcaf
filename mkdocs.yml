@@ -141,6 +141,7 @@ nav:
   - Guides:
     - Custom Agents: guides/custom-agents.md
     - Building Tools: guides/building-tools.md
+    - Tool Approval Types: guides/tool-approval-types.md
     - Agno Toolkits: guides/agno-toolkits.md
     - Skills: guides/skills.md
     - MCP Tools (External): guides/mcp-tools.md

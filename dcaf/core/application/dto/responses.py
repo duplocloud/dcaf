@@ -120,6 +120,7 @@ class ToolCallDTO:
     result: str | None = None
     error: str | None = None
     rejection_reason: str | None = None
+    approval_type: str = "tool_call"
 
     # Alias for backward compatibility
     @property
@@ -146,6 +147,7 @@ class ToolCallDTO:
             result["result"] = self.result
         if self.error:
             result["error"] = self.error
+        result["approval_type"] = self.approval_type
         return result
 
     @classmethod
@@ -164,6 +166,7 @@ class ToolCallDTO:
             result=data.get("result"),
             error=data.get("error"),
             rejection_reason=data.get("rejection_reason"),
+            approval_type=data.get("approval_type", "tool_call"),
         )
 
     @classmethod

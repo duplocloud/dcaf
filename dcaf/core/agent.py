@@ -1263,6 +1263,7 @@ class Agent:
                     input=tc_data.get("input", {}),
                     tool_description=tc_data.get("tool_description", ""),
                     input_description=tc_data.get("input_description", {}),
+                    approval_type=tc_data.get("approval_type", "tool_call"),
                 )
                 for tc in tool_calls_data
                 for tc_data in (tc if isinstance(tc, dict) else tc.to_dict(),)

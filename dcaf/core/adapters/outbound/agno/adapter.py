@@ -87,6 +87,14 @@ def _sync_agno_log_level() -> None:
         )
 
 
+# Approval type registry for native Agno toolkits.
+# Maps individual tool function names to their approval_type.
+# Tools not listed here default to "tool_call".
+TOOLKIT_TOOL_APPROVAL_TYPES: dict[str, str] = {
+    "run_shell_command": "command",  # ShellTools — executes arbitrary shell commands
+}
+
+
 class AgnoAdapter:
     """
     Adapts the Agno SDK to our AgentRuntime port.
@@ -221,10 +229,19 @@ class AgnoAdapter:
 
         self._extra_config = kwargs
 
+        # Approval type registry: populated by _convert_tools_to_agno() and shared
+        # with _response_converter so ToolCallDTOs can be annotated correctly.
+        self._tool_approval_types: dict[str, str] = dict(TOOLKIT_TOOL_APPROVAL_TYPES)
+
         # Converters for messages, tools, and responses
         self._tool_converter = AgnoToolConverter()
         self._message_converter = AgnoMessageConverter()
-        self._response_converter = AgnoResponseConverter()
+        # IMPORTANT: _tool_approval_types must be initialized before this line.
+        # The converter holds a reference to the same dict — entries added later
+        # by _convert_tools_to_agno() will be visible automatically.
+        self._response_converter = AgnoResponseConverter(
+            tool_approval_types=self._tool_approval_types
+        )
 
         # System prompt parts for caching
         self._static_system: str | None = None
@@ -860,6 +877,12 @@ class AgnoAdapter:
                 agno_toolkit = tool_obj._get_agno_toolkit(auto_create=True)
                 agno_tools.append(agno_toolkit)
 
+                # Register approval type for known MCP tool functions (if already connected)
+                mcp_approval_type = getattr(tool_obj, "_approval_type", "tool_call")
+                if hasattr(agno_toolkit, "functions") and agno_toolkit.functions:
+                    for func_name in agno_toolkit.functions:
+                        self._tool_approval_types[func_name] = mcp_approval_type
+
                 # Log based on whether tools are already loaded
                 target = tool_obj._url or tool_obj._command
                 if tool_obj.initialized:
@@ -934,6 +957,9 @@ class AgnoAdapter:
                 description=tool_schema["description"],
                 requires_confirmation=tool_obj.requires_approval or None,
             )(func_to_wrap)
+
+            # Register approval type so response_converter can annotate ToolCallDTOs
+            self._tool_approval_types[tool_schema["name"]] = tool_obj.approval_type
 
             agno_tools.append(decorated_tool)
 
