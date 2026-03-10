@@ -10,6 +10,8 @@ from dcaf.core.application.dto.responses import (
 )
 from dcaf.core.application.dto.responses import (
     DataDTO,
+    StreamEvent as InternalStreamEvent,
+    StreamEventType,
     ToolCallDTO,
 )
 from dcaf.core.interceptors import InterceptorError, LLMRequest, LLMResponse
@@ -584,3 +586,53 @@ class TestAgentEventRegistry:
         assert agent._event_registry.has_subscribers("tool_call_completed")
         assert handler in agent._event_registry.get_handlers("tool_call_started")
         assert handler in agent._event_registry.get_handlers("tool_call_completed")
+
+
+# =============================================================================
+# Agent._convert_stream_event() Tests
+# =============================================================================
+
+
+class TestConvertStreamEvent:
+    def test_convert_stream_event_propagates_approval_type(self):
+        """approval_type from ToolCallDTO must survive into the SchemaToolCall."""
+        agent = _create_agent()
+
+        tc_dto = ToolCallDTO(
+            id="tc-1",
+            name="run_shell_command",
+            input={"cmd": "ls"},
+            approval_type="command",
+        )
+        stream_event = InternalStreamEvent(
+            event_type=StreamEventType.TOOL_CALLS,
+            data={"tool_calls": [tc_dto.to_dict()]},
+        )
+
+        result = agent._convert_stream_event(stream_event, [])
+
+        assert result is not None
+        assert hasattr(result, "tool_calls")
+        assert len(result.tool_calls) == 1
+        assert result.tool_calls[0].approval_type == "command"
+
+    def test_convert_stream_event_defaults_approval_type_to_tool_call(self):
+        """When approval_type is absent from the dict, it defaults to 'tool_call'."""
+        agent = _create_agent()
+
+        tc_data = {
+            "id": "tc-2",
+            "name": "list_pods",
+            "input": {},
+            "tool_description": "",
+            "input_description": {},
+        }
+        stream_event = InternalStreamEvent(
+            event_type=StreamEventType.TOOL_CALLS,
+            data={"tool_calls": [tc_data]},
+        )
+
+        result = agent._convert_stream_event(stream_event, [])
+
+        assert result is not None
+        assert result.tool_calls[0].approval_type == "tool_call"
