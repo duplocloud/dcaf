@@ -791,6 +791,36 @@ class TestToolkitApprovalTypes:
             f"Expected 'tool_call' for plain_tool, got: {adapter._tool_approval_types}"
         )
 
+    def test_adapter_seeds_toolkit_approval_types_on_init(self):
+        """Static TOOLKIT_TOOL_APPROVAL_TYPES must be pre-seeded in _tool_approval_types."""
+        from dcaf.core.adapters.outbound.agno.adapter import TOOLKIT_TOOL_APPROVAL_TYPES, AgnoAdapter
+
+        # Verify the module-level registry contains the expected mapping
+        assert "run_shell_command" in TOOLKIT_TOOL_APPROVAL_TYPES
+        assert TOOLKIT_TOOL_APPROVAL_TYPES["run_shell_command"] == "command"
+
+        # Verify the adapter is seeded with the static registry on init (no tool conversion needed)
+        adapter = AgnoAdapter(model_id="test", provider="bedrock")
+        assert adapter._tool_approval_types.get("run_shell_command") == "command", (
+            f"ShellTools' 'run_shell_command' must be pre-seeded as 'command' on init. "
+            f"Got: {adapter._tool_approval_types}"
+        )
+
+    def test_adapter_init_seeding_does_not_mutate_module_constant(self):
+        """Mutations to _tool_approval_types must not affect TOOLKIT_TOOL_APPROVAL_TYPES."""
+        from dcaf.core.adapters.outbound.agno.adapter import TOOLKIT_TOOL_APPROVAL_TYPES, AgnoAdapter
+
+        original_keys = set(TOOLKIT_TOOL_APPROVAL_TYPES.keys())
+
+        adapter = AgnoAdapter(model_id="test", provider="bedrock")
+        # Mutate the instance dict
+        adapter._tool_approval_types["__test_key__"] = "test_value"
+
+        # Module-level constant must be unchanged
+        assert set(TOOLKIT_TOOL_APPROVAL_TYPES.keys()) == original_keys, (
+            "Mutating _tool_approval_types must not affect the TOOLKIT_TOOL_APPROVAL_TYPES constant."
+        )
+
 
 # =============================================================================
 # Test: AgnoResponseConverter stream events (tool name extraction)

@@ -231,7 +231,7 @@ class AgnoAdapter:
 
         # Approval type registry: populated by _convert_tools_to_agno() and shared
         # with _response_converter so ToolCallDTOs can be annotated correctly.
-        self._tool_approval_types: dict[str, str] = {}
+        self._tool_approval_types: dict[str, str] = dict(TOOLKIT_TOOL_APPROVAL_TYPES)
 
         # Converters for messages, tools, and responses
         self._tool_converter = AgnoToolConverter()
