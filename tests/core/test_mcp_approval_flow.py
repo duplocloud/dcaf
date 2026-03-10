@@ -139,3 +139,19 @@ class TestGlobPatternEdgeCases:
                 assert requires is not True, (
                     f"{tool_name} should not require confirmation when auto_approve_tools is None"
                 )
+
+
+def test_mcp_tool_approval_type_defaults_to_tool_call():
+    """MCPTool approval_type should default to 'tool_call'."""
+    mcp = MCPTool(url="http://localhost:8000", transport="streamable-http")
+    assert mcp._approval_type == "tool_call"
+
+
+def test_mcp_tool_approval_type_can_be_set_to_command():
+    """MCPTool approval_type can be set to 'command' for shell-oriented MCP servers."""
+    mcp = MCPTool(
+        url="http://localhost:8000",
+        transport="streamable-http",
+        approval_type="command",
+    )
+    assert mcp._approval_type == "command"
