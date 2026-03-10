@@ -477,3 +477,28 @@ class TestInvokeWithApprovals:
         exec_event = [e for e in events if e.type == "executed_approvals"][0]
         assert len(exec_event.executed_approvals) == 1
         assert exec_event.executed_approvals[0].output == "pod1"
+
+
+def test_tool_call_schema_approval_type_defaults_to_tool_call():
+    from dcaf.schemas.messages import ToolCall
+    tc = ToolCall(
+        id="t1",
+        name="my_tool",
+        input={},
+        tool_description="A tool",
+        input_description={},
+    )
+    assert tc.approval_type == "tool_call"
+
+
+def test_tool_call_schema_approval_type_can_be_command():
+    from dcaf.schemas.messages import ToolCall
+    tc = ToolCall(
+        id="t1",
+        name="run_kubectl",
+        input={"args": "get pods"},
+        tool_description="Run kubectl",
+        input_description={},
+        approval_type="command",
+    )
+    assert tc.approval_type == "command"
