@@ -37,6 +37,7 @@ from ....schemas.events import (
 from ....schemas.messages import (
     AgentMessage,
     Approval,
+    Command,
     ExecutedApproval,
     ExecutedCommand,
     ExecutedToolCall,
@@ -181,6 +182,80 @@ class ServerAdapter:
             logger.exception(f"Error in agent execution: {e}")
             return AgentMessage(content=f"Error: {str(e)}")
 
+    def _translate_tool_calls_event(self, event: "ToolCallsEvent") -> list[StreamEvent]:
+        """Translate a ToolCallsEvent into a unified ApprovalsEvent + split legacy events.
+
+        Returns a list of events to emit in place of the raw ToolCallsEvent:
+        - ApprovalsEvent (all items, each with correct type from approval_type)
+        - ToolCallsEvent (only non-command items, for legacy tool_call clients)
+        - CommandsEvent (only command items, for legacy command clients)
+        """
+        # 1. Unified event — all approvals with correct types (future clients)
+        approvals = [
+            Approval(
+                id=tc.id,
+                type=tc.approval_type,
+                name=tc.name,
+                input=tc.input,
+                description=tc.tool_description,
+                intent=tc.intent,
+            )
+            for tc in event.tool_calls
+        ]
+        results: list[StreamEvent] = [ApprovalsEvent(approvals=approvals)]
+
+        # 2. Legacy: ToolCallsEvent only for tool_call items
+        tool_call_items = [tc for tc in event.tool_calls if tc.approval_type != "command"]
+        if tool_call_items:
+            results.append(ToolCallsEvent(tool_calls=tool_call_items))
+
+        # 3. Legacy: CommandsEvent only for command items
+        command_items = [tc for tc in event.tool_calls if tc.approval_type == "command"]
+        if command_items:
+            commands = [Command(command=tc.name) for tc in command_items]
+            results.append(CommandsEvent(commands=commands))
+
+        return results
+
+    def _translate_commands_event(self, event: "CommandsEvent") -> ApprovalsEvent:
+        """Translate a CommandsEvent into an ApprovalsEvent for unified approval clients."""
+        approvals = [
+            Approval(
+                id=uuid.uuid4().hex[:12],
+                type="command",
+                name=cmd.command,
+                input={
+                    "command": cmd.command,
+                    "files": [f.model_dump() for f in cmd.files] if cmd.files else [],
+                },
+                description=cmd.command,
+            )
+            for cmd in event.commands
+        ]
+        return ApprovalsEvent(approvals=approvals)
+
+    def _translate_stream_event(
+        self, event: StreamEvent, request_fields: dict[str, Any]
+    ) -> list[StreamEvent]:
+        """Translate a single stream event, applying Gap 1 and Gap 2 transformations.
+
+        Returns the list of events to yield for this input event.
+        Gap 1: ToolCallsEvent is replaced by ApprovalsEvent + split legacy events.
+        Gap 2: CommandsEvent is preceded by an ApprovalsEvent.
+        """
+        if isinstance(event, DoneEvent) and request_fields:
+            event.meta_data["request_context"] = request_fields
+
+        if isinstance(event, ToolCallsEvent) and event.tool_calls:
+            # Gap 1: replaced entirely — do not fall through to raw yield
+            return self._translate_tool_calls_event(event)
+
+        if isinstance(event, CommandsEvent) and event.commands:
+            # Gap 2: prepend ApprovalsEvent, then emit original CommandsEvent
+            return [self._translate_commands_event(event), event]
+
+        return [event]
+
     async def invoke_stream(
         self, messages: dict[str, list[dict[str, Any]]]
     ) -> AsyncIterator[StreamEvent]:
@@ -237,45 +312,8 @@ class ServerAdapter:
                 messages=cast(list[Any], core_messages),
                 context=context,
             ):
-                # Echo top-level request fields in DoneEvent for client correlation
-                if isinstance(event, DoneEvent) and request_fields:
-                    event.meta_data["request_context"] = request_fields
-
-                # Gap 1: translate ToolCallsEvent → ApprovalsEvent for unified approval clients
-                # ApprovalsEvent is emitted first; ToolCallsEvent follows for backward compat
-                if isinstance(event, ToolCallsEvent) and event.tool_calls:
-                    approvals = [
-                        Approval(
-                            id=tc.id,
-                            type="tool_call",
-                            name=tc.name,
-                            input=tc.input,
-                            description=tc.tool_description,
-                            intent=tc.intent,
-                        )
-                        for tc in event.tool_calls
-                    ]
-                    yield ApprovalsEvent(approvals=approvals)
-
-                # Gap 2: translate CommandsEvent → ApprovalsEvent for unified approval clients
-                # ApprovalsEvent is emitted first; CommandsEvent follows for backward compat
-                if isinstance(event, CommandsEvent) and event.commands:
-                    approvals = [
-                        Approval(
-                            id=uuid.uuid4().hex[:12],
-                            type="command",
-                            name=cmd.command,
-                            input={
-                                "command": cmd.command,
-                                "files": [f.model_dump() for f in cmd.files] if cmd.files else [],
-                            },
-                            description=cmd.command,
-                        )
-                        for cmd in event.commands
-                    ]
-                    yield ApprovalsEvent(approvals=approvals)
-
-                yield event
+                for translated in self._translate_stream_event(event, request_fields):
+                    yield translated
 
         except Exception as e:
             logger.exception(f"Stream error: {e}")
