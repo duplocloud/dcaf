@@ -19,11 +19,13 @@ import os
 import shutil
 import subprocess
 import tempfile
+import uuid
 from collections.abc import AsyncIterator, Callable
 from typing import Any, cast
 
 from ....schemas.events import (
     ApprovalsEvent,
+    CommandsEvent,
     DoneEvent,
     ErrorEvent,
     ExecutedApprovalsEvent,
@@ -252,6 +254,24 @@ class ServerAdapter:
                             intent=tc.intent,
                         )
                         for tc in event.tool_calls
+                    ]
+                    yield ApprovalsEvent(approvals=approvals)
+
+                # Gap 2: translate CommandsEvent → ApprovalsEvent for unified approval clients
+                # ApprovalsEvent is emitted first; CommandsEvent follows for backward compat
+                if isinstance(event, CommandsEvent) and event.commands:
+                    approvals = [
+                        Approval(
+                            id=uuid.uuid4().hex[:12],
+                            type="command",
+                            name=cmd.command,
+                            input={
+                                "command": cmd.command,
+                                "files": [f.model_dump() for f in cmd.files] if cmd.files else [],
+                            },
+                            description=cmd.command,
+                        )
+                        for cmd in event.commands
                     ]
                     yield ApprovalsEvent(approvals=approvals)
 
@@ -535,8 +555,9 @@ class ServerAdapter:
 
             if approval.get("execute", False):
                 if approval_type == "command":
+                    files = tool_input.get("files") or None
                     result = self._execute_cmd(
-                        tool_input.get("command", name), files=None, context=platform_context
+                        tool_input.get("command", name), files=files, context=platform_context
                     )
                 else:
                     result = self._execute_tool(name, tool_input, platform_context)

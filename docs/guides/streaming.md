@@ -191,6 +191,14 @@ Unified approval items for user review. Supports tool calls, commands, and custo
 
 **Use:** Display unified approval UI. The `type` field determines which UI variant to render.
 
+!!! warning "Mutual exclusivity with legacy events"
+    For every tool call or command, the server emits **both** an `approvals` event (unified) and the corresponding legacy event (`tool_calls` or `commands`) for backward compatibility. If your client handles `approvals`, you **must not** also handle `tool_calls` or `commands` — doing so will render duplicate approval dialogs for the same action. Pick one format and ignore the other:
+
+    - **Legacy clients:** handle `tool_calls` and `commands`, ignore `approvals`
+    - **Unified clients:** handle `approvals`, ignore `tool_calls` and `commands`
+
+    When sending the approval decision back, use the matching format: `data.approvals` for unified clients, `data.tool_calls` / `data.cmds` for legacy clients.
+
 ### 8. executed_approvals
 
 Approval items that were executed after user approval.
