@@ -215,6 +215,7 @@ class Tool(BaseModel):
     description: str
     input_schema: dict[str, Any]
     requires_approval: bool = False
+    approval_type: str = "tool_call"
     requires_platform_context: bool = False
 
     def __init__(self, **data: Any):
@@ -306,6 +307,7 @@ def tool(
     description: str | None = None,
     name: str | None = None,
     requires_approval: bool = True,  # V1 default: True (safe by default)
+    approval_type: str = "tool_call",
     schema: dict[str, Any] | type[BaseModel] | Any | None = None,
 ) -> Tool | Callable[[Callable], Tool]:
     """
@@ -353,6 +355,8 @@ def tool(
         description: Description shown to the LLM. Defaults to function docstring.
         name: Tool name. Defaults to function name.
         requires_approval: If True, tool execution requires user approval.
+        approval_type: UI hint for the approval prompt. Use "tool_call" (default) for
+                       structured tool UI or "command" for shell/terminal UI.
         schema: Input schema - can be a JSON Schema dict OR a Pydantic model class.
                 If not provided, auto-generated from function signature.
 
@@ -408,6 +412,7 @@ def tool(
             description=tool_description,
             input_schema=tool_schema,
             requires_approval=requires_approval,
+            approval_type=approval_type,
             requires_platform_context=requires_platform_context,
         )
 
