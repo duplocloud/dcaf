@@ -10,7 +10,6 @@ These tests verify that:
 
 from unittest.mock import MagicMock
 
-
 # =============================================================================
 # Tests: tool_approval_types constructor and RunPausedEvent handling
 # =============================================================================

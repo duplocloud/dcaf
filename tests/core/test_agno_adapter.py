@@ -793,7 +793,10 @@ class TestToolkitApprovalTypes:
 
     def test_adapter_seeds_toolkit_approval_types_on_init(self):
         """Static TOOLKIT_TOOL_APPROVAL_TYPES must be pre-seeded in _tool_approval_types."""
-        from dcaf.core.adapters.outbound.agno.adapter import TOOLKIT_TOOL_APPROVAL_TYPES, AgnoAdapter
+        from dcaf.core.adapters.outbound.agno.adapter import (
+            TOOLKIT_TOOL_APPROVAL_TYPES,
+            AgnoAdapter,
+        )
 
         # Verify the module-level registry contains the expected mapping
         assert "run_shell_command" in TOOLKIT_TOOL_APPROVAL_TYPES
@@ -808,7 +811,10 @@ class TestToolkitApprovalTypes:
 
     def test_adapter_init_seeding_does_not_mutate_module_constant(self):
         """Mutations to _tool_approval_types must not affect TOOLKIT_TOOL_APPROVAL_TYPES."""
-        from dcaf.core.adapters.outbound.agno.adapter import TOOLKIT_TOOL_APPROVAL_TYPES, AgnoAdapter
+        from dcaf.core.adapters.outbound.agno.adapter import (
+            TOOLKIT_TOOL_APPROVAL_TYPES,
+            AgnoAdapter,
+        )
 
         original_keys = set(TOOLKIT_TOOL_APPROVAL_TYPES.keys())
 

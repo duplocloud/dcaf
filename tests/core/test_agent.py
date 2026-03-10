@@ -10,9 +10,11 @@ from dcaf.core.application.dto.responses import (
 )
 from dcaf.core.application.dto.responses import (
     DataDTO,
-    StreamEvent as InternalStreamEvent,
     StreamEventType,
     ToolCallDTO,
+)
+from dcaf.core.application.dto.responses import (
+    StreamEvent as InternalStreamEvent,
 )
 from dcaf.core.interceptors import InterceptorError, LLMRequest, LLMResponse
 from dcaf.core.models import ChatMessage

@@ -24,7 +24,7 @@ from dcaf.core.schemas.messages import (
 from dcaf.core.schemas.messages import (
     ExecutedApproval as CoreExecutedApproval,
 )
-from dcaf.schemas.events import ApprovalsEvent, ExecutedApprovalsEvent
+from dcaf.schemas.events import ApprovalsEvent, ExecutedApprovalsEvent, ToolCallsEvent
 from dcaf.schemas.messages import Approval, Data, ExecutedApproval
 
 
@@ -483,7 +483,7 @@ class TestInvokeWithApprovals:
 
 async def _collect_gap1_events(tc_event: "ToolCallsEvent") -> list:  # type: ignore[name-defined]
     """Drive the server_adapter invoke_stream with a single ToolCallsEvent and collect all events."""
-    from dcaf.schemas.events import DoneEvent, ToolCallsEvent
+    from dcaf.schemas.events import DoneEvent
 
     mock_agent = MagicMock()
     mock_agent.tools = []
@@ -521,7 +521,7 @@ class TestServerAdapterApprovalTypeSplitting:
 
     async def test_tool_call_type_yields_approvals_and_tool_calls_event(self, make_tool_call):
         """approval_type='tool_call' -> ApprovalsEvent + ToolCallsEvent, no CommandsEvent."""
-        from dcaf.schemas.events import ApprovalsEvent, CommandsEvent, ToolCallsEvent
+        from dcaf.schemas.events import ToolCallsEvent
 
         tc_event = ToolCallsEvent(tool_calls=[make_tool_call("get_user", "tool_call")])
         events = await _collect_gap1_events(tc_event)
@@ -533,7 +533,7 @@ class TestServerAdapterApprovalTypeSplitting:
 
     async def test_command_type_yields_approvals_and_commands_event(self, make_tool_call):
         """approval_type='command' -> ApprovalsEvent + CommandsEvent, no ToolCallsEvent."""
-        from dcaf.schemas.events import ApprovalsEvent, CommandsEvent, ToolCallsEvent
+        from dcaf.schemas.events import ToolCallsEvent
 
         tc_event = ToolCallsEvent(tool_calls=[make_tool_call("run_shell_command", "command")])
         events = await _collect_gap1_events(tc_event)
@@ -585,6 +585,7 @@ class TestServerAdapterApprovalTypeSplitting:
 
 def test_tool_call_schema_approval_type_defaults_to_tool_call():
     from dcaf.schemas.messages import ToolCall
+
     tc = ToolCall(
         id="t1",
         name="my_tool",
@@ -597,6 +598,7 @@ def test_tool_call_schema_approval_type_defaults_to_tool_call():
 
 def test_tool_call_schema_approval_type_can_be_command():
     from dcaf.schemas.messages import ToolCall
+
     tc = ToolCall(
         id="t1",
         name="run_kubectl",

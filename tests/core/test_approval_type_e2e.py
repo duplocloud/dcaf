@@ -4,12 +4,11 @@ End-to-end tests: approval_type flows from @tool through to ApprovalsEvent.
 These tests verify the pipeline, not individual components. They mock at the
 LLM boundary (Agno) and assert on emitted events.
 """
-import pytest
-from dcaf.core.tools import Tool, tool
-from dcaf.core.application.dto.responses import ToolCallDTO
-from dcaf.schemas.messages import ToolCall
-from dcaf.schemas.events import ApprovalsEvent, CommandsEvent, ToolCallsEvent
 
+from dcaf.core.application.dto.responses import ToolCallDTO
+from dcaf.core.tools import tool
+from dcaf.schemas.events import ToolCallsEvent
+from dcaf.schemas.messages import ToolCall
 
 # ── Component tests (no mocking needed) ──────────────────────────────────────
 
@@ -57,13 +56,15 @@ def test_schema_tool_call_defaults_to_tool_call():
 
 def test_shell_tool_mapped_to_command_in_registry():
     from dcaf.core.adapters.outbound.agno.adapter import TOOLKIT_TOOL_APPROVAL_TYPES
+
     assert TOOLKIT_TOOL_APPROVAL_TYPES["run_shell_command"] == "command"
 
 
 def test_response_converter_uses_registry_for_shell_tool():
     from unittest.mock import MagicMock
-    from dcaf.core.adapters.outbound.agno.response_converter import AgnoResponseConverter
+
     from dcaf.core.adapters.outbound.agno.adapter import TOOLKIT_TOOL_APPROVAL_TYPES
+    from dcaf.core.adapters.outbound.agno.response_converter import AgnoResponseConverter
 
     converter = AgnoResponseConverter(tool_approval_types=dict(TOOLKIT_TOOL_APPROVAL_TYPES))
 
@@ -89,14 +90,19 @@ def test_response_converter_uses_registry_for_shell_tool():
 def test_server_adapter_splits_command_to_commands_event():
     """ToolCallsEvent with approval_type='command' -> ApprovalsEvent + CommandsEvent."""
     tc = ToolCall(
-        id="1", name="run_shell_command", input={},
-        tool_description="", input_description={},
+        id="1",
+        name="run_shell_command",
+        input={},
+        tool_description="",
+        input_description={},
         approval_type="command",
     )
     tc_event = ToolCallsEvent(tool_calls=[tc])
 
     from unittest.mock import MagicMock
+
     from dcaf.core.adapters.inbound.server_adapter import ServerAdapter
+
     adapter = ServerAdapter.__new__(ServerAdapter)
     adapter.agent = MagicMock()
 
@@ -111,14 +117,19 @@ def test_server_adapter_splits_command_to_commands_event():
 def test_server_adapter_splits_tool_call_to_tool_calls_event():
     """ToolCallsEvent with approval_type='tool_call' -> ApprovalsEvent + ToolCallsEvent."""
     tc = ToolCall(
-        id="1", name="get_user", input={},
-        tool_description="", input_description={},
+        id="1",
+        name="get_user",
+        input={},
+        tool_description="",
+        input_description={},
         approval_type="tool_call",
     )
     tc_event = ToolCallsEvent(tool_calls=[tc])
 
     from unittest.mock import MagicMock
+
     from dcaf.core.adapters.inbound.server_adapter import ServerAdapter
+
     adapter = ServerAdapter.__new__(ServerAdapter)
     adapter.agent = MagicMock()
 
