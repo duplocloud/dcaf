@@ -322,7 +322,7 @@ def get_weather(city: str, units: str = "celsius") -> str:
 | Option | Default | Description |
 |--------|---------|-------------|
 | `description` | Docstring | What the tool does (shown to LLM) |
-| `requires_approval` | `False` | Whether to require human approval |
+| `requires_approval` | `True` | Whether to require human approval. **Always set this explicitly.** |
 | `schema` | Auto-generated | Dict schema OR Pydantic model class |
 
 ### Complete Tools Example

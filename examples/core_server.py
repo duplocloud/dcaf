@@ -29,7 +29,7 @@ from dcaf.core import Agent, serve, tool  # noqa: E402
 
 
 # Define some example tools
-@tool(description="Get the current time")
+@tool(description="Get the current time", requires_approval=False)
 def get_time() -> str:
     """Get the current time."""
     from datetime import datetime
@@ -37,7 +37,7 @@ def get_time() -> str:
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
-@tool(description="Echo back a message")
+@tool(description="Echo back a message", requires_approval=False)
 def echo(message: str) -> str:
     """Echo back the given message."""
     return f"You said: {message}"
@@ -53,14 +53,25 @@ def dangerous_operation(action: str) -> str:
     return f"Executed dangerous action: {action}"
 
 
+@tool(requires_approval=True, approval_type="command", description="Run a shell command")
+def run_shell_command(command: str) -> str:
+    """
+    Run a shell command — shown as a terminal/command approval in the UI.
+
+    This demonstrates the command approval_type pattern.
+    """
+    return f"Ran command: {command}"
+
+
 # Create the agent
 agent = Agent(
-    tools=[get_time, echo, dangerous_operation],
+    tools=[get_time, echo, dangerous_operation, run_shell_command],
     system_prompt="""You are a helpful assistant. You have access to the following tools:
 
 - get_time: Returns the current time
 - echo: Echoes back a message
-- dangerous_operation: Requires approval before execution
+- dangerous_operation: Perform a potentially risky action
+- run_shell_command: Run a shell command
 
 When the user asks you to do something, use the appropriate tool.
 """,
