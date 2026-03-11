@@ -41,6 +41,7 @@ from ....schemas.messages import (
     ExecutedApproval,
     ExecutedCommand,
     ExecutedToolCall,
+    FileObject,
 )
 from ...agent import Agent
 
@@ -136,20 +137,14 @@ class ServerAdapter:
         request_fields: dict[str, Any] = messages.get("_request_fields", {})  # type: ignore[assignment]
         context = {**request_fields, **platform_context} if request_fields else platform_context
 
-        # Check for approved tool calls that need to be processed
-        executed_tool_calls = self._process_approved_tool_calls(messages_list, context)
-
-        # Process legacy command approvals
-        executed_commands = self._process_approved_commands(messages_list, context)
-
-        # Process unified approvals
-        executed_approvals = self._process_approvals(messages_list, context)
+        # Unified approval processing — normalize all sources, execute once
+        all_approvals = self._normalize_approvals(messages_list)
+        executed_approvals = self._process_approvals(all_approvals, context)
+        executed_commands, executed_tool_calls = self._fan_out_executed(executed_approvals)
 
         # Convert to Core format and inject execution results
         core_messages = self._convert_messages(messages_list)
-        self._inject_execution_results(
-            core_messages, executed_tool_calls, executed_commands, executed_approvals
-        )
+        self._inject_execution_results(core_messages, executed_approvals)
 
         if not core_messages:
             return AgentMessage(content="No messages provided.")
@@ -212,7 +207,18 @@ class ServerAdapter:
         # 3. Legacy: CommandsEvent only for command items
         command_items = [tc for tc in event.tool_calls if tc.approval_type == "command"]
         if command_items:
-            commands = [Command(command=tc.name) for tc in command_items]
+            commands = []
+            for tc in command_items:
+                raw_files = tc.input.get("files") or None
+                files: list[FileObject] | None = None
+                if raw_files:
+                    files = [FileObject(**f) for f in raw_files]
+                commands.append(
+                    Command(
+                        command=tc.input.get("command", tc.name),
+                        files=files,
+                    )
+                )
             results.append(CommandsEvent(commands=commands))
 
         return results
@@ -281,26 +287,22 @@ class ServerAdapter:
         request_fields: dict[str, Any] = messages.get("_request_fields", {})  # type: ignore[assignment]
         context = {**request_fields, **platform_context} if request_fields else platform_context
 
-        # Execute any approved tool calls before streaming
-        executed_tool_calls = self._process_approved_tool_calls(messages_list, context)
+        # Unified approval processing — normalize all sources, execute once
+        all_approvals = self._normalize_approvals(messages_list)
+        executed_approvals = self._process_approvals(all_approvals, context)
+        executed_commands, executed_tool_calls = self._fan_out_executed(executed_approvals)
+
+        # Emit execution events — unified first, then legacy
+        if executed_approvals:
+            yield ExecutedApprovalsEvent(executed_approvals=executed_approvals)
+        if executed_commands:
+            yield ExecutedCommandsEvent(executed_cmds=executed_commands)
         if executed_tool_calls:
             yield ExecutedToolCallsEvent(executed_tool_calls=executed_tool_calls)
 
-        # Process legacy command approvals
-        executed_commands = self._process_approved_commands(messages_list, context)
-        if executed_commands:
-            yield ExecutedCommandsEvent(executed_cmds=executed_commands)
-
-        # Process unified approvals
-        executed_approvals = self._process_approvals(messages_list, context)
-        if executed_approvals:
-            yield ExecutedApprovalsEvent(executed_approvals=executed_approvals)
-
         # Convert to Core format and inject execution results
         core_messages = self._convert_messages(messages_list)
-        self._inject_execution_results(
-            core_messages, executed_tool_calls, executed_commands, executed_approvals
-        )
+        self._inject_execution_results(core_messages, executed_approvals)
 
         if not core_messages:
             yield ErrorEvent(error="No messages provided")
@@ -322,26 +324,22 @@ class ServerAdapter:
     def _inject_execution_results(
         self,
         core_messages: list[dict[str, Any]],
-        executed_tool_calls: list[ExecutedToolCall],
-        executed_commands: list[ExecutedCommand],
         executed_approvals: list[ExecutedApproval],
     ) -> None:
-        """Inject tool/command/approval results into the conversation as a user message."""
+        """Inject execution results into the conversation as a user message.
+
+        Branches on approval type for the context string format:
+        - command: "Executed command: <cmd>\nOutput: <out>"
+        - tool_call: "Tool result for <name> with inputs <input>: <out>"
+        """
         parts: list[str] = []
-        if executed_tool_calls:
-            parts.extend(
-                f"Tool result for {tc.name} with inputs {tc.input}: {tc.output}"
-                for tc in executed_tool_calls
-            )
-        if executed_commands:
-            parts.extend(
-                f"Executed command: {ec.command}\nOutput: {ec.output}" for ec in executed_commands
-            )
-        if executed_approvals:
-            parts.extend(
-                f"Tool result for {ea.name} with inputs {ea.input}: {ea.output}"
-                for ea in executed_approvals
-            )
+        for ea in executed_approvals:
+            if ea.type == "command":
+                parts.append(
+                    f"Executed command: {ea.input.get('command', ea.name)}\nOutput: {ea.output}"
+                )
+            else:
+                parts.append(f"Tool result for {ea.name} with inputs {ea.input}: {ea.output}")
         if not parts:
             return
         result_content = "\n\n".join(parts)
@@ -399,55 +397,93 @@ class ServerAdapter:
                     return platform_context if isinstance(platform_context, dict) else {}
         return {}
 
-    def _process_approved_tool_calls(
+    def _normalize_approvals(
         self,
         messages_list: list[dict[str, Any]],
-        platform_context: dict[str, Any],
-    ) -> list[ExecutedToolCall]:
-        """
-        Process any approved tool calls from incoming messages.
+    ) -> list[dict[str, Any]]:
+        """Normalize all approval sources from the latest message into a single list.
 
-        When the user approves tool calls, they come back in the
-        message data. We execute them here and return results.
+        Reads data.approvals[], data.cmds[], and data.tool_calls[] and converts
+        all entries to the unified Approval dict format.  data.approvals[] entries
+        take precedence — legacy entries whose id already appears in approvals are
+        skipped to avoid double-execution.
         """
-        executed_tools: list[ExecutedToolCall] = []
-
         if not messages_list:
-            return executed_tools
+            return []
 
-        # Get the latest message's data
-        latest_message = messages_list[-1]
-        data = latest_message.get("data", {})
-        tool_calls = data.get("tool_calls", [])
+        data = messages_list[-1].get("data", {})
+        seen_ids: set[str] = set()
+        result: list[dict[str, Any]] = []
 
-        for tool_call in tool_calls:
-            tool_name = tool_call.get("name")
-            tool_input = tool_call.get("input", {})
-            tool_id = tool_call.get("id")
+        # 1. Unified approvals — source of truth
+        for a in data.get("approvals", []):
+            aid = a.get("id", "")
+            if aid:
+                seen_ids.add(aid)
+            result.append(a)
 
-            if tool_call.get("execute", False):
-                # User approved - execute the tool
-                result = self._execute_tool(tool_name, tool_input, platform_context)
-                executed_tools.append(
-                    ExecutedToolCall(
-                        id=tool_id,
-                        name=tool_name,
-                        input=tool_input,
-                        output=result,
+        # 2. Legacy data.cmds[] — normalize to command-type Approval
+        for cmd in data.get("cmds", []):
+            command_str = cmd.get("command", "")
+            result.append(
+                {
+                    "id": uuid.uuid4().hex,
+                    "type": "command",
+                    "name": command_str,
+                    "input": {"command": command_str, "files": cmd.get("files")},
+                    "execute": cmd.get("execute", False),
+                    "rejection_reason": cmd.get("rejection_reason"),
+                }
+            )
+
+        # 3. Legacy data.tool_calls[] — normalize to tool_call-type Approval
+        for tc in data.get("tool_calls", []):
+            tc_id = tc.get("id") or uuid.uuid4().hex
+            if tc_id in seen_ids:
+                continue  # already covered by data.approvals[]
+            result.append(
+                {
+                    "id": tc_id,
+                    "type": "tool_call",
+                    "name": tc.get("name", ""),
+                    "input": tc.get("input", {}),
+                    "execute": tc.get("execute", False),
+                    "rejection_reason": tc.get("rejection_reason"),
+                }
+            )
+
+        return result
+
+    def _fan_out_executed(
+        self,
+        executed_approvals: list[ExecutedApproval],
+    ) -> tuple[list[ExecutedCommand], list[ExecutedToolCall]]:
+        """Convert ExecutedApproval list to legacy ExecutedCommand / ExecutedToolCall lists.
+
+        These are used to populate the legacy fields in the response (data.executed_cmds,
+        data.executed_tool_calls) and the legacy stream events (ExecutedCommandsEvent,
+        ExecutedToolCallsEvent) for backward-compatible clients.
+        """
+        cmds: list[ExecutedCommand] = []
+        tool_calls: list[ExecutedToolCall] = []
+        for ea in executed_approvals:
+            if ea.type == "command":
+                cmds.append(
+                    ExecutedCommand(
+                        command=ea.input.get("command", ea.name),
+                        output=ea.output,
                     )
                 )
-            elif tool_call.get("rejection_reason"):
-                # User rejected
-                executed_tools.append(
+            else:
+                tool_calls.append(
                     ExecutedToolCall(
-                        id=tool_id,
-                        name=tool_name,
-                        input=tool_input,
-                        output=f"Tool rejected: {tool_call['rejection_reason']}",
+                        id=ea.id,
+                        name=ea.name,
+                        input=ea.input,
+                        output=ea.output,
                     )
                 )
-
-        return executed_tools
+        return cmds, tool_calls
 
     def _execute_tool(
         self,
@@ -528,62 +564,19 @@ class ServerAdapter:
             if work_dir:
                 shutil.rmtree(work_dir, ignore_errors=True)
 
-    def _process_approved_commands(
-        self,
-        messages_list: list[dict[str, Any]],
-        context: dict[str, Any] | None = None,
-    ) -> list[ExecutedCommand]:
-        """
-        Process approved/rejected commands from the legacy cmds field.
-
-        Reads data.cmds[] from the latest message. Approved commands are
-        executed via subprocess; rejected commands record the rejection reason.
-        """
-        executed: list[ExecutedCommand] = []
-
-        if not messages_list:
-            return executed
-
-        latest_message = messages_list[-1]
-        cmds = latest_message.get("data", {}).get("cmds", [])
-
-        for cmd in cmds:
-            command = cmd.get("command", "")
-            files = cmd.get("files") or None  # list[dict] | None
-            if cmd.get("execute", False):
-                logger.info("Executing approved command: %s", command)
-                output = self._execute_cmd(command, files=files, context=context)
-                executed.append(ExecutedCommand(command=command, output=output))
-            elif cmd.get("rejection_reason"):
-                executed.append(
-                    ExecutedCommand(
-                        command=command,
-                        output=f"Rejected: {cmd['rejection_reason']}",
-                    )
-                )
-
-        return executed
-
     def _process_approvals(
         self,
-        messages_list: list[dict[str, Any]],
+        approvals: list[dict[str, Any]],
         platform_context: dict[str, Any],
     ) -> list[ExecutedApproval]:
-        """
-        Process approved/rejected items from the unified approvals field.
+        """Execute a pre-normalized list of approval dicts.
 
-        Reads data.approvals[] from the latest message. For each:
-        - If execute=True: runs the tool via _execute_tool() and captures output
-        - If rejection_reason is set: captures the rejection as output
+        For each entry:
+        - type="command" + execute=True  → _execute_cmd()
+        - type="tool_call" + execute=True → _execute_tool()
+        - rejection_reason set            → record rejection (no execution)
         """
         executed: list[ExecutedApproval] = []
-
-        if not messages_list:
-            return executed
-
-        latest_message = messages_list[-1]
-        data = latest_message.get("data", {})
-        approvals = data.get("approvals", [])
 
         for approval in approvals:
             approval_id = approval.get("id", "")

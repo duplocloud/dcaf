@@ -55,8 +55,11 @@ from dcaf.tools import tool
 
 The simplest approach is to let DCAF auto-generate the schema from your function signature:
 
+!!! warning "Default: `requires_approval=True`"
+    The `@tool` decorator defaults to `requires_approval=True` (safe by default). Tools without an explicit `requires_approval=False` will pause and wait for human approval before executing — the agent will not auto-run them. **Always set `requires_approval` explicitly.**
+
 ```python
-@tool(description="Generate a personalized greeting for a user")
+@tool(description="Generate a personalized greeting for a user", requires_approval=False)
 def greet_user(name: str, language: str = "english") -> str:
     """Generate a personalized greeting."""
     greetings = {
@@ -96,7 +99,7 @@ DCAF supports three ways to define tool input schemas, giving you flexibility ba
 Let DCAF infer the schema from your function signature:
 
 ```python
-@tool(description="Create a new Kubernetes deployment")
+@tool(description="Create a new Kubernetes deployment", requires_approval=True)
 def create_deployment(
     name: str,
     image: str,
@@ -411,7 +414,8 @@ import requests
             "properties": {},
             "required": []
         }
-    }
+    },
+    requires_approval=False  # Read-only — no approval needed
 )
 def get_tenant_services(platform_context: dict) -> str:
     """Get services from DuploCloud API."""
@@ -666,7 +670,8 @@ executor = ThreadPoolExecutor(max_workers=4)
             },
             "required": ["operation_id"]
         }
-    }
+    },
+    requires_approval=True  # Set explicitly — this mutates state
 )
 def long_running_operation(operation_id: str) -> str:
     """Execute a long operation with timeout handling."""
@@ -702,7 +707,8 @@ from dcaf.tools import tool
             },
             "required": ["endpoint"]
         }
-    }
+    },
+    requires_approval=False  # Read-only GET — no approval needed
 )
 def api_call_with_retry(endpoint: str, max_retries: int = 3) -> str:
     """Make API call with exponential backoff retry."""
@@ -854,7 +860,7 @@ from dcaf.llm import BedrockLLM
 from dcaf.agents import ToolCallingAgent
 from dcaf.tools import tool
 
-@tool(schema={...})
+@tool(schema={...}, requires_approval=False)
 def my_tool(param: str) -> str:
     return f"Result: {param}"
 
@@ -909,7 +915,7 @@ def test_agent_uses_tool():
 ### 3. Validate Early, Fail Fast
 
 ```python
-@tool(schema={...})
+@tool(schema={...}, requires_approval=True)
 def create_resource(name: str, config: dict) -> str:
     # Validate immediately
     if not name:
@@ -936,7 +942,7 @@ return "Done"
 ### 5. Handle Errors Gracefully
 
 ```python
-@tool(schema={...})
+@tool(schema={...}, requires_approval=False)
 def api_call(endpoint: str) -> str:
     try:
         response = requests.get(endpoint)
@@ -952,17 +958,19 @@ def api_call(endpoint: str) -> str:
         return f"Error: Unexpected error - {str(e)}"
 ```
 
-### 6. Use Appropriate Approval Settings
+### 6. Always Set `requires_approval` Explicitly
+
+The default is `requires_approval=True` (safe by default). Omitting it means the tool will pause for human approval even if you didn't intend that. **Always set it explicitly** so the behavior is obvious to readers.
 
 ```python
-# Read operations - no approval needed
+# Read operations - set False explicitly
 @tool(schema={...}, requires_approval=False)
 def list_resources(): ...
 
 @tool(schema={...}, requires_approval=False)
 def get_status(): ...
 
-# Write operations - approval recommended
+# Write operations - set True explicitly (even though it's the default)
 @tool(schema={...}, requires_approval=True)
 def create_resource(): ...
 
@@ -978,7 +986,8 @@ def delete_resource(): ...
         "name": "tenant_specific_action",
         "description": "Perform action in current tenant. Requires tenant_name and duplo_token in platform context.",
         "input_schema": {...}
-    }
+    },
+    requires_approval=True  # Set explicitly based on whether this mutates state
 )
 def tenant_specific_action(data: str, platform_context: dict) -> str:
     """

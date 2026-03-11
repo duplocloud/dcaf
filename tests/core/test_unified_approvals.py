@@ -261,7 +261,7 @@ class TestProcessApprovals:
             }
         ]
 
-        result = adapter._process_approvals(messages_list, {})
+        result = adapter._process_approvals(adapter._normalize_approvals(messages_list), {})
 
         assert len(result) == 1
         assert result[0].id == "ap-1"
@@ -293,7 +293,7 @@ class TestProcessApprovals:
             }
         ]
 
-        result = adapter._process_approvals(messages_list, {})
+        result = adapter._process_approvals(adapter._normalize_approvals(messages_list), {})
 
         assert len(result) == 1
         assert result[0].id == "ap-2"
@@ -351,7 +351,7 @@ class TestProcessApprovals:
             }
         ]
 
-        result = adapter._process_approvals(messages_list, {})
+        result = adapter._process_approvals(adapter._normalize_approvals(messages_list), {})
 
         assert len(result) == 2
         assert result[0].output == "pod1"
@@ -383,7 +383,7 @@ class TestProcessApprovals:
             }
         ]
 
-        result = adapter._process_approvals(messages_list, {})
+        result = adapter._process_approvals(adapter._normalize_approvals(messages_list), {})
 
         assert len(result) == 1
         assert result[0].type == "command"

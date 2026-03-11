@@ -18,7 +18,7 @@ def _make_adapter(**kwargs):
 
 class TestProcessApprovedCommandsReceivesContext:
     def test_context_is_passed_to_execute_cmd(self):
-        """_process_approved_commands must forward platform_context to _execute_cmd."""
+        """data.cmds[] commands must forward platform_context to _execute_cmd."""
         adapter = _make_adapter()
         ctx = {"tenant_name": "acme", "kubeconfig": "/home/user/.kube/config"}
 
@@ -30,7 +30,8 @@ class TestProcessApprovedCommandsReceivesContext:
                     "data": {"cmds": [{"command": "kubectl get pods", "execute": True}]},
                 }
             ]
-            adapter._process_approved_commands(messages, ctx)
+            normalized = adapter._normalize_approvals(messages)
+            adapter._process_approvals(normalized, ctx)
             mock_exec.assert_called_once_with("kubectl get pods", files=None, context=ctx)
 
     def test_empty_context_is_forwarded(self):
@@ -43,7 +44,8 @@ class TestProcessApprovedCommandsReceivesContext:
                     "data": {"cmds": [{"command": "ls", "execute": True}]},
                 }
             ]
-            adapter._process_approved_commands(messages, {})
+            normalized = adapter._normalize_approvals(messages)
+            adapter._process_approvals(normalized, {})
             mock_exec.assert_called_once_with("ls", files=None, context={})
 
 
@@ -69,7 +71,8 @@ class TestProcessApprovedCommandsPassesFiles:
                     },
                 }
             ]
-            adapter._process_approved_commands(messages, {})
+            normalized = adapter._normalize_approvals(messages)
+            adapter._process_approvals(normalized, {})
             mock_exec.assert_called_once_with("helm install myapp .", files=files, context={})
 
     def test_no_files_passes_none(self):
@@ -82,7 +85,8 @@ class TestProcessApprovedCommandsPassesFiles:
                     "data": {"cmds": [{"command": "ls", "execute": True}]},
                 }
             ]
-            adapter._process_approved_commands(messages, {})
+            normalized = adapter._normalize_approvals(messages)
+            adapter._process_approvals(normalized, {})
             mock_exec.assert_called_once_with("ls", files=None, context={})
 
 
@@ -185,8 +189,8 @@ class TestCustomExecutorCallback:
         result = adapter._execute_cmd("echo default", files=None, context={})
         assert "default" in result
 
-    def test_custom_executor_wires_through_process_approved_commands(self):
-        """Custom executor is called end-to-end from _process_approved_commands."""
+    def test_custom_executor_wires_through_unified_path(self):
+        """Custom executor is called end-to-end via the unified approval path."""
         calls: list[str] = []
 
         def my_executor(command, files, context):
@@ -201,9 +205,11 @@ class TestCustomExecutorCallback:
                 "data": {"cmds": [{"command": "kubectl get pods", "execute": True}]},
             }
         ]
-        results = adapter._process_approved_commands(messages, {})
+        normalized = adapter._normalize_approvals(messages)
+        executed_approvals = adapter._process_approvals(normalized, {})
+        cmds, _ = adapter._fan_out_executed(executed_approvals)
         assert calls == ["kubectl get pods"]
-        assert results[0].output == "custom result"
+        assert cmds[0].output == "custom result"
 
 
 def _make_agent_that_streams(*events):
@@ -335,6 +341,7 @@ class TestThreadIdFlowsThroughContext:
             }
         ]
         ctx = adapter._extract_platform_context(messages)
-        adapter._process_approved_commands(messages, ctx)
+        normalized = adapter._normalize_approvals(messages)
+        adapter._process_approvals(normalized, ctx)
 
         assert received[0].get("thread_id") == "thread-abc"
