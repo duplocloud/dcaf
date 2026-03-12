@@ -77,6 +77,7 @@ from .models import ChatMessage, normalize_messages
 from .schemas.events import (
     DoneEvent,
     ErrorEvent,
+    ExecutedToolCallsEvent,
     IntermittentUpdateEvent,
     TextDeltaEvent,
     ToolCallsEvent,
@@ -199,6 +200,8 @@ class AgentResponse(LLMResponse):
 
     # Internal reference for continuing
     _agent: "Agent | None" = field(repr=False, default=None)
+    # Internal DTO from AgentService — carries rejected/executed tool calls for serialization
+    _internal_dto: Any = field(repr=False, default=None)
 
     def approve_all(self) -> "AgentResponse":
         """Approve all pending tool calls and continue execution."""
@@ -229,26 +232,51 @@ class AgentResponse(LLMResponse):
         """
         from dcaf.core.schemas.messages import AgentMessage, Data, ToolCall
 
-        # Build tool_calls for the Data container
-        tool_calls = []
-        for tc in self.pending_tools:
-            tool_calls.append(
+        # Prefer DTO data (has status, rejection_reason, executed_tool_calls) when available.
+        # Fall back to pending_tools for backwards compatibility.
+        dto = self._internal_dto
+        if dto is not None and hasattr(dto, "data"):
+            # Build ToolCall schema objects from DTO (includes status + rejection_reason)
+            tool_calls = []
+            for tc in getattr(dto.data, "tool_calls", []):
+                tool_calls.append(
+                    ToolCall(
+                        id=str(tc.id) if hasattr(tc, "id") else tc.get("id", ""),
+                        name=tc.name if hasattr(tc, "name") else tc.get("name", ""),
+                        input=tc.input if hasattr(tc, "input") else tc.get("input", {}),
+                        execute=getattr(tc, "execute", False),
+                        tool_description=getattr(tc, "tool_description", ""),
+                        input_description=getattr(tc, "input_description", {}),
+                        intent=getattr(tc, "intent", None),
+                        rejection_reason=getattr(tc, "rejection_reason", None),
+                        status=getattr(tc, "status", None),
+                        requires_approval=getattr(tc, "requires_approval", True),
+                    )
+                )
+            executed_tool_calls = list(getattr(dto.data, "executed_tool_calls", []))
+        else:
+            # Fallback: only pending tools are available
+            tool_calls = [
                 ToolCall(
                     id=tc.id,
                     name=tc.name,
                     input=tc.input,
-                    execute=False,  # Pending approval
+                    execute=False,
                     tool_description=tc.description or "",
                     input_description={},
+                    status="pending",
+                    requires_approval=True,
                 )
-            )
+                for tc in self.pending_tools
+            ]
+            executed_tool_calls = []
 
         # Build Data container with session
         data = Data(
             tool_calls=tool_calls,
             cmds=[],
             executed_cmds=[],
-            executed_tool_calls=[],
+            executed_tool_calls=executed_tool_calls,
             session=self.session,
         )
 
@@ -1089,7 +1117,8 @@ class Agent:
                     # Convert internal stream events to server stream events
                     server_event = self._convert_stream_event(event, pending_tool_calls)
                     if server_event and self._is_new_update(server_event, seen_update_texts):
-                        yield server_event
+                        async for out in self._gate_stream_event(server_event, platform_context):
+                            yield out
 
                 # Final drain after the runtime loop ends
                 while user_events:
@@ -1276,6 +1305,107 @@ class Agent:
 
         return None
 
+    async def _gate_stream_event(
+        self,
+        event: "ServerStreamEvent",
+        platform_context: "PlatformContext | None",
+    ) -> "AsyncIterator[ServerStreamEvent]":
+        """Yield events, applying the permission policy to ToolCallsEvents.
+
+        Extracted from run_stream to keep that method's branch count under the
+        PLR0912 threshold.
+        """
+        if (
+            isinstance(event, ToolCallsEvent)
+            and event.tool_calls
+            and platform_context
+            and platform_context.permissions
+        ):
+            for policy_event in self._apply_stream_policy(event, platform_context):
+                yield policy_event
+        else:
+            yield event
+
+    def _apply_stream_policy(
+        self,
+        event: "ToolCallsEvent",
+        platform_context: "PlatformContext",
+    ) -> "list[ServerStreamEvent]":
+        """Apply permission policy to streaming tool calls.
+
+        Called when Agno pauses (requires_confirmation=True) and emits a
+        TOOL_CALLS event.  Splits tool calls into three buckets:
+          - blocked  → TextDeltaEvent with rejection message
+          - HITL     → ToolCallsEvent (pending approval)
+          - allowed  → execute immediately, ExecutedToolCallsEvent
+
+        Returns a list of zero or more events to yield in place of the
+        original ToolCallsEvent.
+        """
+        from .schemas.messages import ExecutedToolCall as ExecSchema
+
+        policy = self._agent_service._policy
+
+        pending: list[SchemaToolCall] = []
+        executed: list[ExecSchema] = []
+        blocked_reasons: list[str] = []
+
+        for tc in event.tool_calls:
+            tool_obj = next((t for t in self.tools if t.name == tc.name), None)
+
+            class _FallbackTool:  # noqa: N801
+                name = tc.name
+                requires_approval = True
+
+            tool_for_policy = tool_obj or _FallbackTool()
+            decision = policy.check(tool_for_policy, platform_context, tc.input)
+
+            if decision.is_blocked:
+                blocked_reasons.append(decision.reason or "blocked by permission policy")
+
+            elif decision.requires_approval:
+                tc_with_status = SchemaToolCall(
+                    id=tc.id,
+                    name=tc.name,
+                    input=tc.input,
+                    execute=False,
+                    tool_description=getattr(tc, "tool_description", ""),
+                    input_description=getattr(tc, "input_description", {}),
+                    status="pending",
+                    requires_approval=True,
+                )
+                pending.append(tc_with_status)
+
+            else:
+                # Auto-execute
+                output = ""
+                if tool_obj:
+                    try:
+                        output = (
+                            tool_obj.execute(
+                                tc.input,
+                                platform_context.to_dict()
+                                if tool_obj.requires_platform_context
+                                else None,
+                            )
+                            or ""
+                        )
+                    except Exception as exc:
+                        output = f"Error: {exc}"
+                executed.append(ExecSchema(id=tc.id, name=tc.name, input=tc.input, output=output))
+
+        out: list[ServerStreamEvent] = []
+        if blocked_reasons:
+            reasons = "; ".join(blocked_reasons)
+            out.append(
+                TextDeltaEvent(text=f"The request was blocked by the permission policy: {reasons}")
+            )
+        if pending:
+            out.append(ToolCallsEvent(tool_calls=pending))
+        if executed:
+            out.append(ExecutedToolCallsEvent(executed_tool_calls=executed))
+        return out
+
     # Private methods
 
     def _convert_response(self, internal: Any, session: Session | None = None) -> AgentResponse:
@@ -1308,6 +1438,7 @@ class Agent:
             is_complete=getattr(internal, "is_complete", True),
             session=session_data,
             _agent=self,
+            _internal_dto=internal,
         )
 
     def _approve_all_and_continue(self, conversation_id: str) -> AgentResponse:

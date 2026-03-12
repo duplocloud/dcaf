@@ -31,6 +31,8 @@ class ToolCall(BaseModel):
     input_description: dict[str, Any]
     intent: str | None = None
     rejection_reason: str | None = None
+    status: str | None = None
+    requires_approval: bool = True
 
 
 class ExecutedToolCall(BaseModel):

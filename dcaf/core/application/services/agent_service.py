@@ -14,7 +14,14 @@ from ...domain.value_objects import (
     ToolInput,
 )
 from ..dto.requests import AgentRequest
-from ..dto.responses import AgentResponse, DataDTO, StreamEvent, StreamEventType, ToolCallDTO
+from ..dto.responses import (
+    AgentResponse,
+    DataDTO,
+    ExecutedToolCallDTO,
+    StreamEvent,
+    StreamEventType,
+    ToolCallDTO,
+)
 from ..ports.agent_runtime import AgentRuntime
 from ..ports.conversation_repository import ConversationRepository
 from ..ports.event_publisher import EventPublisher
@@ -378,7 +385,8 @@ class AgentService:
             conversation.add_assistant_message(runtime_response.text)
 
         # Process tool calls
-        processed_tool_calls = []
+        processed_tool_calls: list[ToolCallDTO] = []
+        executed_tool_call_dtos: list[ExecutedToolCallDTO] = []
         for tc_dto in runtime_response.tool_calls:
             # Find the registered tool (may be None for runtime-only tools)
             tool = self._find_tool(tc_dto.name, tools)
@@ -424,12 +432,35 @@ class AgentService:
                         tool_call.start_execution()
                         tool_call.fail(str(e))
 
-                processed_tool_calls.append(ToolCallDTO.from_tool_call(tool_call))
+                # Auto-executed calls go to executed_tool_calls for wire-format clarity
+                executed_tool_call_dtos.append(
+                    ExecutedToolCallDTO(
+                        id=str(tool_call.id),
+                        name=tool_call.tool_name,
+                        input=tool_call.input.parameters,
+                        output=tool_call.result or tool_call.error or "",
+                    )
+                )
+
+        # Synthesize a rejection message when tools were blocked and there's no LLM text.
+        # This happens when Agno pauses before execution (requires_confirmation=True) and
+        # the policy hard-denies all tool calls, leaving text empty.
+        response_text = runtime_response.text
+        if not response_text:
+            blocked = [tc for tc in processed_tool_calls if tc.status == "rejected"]
+            if blocked:
+                reasons = "; ".join(
+                    tc.rejection_reason or "blocked by permission policy" for tc in blocked
+                )
+                response_text = f"The request was blocked by the permission policy: {reasons}"
 
         return AgentResponse(
             conversation_id=str(conversation.id),
-            text=runtime_response.text,
-            data=DataDTO(tool_calls=processed_tool_calls),
+            text=response_text,
+            data=DataDTO(
+                tool_calls=processed_tool_calls,
+                executed_tool_calls=executed_tool_call_dtos,
+            ),
             has_pending_approvals=conversation.has_pending_approvals,
             is_complete=not conversation.has_pending_approvals,
         )

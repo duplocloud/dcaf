@@ -425,15 +425,32 @@ def create_app(
         try:
             result = await _invoke_agent(adapter, agent_input)
 
-            # Build response
+            # Build response — include full data + meta_data for permission/HITL clients
             response: dict[str, Any] = {
                 "role": result.role if hasattr(result, "role") else "assistant",
                 "content": result.content if hasattr(result, "content") else str(result),
             }
 
-            # Echo request_fields in meta_data.request_context if present
-            if request_fields:
+            # Include data (tool_calls, executed_tool_calls, etc.) when present
+            if hasattr(result, "data"):
+                data_dict = result.data.model_dump(exclude_none=True)
+                if any(data_dict.get(k) for k in ("tool_calls", "executed_tool_calls", "cmds")):
+                    response["data"] = data_dict
+
+            # Merge meta_data (has_pending_approvals, is_complete) into response
+            if hasattr(result, "meta_data") and result.meta_data:
+                meta = result.meta_data
+                if request_fields:
+                    meta = {**meta, "request_context": request_fields}
+                response["meta_data"] = meta
+            elif request_fields:
                 response["meta_data"] = {"request_context": request_fields}
+
+            # Promote key meta_data fields to top level for easy client access
+            if hasattr(result, "meta_data") and result.meta_data:
+                for key in ("has_pending_approvals", "is_complete"):
+                    if key in result.meta_data:
+                        response[key] = result.meta_data[key]
 
             return response
 

@@ -929,10 +929,19 @@ class AgnoAdapter:
             # Note: Agno infers parameter schema from function signature automatically.
             # We only pass name and description - 'parameters' is NOT a valid Agno arg.
             # requires_confirmation tells Agno to pause before executing (HITL).
+            #
+            # When platform_context carries permission rules, ALL tools must pause so
+            # AgentService._process_response can gate execution via ApprovalPolicy
+            # (deny → reject, no-match → HITL, allow → execute via tool.execute()).
+            # Without this, Agno executes tools before the policy check runs.
+            has_permissions = bool(platform_context and platform_context.get("permissions"))
+            confirmation_required = (
+                True if has_permissions else (tool_obj.requires_approval or None)
+            )
             decorated_tool = agno_tool_decorator(
                 name=tool_schema["name"],
                 description=tool_schema["description"],
-                requires_confirmation=tool_obj.requires_approval or None,
+                requires_confirmation=confirmation_required,
             )(func_to_wrap)
 
             agno_tools.append(decorated_tool)
