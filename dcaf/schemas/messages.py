@@ -1,7 +1,7 @@
 from typing import List, Optional, Dict, Any, Literal, Union
 from datetime import datetime
 
-from pydantic import BaseModel, Field, HttpUrl
+from pydantic import BaseModel, Field, HttpUrl, model_validator
 
 
 class FileObject(BaseModel):
@@ -69,10 +69,24 @@ class User(BaseModel):
     name: str
     id: str
 
+    @model_validator(mode="before")
+    @classmethod
+    def coerce_string(cls, v):
+        if isinstance(v, str):
+            return {"name": v, "id": v}
+        return v
+
 
 class Agent(BaseModel):
     name: str
     id: str
+
+    @model_validator(mode="before")
+    @classmethod
+    def coerce_string(cls, v):
+        if isinstance(v, str):
+            return {"name": v, "id": v}
+        return v
 
 
 class Message(BaseModel):
