@@ -63,7 +63,7 @@ class BedrockLLM(LLM):
         model_id: str,
         max_tokens: int = 1000,
         temperature: float = 0.0,
-        top_p: float = 0.9,
+        top_p: Optional[float] = None,
         system_prompt: Optional[str] = None,
         tools: Optional[List[Dict[str, Any]]] = None,
         tool_choice: Optional[Union[str, Dict[str, Any]]] = None,
@@ -94,28 +94,34 @@ class BedrockLLM(LLM):
         
         logger.info(f"Invoking model {model_id} with Converse API")
         logger.debug(f"Messages: {messages}")
-        
+        logger.debug(f"Inference parameters - max_tokens: {max_tokens}, temperature: {temperature}, top_p: {top_p}")
+
         # Normalize messages to ensure proper role alternation
         messages = self.normalize_message_roles(messages)
-        
+
         # Build the request
         request = {
             'modelId': model_id,
             'messages': self._format_messages(messages)
         }
-        
+
         # Add system prompt if provided
         if system_prompt:
             request['system'] = [{'text': system_prompt}]
-        
+            logger.debug(f"System prompt added (length: {len(system_prompt)})")
+
         # Add inference configuration
         inference_config = {
             'maxTokens': max_tokens,
             'temperature': temperature,
         }
-        if top_p:
+        if top_p is not None:
             inference_config['topP'] = top_p
+            logger.debug(f"topP parameter included in inference config: {top_p}")
+        else:
+            logger.debug("topP parameter is None, excluding from inference config (Bedrock will use default)")
         request['inferenceConfig'] = inference_config
+        logger.debug(f"Final inference config: {inference_config}")
         
         # Add tool configuration if provided
         if tools:
