@@ -112,8 +112,9 @@ class BedrockLLM(LLM):
         inference_config = {
             'maxTokens': max_tokens,
             'temperature': temperature,
-            'topP': top_p
         }
+        if top_p:
+            inference_config['topP'] = top_p
         request['inferenceConfig'] = inference_config
         
         # Add tool configuration if provided
